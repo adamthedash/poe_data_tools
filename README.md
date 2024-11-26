@@ -4,6 +4,11 @@
 
 ## Dump files
 
+
+# Bundle File format
+![bundle file format](./images/bundle_spec.png)
+
+
 **TODO List**
 - Group files by their bundle before processing so we don't re-read the bundle a bunch of times
 - Directly use Murmur64A as the Hasher for my LUTs, rather than using the hashes as keys with the default Hasher
