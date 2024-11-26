@@ -23,7 +23,7 @@ Files to extract are read from stdin, one per line.
 ### Usage
 From source (requires Rust to be installed)
 ```bash
-cargo run --release --bin dump_files -- /path/to/poe/steam_folder
+cargo run --release --bin dump_files -- /path/to/poe/steam_folder /path/to/output/folder
 ```
 
 Using executable file
