@@ -11,13 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: [ubuntu-latest] # Platforms to build for
+        platform: [ubuntu-latest]
         include:
           - platform: ubuntu-latest
             target: x86_64-unknown-linux-gnu
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
@@ -29,44 +29,31 @@ jobs:
       - name: Install Dependencies
         run: rustup target add ${{ matrix.target }}
 
-      - name: Build Binary - dump_paths
-        run: cargo build --release --target ${{ matrix.target }} --bin dump_paths
+      - name: Build Binaries
+        run: |
+          for bin in dump_paths dump_files; do
+            cargo build --release --target ${{ matrix.target }} --bin $bin
+          done
 
-      - name: Build Binary - dump_files
-        run: cargo build --release --target ${{ matrix.target }} --bin dump_files
-
-      - name: Upload Artifacts - dump_paths
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: dump_paths-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/dump_paths
-
-      - name: Upload Artifacts - dump_files
-        uses: actions/upload-artifact@v3
-        with:
-          name: dump_files-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/dump_files
+          name: binaries-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/
 
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download Artifacts - dump_paths
+      - name: Download Artifacts
         uses: actions/download-artifact@v3
         with:
-          name: dump_paths-${{ matrix.target }}
-          path: binaries/dump_paths
-
-      - name: Download Artifacts - dump_files
-        uses: actions/download-artifact@v3
-        with:
-          name: dump_files-${{ matrix.target }}
-          path: binaries/dump_files
+          name: binaries-${{ needs.build.outputs.platform }}
+          path: binaries/${{ needs.build.outputs.platform }}
 
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: |
-            binaries/dump_paths/*
-            binaries/dump_files/*
+          artifacts: binaries/*
           token: ${{ secrets.GITHUB_TOKEN }}
+
