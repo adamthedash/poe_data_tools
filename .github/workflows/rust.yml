@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: [ubuntu-latest, windows-latest] # Platforms to build for
+        platform: [ubuntu-latest] # Platforms to build for
         include:
           - platform: ubuntu-latest
             target: x86_64-unknown-linux-gnu
