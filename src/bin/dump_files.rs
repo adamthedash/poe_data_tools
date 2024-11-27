@@ -1,6 +1,10 @@
+#![feature(hash_raw_entry)]
+
 use clap::Parser;
-use murmurhash64::murmur_hash64a;
-use poe_game_data_parser::{bundle::load_bundle_content, bundle_index::load_index_file};
+use poe_game_data_parser::{
+    bundle::load_bundle_content, bundle_index::load_index_file, hasher::BuildMurmurHash64A,
+};
+use std::hash::{BuildHasher, Hasher};
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -34,15 +38,17 @@ fn main() {
         .collect::<HashMap<_, _>>();
 
     // Output folder
-
-    let hash_seed = 0x1337b33f;
+    let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
 
     // Process input filenames
     let stdin = io::stdin().lock();
     stdin.lines().for_each(|l| {
         // Look up the filename
         let filename = l.expect("Failed to read line from stdin.");
-        let hash = murmur_hash64a(filename.to_lowercase().as_bytes(), hash_seed);
+        let mut hasher = hash_builder.build_hasher();
+        hasher.write(filename.to_lowercase().as_bytes());
+        let hash = hasher.finish();
+
         let file = file_lut
             .get(&hash)
             .unwrap_or_else(|| panic!("File not found: {}", filename));
