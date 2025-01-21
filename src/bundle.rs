@@ -8,6 +8,8 @@ use nom::{
 };
 use oozextract::Extractor;
 
+use crate::bundle_loader::Loader;
+
 /// Encoded as a u32
 #[derive(Debug)]
 pub enum FirstFileEncode {
@@ -137,6 +139,15 @@ pub fn load_bundle_content(path: &Path) -> Vec<u8> {
     // todo: figure how to properly do error propogation with nom
     let bundle_content = fs::read(path).expect("Failed to read bundle file");
 
+    let (_, bundle) = parse_bundle(&bundle_content).expect("Failed to parse bundle");
+    bundle.read_content()
+}
+
+// Fetch a bundle file from the CDN (or cache)
+pub fn fetch_bundle_content(patch: &str, cache_dir: &Path, path: &Path) -> Vec<u8> {
+    let bundle_content = Loader::new(patch, cache_dir.to_str().unwrap())
+        .load(path)
+        .expect("Failed to load bundle");
     let (_, bundle) = parse_bundle(&bundle_content).expect("Failed to parse bundle");
     bundle.read_content()
 }

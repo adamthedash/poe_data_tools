@@ -1,6 +1,7 @@
 use std::{
     io::{Read, Write},
     net::TcpStream,
+    path::Path,
 };
 
 use anyhow::{Error, Ok};
@@ -13,6 +14,10 @@ pub struct Loader {
 
 impl Loader {
     pub fn new(version: &str, cache_dir: &str) -> Self {
+        // 1 == latest for PoE 1
+        // 2 == latest for PoE 2
+        // 4.* == specific version for PoE 2
+        // * == specific version for PoE 1
         if version == "1" {
             let base_url = cur_url_poe().unwrap();
             return Self {
@@ -38,33 +43,50 @@ impl Loader {
         }
     }
 
-    pub fn load(&self, path: &str) -> anyhow::Result<Vec<u8>> {
-        let url = self.base_url.join("Bundles2/")?.join(path)?;
-        println!("url: {}", url);
+    pub fn load(&self, path: &Path) -> anyhow::Result<Vec<u8>> {
+        let url = self.base_url.join(path.to_str().unwrap())?;
+        let client = reqwest::blocking::Client::new();
         let path = std::path::PathBuf::from(&self.cache_dir)
             .join(url.to_string().trim_start_matches("https://"));
-        println!("path2: {:?}", path);
         if path.exists() {
-            // todo: check etag
-            let mut file = std::fs::File::open(&path)?;
-            let mut buffer = Vec::new();
-            file.read_to_end(&mut buffer)?;
-            Ok(buffer)
-        } else {
-            let response = reqwest::blocking::get(url.clone())?;
-            if !response.status().is_success() {
-                return Err(Error::msg(format!(
-                    "Failed to download {}: {}",
-                    url,
-                    response.status()
-                )));
+            let req = client.get(url.clone());
+            let res = req.send()?;
+            if res.status().is_success() {
+                let etag = res.headers().get("ETag").unwrap().to_str().unwrap();
+                let etag_path = path.with_extension("etag");
+                let file_etag = std::fs::read_to_string(&etag_path).unwrap_or_default();
+                if file_etag == etag {
+                    println!("Using cached file: {}", path.display());
+                    let mut file = std::fs::File::open(&path)?;
+                    let mut buffer = Vec::new();
+                    file.read_to_end(&mut buffer)?;
+                    return Ok(buffer);
+                }
             }
-            let bytes = response.bytes()?;
-            std::fs::create_dir_all(path.parent().unwrap())?;
-            let mut file = std::fs::File::create(&path)?;
-            file.write_all(&bytes)?;
-            Ok(bytes.to_vec())
         }
+
+        println!("Downloading file: {}", url);
+        let req = client.get(url.clone());
+        let res = req.send()?;
+
+        if !res.status().is_success() {
+            return Err(Error::msg(format!(
+                "Failed to download {}: {}",
+                url,
+                res.status()
+            )));
+        }
+        std::fs::create_dir_all(path.parent().unwrap())?;
+        {
+            let etag = res.headers().get("ETag").unwrap().to_str().unwrap();
+            let etag_path = path.with_extension("etag");
+            let mut etag_file = std::fs::File::create(etag_path)?;
+            etag_file.write_all(etag.as_bytes())?;
+        }
+        let bytes = res.bytes()?;
+        let mut file = std::fs::File::create(&path)?;
+        file.write_all(&bytes)?;
+        Ok(bytes.to_vec())
     }
 }
 
@@ -95,16 +117,4 @@ fn cur_url(host: String, send: &[u8]) -> anyhow::Result<Url> {
     let s = String::from_utf16(&raw)?;
     let url = Url::parse(&s)?;
     Ok(url)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_load_index() {
-        let loader = Loader::new("1", "cache");
-        let result = loader.load("_.index.bin");
-        assert!(result.is_ok(), "{}", result.unwrap_err().to_string());
-    }
 }

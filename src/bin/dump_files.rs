@@ -1,6 +1,8 @@
 #![feature(hash_raw_entry)]
 
 use clap::Parser;
+use poe_game_data_parser::bundle::fetch_bundle_content;
+use poe_game_data_parser::bundle_index::{fetch_index_file, BundleIndex};
 use poe_game_data_parser::{
     bundle::load_bundle_content, bundle_index::load_index_file, hasher::BuildMurmurHash64A,
 };
@@ -17,9 +19,17 @@ use std::{
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// The path to the Path of Exile folder for steam
-    steam_folder: PathBuf,
+    /// The path to the Path of Exile folder for steam - if not provided, will fetch from the CDN
+    #[arg(short, long)]
+    steam_folder: Option<PathBuf>,
+    /// Version of the game to use: 1 for PoE 1, 2 for PoE 2, or a specific CDN patch version
+    #[arg(short, long, default_value = "1")]
+    patch: String,
+    /// The path to the dir to store the local CDN cache
+    #[arg(short, long, default_value=dirs::cache_dir().unwrap().join("poe_data_tools").into_os_string())]
+    cache_dir: PathBuf,
     /// The folder to which to output extracted files
+    #[arg(short, long)]
     output_folder: PathBuf,
 }
 
@@ -27,8 +37,17 @@ fn main() {
     let args = Cli::parse();
 
     // Load up index file
-    let index_path = args.steam_folder.as_path().join("Bundles2/_.index.bin");
-    let index = load_index_file(index_path.as_ref());
+    let index: BundleIndex;
+    if let Some(steam_folder) = &args.steam_folder {
+        let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
+        index = load_index_file(index_path.as_ref());
+    } else {
+        index = fetch_index_file(
+            args.patch.as_str(),
+            args.cache_dir.as_ref(),
+            PathBuf::from("Bundles2/_.index.bin").as_ref(),
+        );
+    }
 
     // Effficient LUT for filenames -> bundle
     let file_lut = index
@@ -61,12 +80,25 @@ fn main() {
 
     // Pull out the data
     files.iter().for_each(|(&bundle_index, bundle_files)| {
-        // Go get the bundle where the data is
-        let bundle_path = args.steam_folder.as_path().join(format!(
-            "Bundles2/{}.bundle.bin",
-            index.bundles[bundle_index as usize].name
-        ));
-        let bundle = load_bundle_content(bundle_path.as_path());
+        // Load up bundle file
+        let bundle: Vec<u8>;
+        if let Some(steam_folder) = &args.steam_folder {
+            let bundle_path = steam_folder.as_path().join(format!(
+                "Bundles2/{}.bundle.bin",
+                index.bundles[bundle_index as usize].name
+            ));
+            bundle = load_bundle_content(bundle_path.as_ref());
+        } else {
+            bundle = fetch_bundle_content(
+                args.patch.as_str(),
+                args.cache_dir.as_ref(),
+                PathBuf::from(format!(
+                    "Bundles2/{}.bundle.bin",
+                    index.bundles[bundle_index as usize].name
+                ))
+                .as_ref(),
+            );
+        }
 
         // Extract all the files we want
         bundle_files.iter().for_each(|(filename, file)| {
