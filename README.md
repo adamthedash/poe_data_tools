@@ -50,7 +50,6 @@ dump_files --help
 
 **TODO List**
 
-- Support PoE 2 index format
 - Directly use Murmur64A as the Hasher for my LUTs, rather than using the hashes as keys with the default Hasher
 - Proper error propogation in the lib crate using Anyhow
 - Proper documentation for the lib crate

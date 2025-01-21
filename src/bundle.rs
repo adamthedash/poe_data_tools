@@ -15,6 +15,7 @@ use crate::bundle_loader::Loader;
 pub enum FirstFileEncode {
     Kraken6 = 8,
     MermaidA = 9,
+    Bitknit = 12,
     LeviathanC = 13,
 }
 
@@ -23,6 +24,7 @@ impl FirstFileEncode {
         match value {
             8 => Some(Self::Kraken6),
             9 => Some(Self::MermaidA),
+            12 => Some(Self::Bitknit),
             13 => Some(Self::LeviathanC),
             _ => None,
         }
