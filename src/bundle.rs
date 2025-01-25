@@ -4,7 +4,7 @@ use nom::{
     bytes::complete::take,
     multi::count,
     number::complete::{le_u32, le_u64},
-    IResult,
+    Finish, IResult,
 };
 use oozextract::Extractor;
 
@@ -137,6 +137,8 @@ pub fn load_bundle_content(path: &Path) -> Vec<u8> {
     // todo: figure how to properly do error propogation with nom
     let bundle_content = fs::read(path).expect("Failed to read bundle file");
 
-    let (_, bundle) = parse_bundle(&bundle_content).expect("Failed to parse bundle");
+    let (_, bundle) = parse_bundle(&bundle_content)
+        .finish()
+        .expect("Failed to parse bundle");
     bundle.read_content()
 }

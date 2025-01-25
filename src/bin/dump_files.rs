@@ -51,7 +51,7 @@ fn main() {
 
         let file = *file_lut
             .get(&hash)
-            .unwrap_or_else(|| panic!("File not found: {}", filename));
+            .unwrap_or_else(|| panic!("File not found: {:?}", filename));
 
         files
             .entry(file.bundle_index)
