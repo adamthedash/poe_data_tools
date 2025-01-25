@@ -8,7 +8,7 @@ use nom::{
     IResult,
 };
 
-use crate::bundle::{load_bundle_content, parse_bundle};
+use crate::bundle::{fetch_bundle_content, load_bundle_content, parse_bundle};
 
 #[derive(Debug)]
 pub struct BundleInfo {
@@ -135,6 +135,14 @@ pub fn parse_bundle_index(input: &[u8]) -> IResult<&[u8], BundleIndex> {
 /// Load an index file from disk
 pub fn load_index_file(path: &Path) -> BundleIndex {
     let index_content = load_bundle_content(path);
+    let (_, index) = parse_bundle_index(&index_content).expect("Failed to parse bundle as index");
+
+    index
+}
+
+/// Fetch an index file from the CDN (or cache)
+pub fn fetch_index_file(patch: &str, cache_dir: &Path, path: &Path) -> BundleIndex {
+    let index_content = fetch_bundle_content(patch, cache_dir, path);
     let (_, index) = parse_bundle_index(&index_content).expect("Failed to parse bundle as index");
 
     index

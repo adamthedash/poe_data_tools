@@ -1,5 +1,5 @@
 use clap::Parser;
-use poe_game_data_parser::bundle_index::load_index_file;
+use poe_game_data_parser::bundle_index::{fetch_index_file, load_index_file, BundleIndex};
 use poe_game_data_parser::path::parse_paths;
 use std::io::Write;
 use std::{
@@ -12,16 +12,32 @@ use std::{
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// The path to the Path of Exile folder for steam
-    steam_folder: PathBuf,
+    /// Version of the game to use: 1 for PoE 1, 2 for PoE 2, or a specific CDN patch version
+    #[arg(short, long, default_value = "1")]
+    patch: String,
+    /// The path to the Path of Exile folder for steam - if not provided, will fetch from the CDN
+    #[arg(short, long)]
+    steam_folder: Option<PathBuf>,
+    /// The path to the dir to store the local CDN cache
+    #[arg(short, long, default_value=dirs::cache_dir().unwrap().join("poe_data_tools").into_os_string())]
+    cache_dir: PathBuf,
 }
 
 fn main() {
     let args = Cli::parse();
 
     // Load up index file
-    let index_path = args.steam_folder.as_path().join("Bundles2/_.index.bin");
-    let index = load_index_file(index_path.as_ref());
+    let index: BundleIndex;
+    if let Some(steam_folder) = args.steam_folder {
+        let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
+        index = load_index_file(index_path.as_ref());
+    } else {
+        index = fetch_index_file(
+            args.patch.as_str(),
+            args.cache_dir.as_ref(),
+            PathBuf::from("Bundles2/_.index.bin").as_ref(),
+        );
+    }
 
     // Use a buffered writer since we're dumping a lot of data
     let stdout = io::stdout().lock();
