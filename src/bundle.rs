@@ -8,7 +8,7 @@ use nom::{
 };
 use oozextract::Extractor;
 
-use crate::bundle_loader::Loader;
+use crate::bundle_loader::CDNLoader;
 
 /// Encoded as a u32
 #[derive(Debug)]
@@ -147,7 +147,7 @@ pub fn load_bundle_content(path: &Path) -> Vec<u8> {
 
 // Fetch a bundle file from the CDN (or cache)
 pub fn fetch_bundle_content(patch: &str, cache_dir: &Path, path: &Path) -> Vec<u8> {
-    let bundle_content = Loader::new(patch, cache_dir.to_str().unwrap())
+    let bundle_content = CDNLoader::new(patch, cache_dir.to_str().unwrap())
         .load(path)
         .expect("Failed to load bundle");
     let (_, bundle) = parse_bundle(&bundle_content).expect("Failed to parse bundle");
