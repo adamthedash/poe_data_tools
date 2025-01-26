@@ -1,11 +1,10 @@
-$STEAM_FOLDER = "E:\SteamLibrary\steamapps\common\Path of Exile"
 $OUT_FOLDER = "E:\programming\data\poe\file_dumps"
 
 # Extract the dat64 files from the cdn
 #& cargo run --release --bin poe_files -- extract "$OUT_FOLDER" "*.datc64"
 
-# Extract the dds files from $STEAM_FOLDER
-#& cargo run --release --bin poe_files -- extract --steam-folder "$STEAM_FOLDER" "$OUT_FOLDER" "*.dds"
+# Extract the dds files from the steam folder
+#& cargo run --release --bin poe_files -- --steam extract "$OUT_FOLDER" "*.dds"
 
 
 # Use imageMagick to turn all the dds files into png
