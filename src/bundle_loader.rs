@@ -8,6 +8,7 @@ use std::{
 };
 
 use anyhow::{bail, Context};
+use bytes::Bytes;
 use nom::bytes::complete::take;
 use nom::multi::count;
 use nom::number::complete::le_u8;
@@ -50,53 +51,36 @@ impl CDNLoader {
 
     /// Loads the contents of the bundle file. Either reads from the local cache or from the CDN if
     /// it's not cached.
-    pub fn load(&self, path_stub: &Path) -> anyhow::Result<Vec<u8>> {
+    pub fn load(&self, path_stub: &Path) -> anyhow::Result<Bytes> {
+        let url = self
+            .base_url
+            .join(path_stub.to_str().expect("Failed to parse path as string"))?;
+
+        // If already cached, assume nothing has changed due to version immutability
+        let cache_path =
+            PathBuf::from(&self.cache_dir).join(url.to_string().trim_start_matches("https://"));
+        if let Ok(bytes) = fs::read(&cache_path) {
+            eprintln!("Using cached bundle: {}", cache_path.to_str().unwrap());
+            return Ok(Bytes::from(bytes));
+        }
+
+        eprintln!("Downloading bundle: {}", url);
         // Short timeout for initial connection, but none for transfer to allow for fetching large
         // files on a poor network connection
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(10))
             .timeout(None)
             .build()?;
-
-        let url = self
-            .base_url
-            .join(path_stub.to_str().expect("Failed to parse path as string"))?;
-
-        // Grab ETag from CDN
-        let response = client.get(url.clone()).send()?.error_for_status()?;
-        let cdn_etag = response
-            .headers()
-            .get("ETag")
-            .with_context(|| "Missing ETag header from response")?
-            .to_str()
-            .expect("Failed to parse ETag as string")
-            .to_string();
-
-        // If already cached, check the ETag matches
-        let cache_path =
-            PathBuf::from(&self.cache_dir).join(url.to_string().trim_start_matches("https://"));
-        if cache_path.exists() {
-            // Check if it matches the cache
-            let etag_path = cache_path.with_extension("etag");
-            let cache_hit =
-                fs::read_to_string(&etag_path).is_ok_and(|cache_etag| cache_etag == cdn_etag);
-
-            if cache_hit {
-                eprintln!("Using cached file: {}", cache_path.display());
-                let buffer = fs::read(&cache_path)?;
-                return Ok(buffer);
-            }
-        }
-
+        let bytes = client
+            .get(url.clone())
+            .send()?
+            .error_for_status()?
+            .bytes()?;
         // Save data to file - data first then ETag in case of failure mid-download
         fs::create_dir_all(cache_path.parent().expect("Failed to get path parent"))?;
-
-        eprintln!("Downloading file: {}", url);
-        let bytes = response.bytes()?;
         fs::write(&cache_path, &bytes)?;
-        fs::write(cache_path.with_extension("etag"), cdn_etag)?;
 
-        Ok(bytes.to_vec())
+        Ok(bytes)
     }
 }
 
