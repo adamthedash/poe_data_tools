@@ -8,12 +8,8 @@ name = "poe_game_data_parser"
 path = "src/lib.rs"
 
 [[bin]]
-name = "dump_paths"
-path = "src/bin/dump_paths.rs"
-
-[[bin]]
-name = "dump_files"
-path = "src/bin/dump_files.rs"
+name = "poe_files"
+path = "src/bin/poe_files.rs"
 
 [dependencies]
 anyhow = "1.0.93"

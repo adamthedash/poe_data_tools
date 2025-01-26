@@ -79,6 +79,12 @@ impl FS {
             .unwrap_or_else(|| panic!("Path not found in index: {}", path));
         let file = &self.index.files[*index];
 
+        // FIXME: This is expensive and gets repeated even for files in bundles
+        // we've already seen
+        //
+        // I need to either optimize it heavily for random reads, or extract the
+        // entire bundle and cache all the files so when we are after a
+        // different file in the bundle we can skip this
         let bundle = match self.steam_folder {
             Some(ref steam_folder) => {
                 let bundle_path = steam_folder.join(format!(

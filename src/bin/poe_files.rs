@@ -20,20 +20,23 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// List files
     List {
-        // Glob pattern to filter the list of files
+        /// Glob pattern to filter the list of files
         #[clap(default_value = "*")]
         glob: String,
     },
-    Dump {
-        // Path to the folder to output the extracted files
+    /// Extract matched files to a folder
+    Extract {
+        /// Path to the folder to output the extracted files
         output_folder: PathBuf,
-        // Glob pattern to filter the list of files
+        /// Glob pattern to filter the list of files
         #[clap(default_value = "*")]
         glob: String,
     },
+    /// Extract a single file to stdout
     Cat {
-        // Path to the file to extract
+        /// Path to the file to extract
         path: String,
     },
 }
@@ -83,19 +86,17 @@ fn main() {
             out.write_all(&result).expect("Failed to write to stdout");
             out.flush().expect("Failed to flush stdout");
         }
-        Command::Dump {
+        Command::Extract {
             glob,
             output_folder,
         } => {
             let pattern = glob::Pattern::new(&glob).expect("Failed to parse glob pattern");
-            eprintln!("Dumping files to: {:?}", output_folder);
 
             fs.list()
                 .iter()
                 .filter(|p| pattern.matches(p))
                 .for_each(|p| {
                     // Dump it to disk
-                    eprintln!("{}", p);
                     let contents = fs.read(p.to_string()).expect("Failed to read file");
                     let out_filename = output_folder.as_path().join(p);
                     fs::create_dir_all(out_filename.parent().unwrap())
