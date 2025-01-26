@@ -2,25 +2,43 @@ use std::{fs, path::PathBuf};
 
 use clap::{command, Parser};
 use nom::{
-    bytes::complete::take_until, combinator::map, number::complete::le_u32, sequence::tuple,
+    bytes::complete::{tag, take_until},
+    combinator::{map, map_res},
+    number::complete::le_u32,
+    sequence::tuple,
     IResult,
 };
+use poe_game_data_parser::{schema_parsing::infer_types, table_view::DatTable};
 
-/// A simple CLI tool that parses table data from a dat64 file
+/// A simple CLI tool that parses table data from a datc64 file
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// The path to the .dat64 file on disk
+    /// The path to the .datc64 file on disk
     dat64_path: PathBuf,
 }
 
-fn take_until_string_separator(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    // Define the pattern for 8 consecutive 0xBB bytes
-    const PATTERN: &[u8] = &[0xBB; 8];
+/// Splits a byte slice into two parts around 16 consecutive 0xBB bytes.
+/// Returns a tuple containing the two halves.
+fn split_on_8_bb(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
+    // Define the delimiter: 16 consecutive 0xBB bytes
+    const DELIMITER: &[u8] = &[0xBB; 8];
 
-    // Use `take_until` to consume the stream until we find the pattern
-    let parser = tuple((take_until(PATTERN), take_until(PATTERN)));
-    map(parser, |(data, _)| data)(input)
+    // Parser to take until the delimiter and then consume it
+    let parser = tuple((
+        take_until(DELIMITER), // Take everything up to the delimiter
+        tag(DELIMITER),        // Match the delimiter itself
+    ));
+
+    // Apply the parser and return the remaining parts
+    map_res(
+        parser,
+        |(before, _delimiter): (&[u8], &[u8])| -> Result<(&[u8], &[u8]), ()> {
+            // The rest of the input after the delimiter
+            let remaining: &[u8] = &input[before.len() + DELIMITER.len()..];
+            Ok((before, remaining))
+        },
+    )(input)
 }
 
 fn take_utf16_string(input: &[u8]) -> String {
@@ -37,7 +55,7 @@ fn parse_table(input: &[u8]) -> IResult<&[u8], ()> {
     let (input, num_rows) = le_u32(input)?;
     println!("rows: {}", num_rows);
 
-    let (input, fixed_data) = take_until_string_separator(input)?;
+    let (input, (fixed_data, variable_data)) = split_on_8_bb(input)?;
 
     let bytes_per_row = fixed_data.len() / num_rows as usize;
     println!(
@@ -45,42 +63,20 @@ fn parse_table(input: &[u8]) -> IResult<&[u8], ()> {
         fixed_data.len(),
         bytes_per_row
     );
+    println!("variable data: {:?} bytes", variable_data.len());
 
-    let rows = fixed_data.chunks_exact(bytes_per_row).collect::<Vec<_>>();
+    let rows = fixed_data
+        .chunks_exact(bytes_per_row)
+        .map(|row| row.to_vec())
+        .collect::<Vec<_>>();
 
-    rows.iter().for_each(|r| {
-        let pointer_offsets = [0, 12, 28, 36];
+    let table = DatTable {
+        rows,
+        variable_data: variable_data.to_vec(),
+    };
+    println!("{}", table);
 
-        let strings = pointer_offsets
-            .iter()
-            .map(|&p| u64::from_le_bytes(r[p..p + 8].try_into().unwrap()))
-            .map(|p| take_utf16_string(&input[p as usize..]))
-            .collect::<Vec<_>>();
-
-        println!("{:?}", strings);
-
-        let list_pointer_offset = 61;
-        let list_pointer = u64::from_le_bytes(
-            r[list_pointer_offset..list_pointer_offset + 8]
-                .try_into()
-                .unwrap(),
-        ) as usize;
-
-        println!("{:?}", &r[53..]);
-
-        //println!("{:?}", &input[list_pointer..list_pointer + 32]);
-    });
-
-    // Debug - print out the values as hex
-    rows.iter().for_each(|row| {
-        let chars = row
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<Vec<_>>()
-            .join(" ");
-
-        println!("{}", chars);
-    });
+    infer_types(&table);
 
     unimplemented!()
 }

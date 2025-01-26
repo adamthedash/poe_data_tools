@@ -6,3 +6,4 @@ pub mod commands;
 pub mod hasher;
 pub mod path;
 pub mod steam;
+pub mod table_view;
