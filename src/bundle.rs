@@ -1,5 +1,6 @@
 use std::{fs, path::Path};
 
+use anyhow::Context;
 use bytes::Bytes;
 use nom::{
     bytes::complete::take,
@@ -140,7 +141,9 @@ pub fn parse_bundle(input: &[u8]) -> IResult<&[u8], Bundle> {
 /// Load a bundle file from disk
 pub fn load_bundle_content(path: &Path) -> Bytes {
     // todo: figure how to properly do error propogation with nom
-    let bundle_content = fs::read(path).expect("Failed to read bundle file");
+    let bundle_content = fs::read(path)
+        .context(format!("{:?}", path))
+        .expect("Failed to read bundle file");
 
     let (_, bundle) = parse_bundle(&bundle_content).expect("Failed to parse bundle");
     bundle.read_content()
