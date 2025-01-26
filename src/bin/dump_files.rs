@@ -1,5 +1,6 @@
 #![feature(hash_raw_entry)]
 
+use bytes::Bytes;
 use clap::Parser;
 use poe_game_data_parser::bundle::fetch_bundle_content;
 use poe_game_data_parser::bundle_index::{fetch_index_file, BundleIndex};
@@ -81,7 +82,7 @@ fn main() {
     // Pull out the data
     files.iter().for_each(|(&bundle_index, bundle_files)| {
         // Load up bundle file
-        let bundle: Vec<u8>;
+        let bundle: Bytes;
         if let Some(steam_folder) = &args.steam_folder {
             let bundle_path = steam_folder.as_path().join(format!(
                 "Bundles2/{}.bundle.bin",

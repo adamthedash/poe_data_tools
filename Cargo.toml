@@ -25,3 +25,4 @@ reqwest = { version = "0.12.12", features = ["blocking"] }
 url = "2.5.4"
 dirs = "6.0.0"
 bytes = "1.9.0"
+glob = "0.3.2"

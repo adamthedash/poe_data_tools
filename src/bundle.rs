@@ -1,5 +1,6 @@
 use std::{fs, path::Path};
 
+use bytes::Bytes;
 use nom::{
     bytes::complete::take,
     multi::count,
@@ -46,14 +47,14 @@ pub struct Bundle {
 }
 
 impl Bundle {
-    /// Return the entire conent of the bundle
+    /// Return the entire content of the bundle
     /// todo: decode blocks in parallel
     ///     Also return a result instead of panicing
-    pub fn read_content(&self) -> Vec<u8> {
+    pub fn read_content(&self) -> Bytes {
         let mut ext = Extractor::new();
         let mut buf = vec![0; self.head.uncompressed_block_granularity as usize];
 
-        let bundle_conent = self
+        let bundle_content = self
             .blocks
             .iter()
             .enumerate()
@@ -69,9 +70,9 @@ impl Bundle {
 
                 buf[..decompressed_length].to_vec()
             })
-            .collect::<Vec<_>>();
+            .collect::<Bytes>();
 
-        bundle_conent
+        bundle_content
     }
 }
 
@@ -137,7 +138,7 @@ pub fn parse_bundle(input: &[u8]) -> IResult<&[u8], Bundle> {
 }
 
 /// Load a bundle file from disk
-pub fn load_bundle_content(path: &Path) -> Vec<u8> {
+pub fn load_bundle_content(path: &Path) -> Bytes {
     // todo: figure how to properly do error propogation with nom
     let bundle_content = fs::read(path).expect("Failed to read bundle file");
 
@@ -146,7 +147,7 @@ pub fn load_bundle_content(path: &Path) -> Vec<u8> {
 }
 
 // Fetch a bundle file from the CDN (or cache)
-pub fn fetch_bundle_content(patch: &str, cache_dir: &Path, path: &Path) -> Vec<u8> {
+pub fn fetch_bundle_content(patch: &str, cache_dir: &Path, path: &Path) -> Bytes {
     let bundle_content = CDNLoader::new(patch, cache_dir.to_str().unwrap())
         .load(path)
         .expect("Failed to load bundle");

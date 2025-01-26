@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use bytes::Bytes;
 use nom::{
     bytes::complete::take,
     combinator::rest,
@@ -37,7 +38,7 @@ pub struct BundleIndex {
     pub bundles: Vec<BundleInfo>,
     pub files: Vec<FileInfo>,
     pub paths: Vec<PathRep>,
-    pub path_rep_bundle: Vec<u8>,
+    pub path_rep_bundle: Bytes,
 }
 
 // Parser for a UTF-8 string of given length
