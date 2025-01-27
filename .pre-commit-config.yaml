@@ -15,4 +15,5 @@ repos:
     -   id: clippy
     -   id: build
     -   id: test
+        args: ["--tests"]
 

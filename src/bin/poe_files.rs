@@ -1,9 +1,10 @@
-use clap::{error::ErrorKind, ArgAction, Args, CommandFactory, Parser, Subcommand};
+use anyhow::ensure;
+use anyhow::Result;
+use clap::{ArgGroup, Parser, Subcommand};
 use glob::Pattern;
 use poe_game_data_parser::{
     bundle_fs::{from_cdn, from_steam},
     bundle_loader::cdn_base_url,
-    steam::steam_folder_search,
 };
 use std::{
     fs::{self, File},
@@ -11,16 +12,23 @@ use std::{
     path::PathBuf,
 };
 
-/// A simple CLI tool that extracts the virtual filenames from PoE data files.
-/// File paths are printed to stdout.
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
-    #[clap(flatten)]
-    global_opts: GlobalOpts,
+#[derive(Debug, Clone)]
+enum Patch {
+    One,
+    Two,
+    Specific(String),
+}
 
-    #[clap(subcommand)]
-    command: Command,
+impl std::str::FromStr for Patch {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "1" => Ok(Patch::One),
+            "2" => Ok(Patch::Two),
+            _ => Ok(Patch::Specific(s.to_string())),
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -46,54 +54,90 @@ enum Command {
     },
 }
 
-#[derive(Debug, Args)]
-struct GlobalOpts {
-    /// Use the steam folder as the source of the data instead of the CDN
-    #[clap(
-        long,
-        group = "source",
-        action = ArgAction::SetTrue,
-        default_value_t=false,
-        conflicts_with_all=&["cdn", "cache_dir"],
-    )]
-    steam: bool,
+/// A simple CLI tool that extracts the virtual filenames from PoE data files.
+/// File paths are printed to stdout.
+#[derive(Parser, Debug)]
+#[command(
+    name = "poe_files",
+    group(
+        ArgGroup::new("source")
+        .args(&["steam", "cache_dir"])
+        .required(false) // At least one is not required, but they are mutually exclusive
+        .multiple(false) // Only one can be used at a time
+    )
+)]
+struct Cli {
+    /// Specify the patch version (1, 2, or specific_patch)
+    #[arg(long, required = true)]
+    patch: Patch,
 
-    /// Version of the game to use: 1 for PoE 1, 2 for PoE 2, or a specific CDN patch version if --steam isn't used
-    #[clap(long, default_value = "2")]
-    patch: String,
+    /// Specify the Steam folder path (optional)
+    #[arg(long)]
+    steam: Option<PathBuf>,
 
-    /// The path to the dir to store the local CDN cache; only required without --steam
-    #[clap(
-        long,
-        default_value=dirs::cache_dir().unwrap().join("poe_data_tools").into_os_string(),
-    )]
-    cache_dir: PathBuf,
+    /// Specify the cache directory (optional)
+    #[arg(long)]
+    cache_dir: Option<PathBuf>,
 
-    /// The path to the game install folder for --steam [default: autodetect based on --patch]
-    #[clap(
-        long,
-        default_value_ifs([
-            ("patch", "1", steam_folder_search("1").unwrap_or(PathBuf::new()).into_os_string()),
-            ("patch", "2", steam_folder_search("2").unwrap_or(PathBuf::new()).into_os_string()),
-        ])
-    )]
-    steam_folder: Option<PathBuf>,
+    #[command(subcommand)]
+    command: Command,
 }
 
-fn main() {
-    let args = Cli::parse();
+#[derive(Debug)]
+enum Source {
+    Cdn { cache_dir: PathBuf },
+    Steam { steam_folder: PathBuf },
+}
 
-    let mut fs = match args.global_opts.steam {
-        true => match args.global_opts.steam_folder {
-            Some(f) => from_steam(f),
-            None => Cli::command()
-                .error(
-                    ErrorKind::ArgumentConflict,
-                    "Invalid steam folder. Patch must be 1 or 2 when using --steam without --steam-folder",
-                )
-                .exit(),
-        },
-        false => from_cdn(&cdn_base_url(args.global_opts.patch.as_str()), &args.global_opts.cache_dir),
+#[derive(Debug)]
+struct Args {
+    patch: Patch,
+    source: Source,
+    command: Command,
+}
+
+/// Validates user input and constructs a valid input state
+fn parse_args() -> Result<Args> {
+    let cli = Cli::parse();
+
+    let source = if let Some(steam_folder) = cli.steam {
+        ensure!(steam_folder.exists(), "Steam folder doesn't exist");
+        Source::Steam { steam_folder }
+    } else {
+        let cache_dir = cli
+            .cache_dir
+            .unwrap_or_else(|| dirs::cache_dir().unwrap().join("poe_data_tools"));
+
+        Source::Cdn { cache_dir }
+    };
+
+    if matches!(source, Source::Steam { .. }) {
+        ensure!(
+            !matches!(cli.patch, Patch::Specific { .. }),
+            "When using steam, specific patch versions are not supported."
+        );
+    }
+
+    Ok(Args {
+        patch: cli.patch,
+        source,
+        command: cli.command,
+    })
+}
+
+fn main() -> Result<()> {
+    let args = parse_args()?;
+
+    let mut fs = match args.source {
+        Source::Cdn { cache_dir } => {
+            let version_string = match args.patch {
+                Patch::One => "1".to_string(),
+                Patch::Two => "2".to_string(),
+                Patch::Specific(v) => v,
+            };
+            from_cdn(&cdn_base_url(&version_string), &cache_dir)
+        }
+        Source::Steam { steam_folder } => from_steam(steam_folder),
     };
 
     match args.command {
@@ -133,4 +177,6 @@ fn main() {
             });
         }
     }
+
+    Ok(())
 }
