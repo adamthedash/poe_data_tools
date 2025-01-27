@@ -128,9 +128,7 @@ pub fn parse_bundle_index(input: &[u8]) -> IResult<&[u8], BundleIndex> {
             bundles,
             files,
             paths,
-            //            path_rep_bundle: path_rep_bundle.read_content(),
-            path_rep_bundle: path_rep_bundle
-                .read_range(0, path_rep_bundle.head.uncompressed_size as usize),
+            path_rep_bundle: path_rep_bundle.read_all(),
         },
     ))
 }
@@ -139,7 +137,6 @@ pub fn parse_bundle_index(input: &[u8]) -> IResult<&[u8], BundleIndex> {
 pub fn load_index_file(path: &Path) -> BundleIndex {
     let index_content = load_bundle_content(path).read_all();
     let (_, index) = parse_bundle_index(&index_content).expect("Failed to parse bundle as index");
-
     index
 }
 
@@ -147,6 +144,5 @@ pub fn load_index_file(path: &Path) -> BundleIndex {
 pub fn fetch_index_file(patch: &str, cache_dir: &Path, path: &Path) -> BundleIndex {
     let index_content = fetch_bundle_content(patch, cache_dir, path).read_all();
     let (_, index) = parse_bundle_index(&index_content).expect("Failed to parse bundle as index");
-
     index
 }
