@@ -8,12 +8,8 @@ name = "poe_game_data_parser"
 path = "src/lib.rs"
 
 [[bin]]
-name = "dump_paths"
-path = "src/bin/dump_paths.rs"
-
-[[bin]]
-name = "dump_files"
-path = "src/bin/dump_files.rs"
+name = "poe_files"
+path = "src/bin/poe_files.rs"
 
 [dependencies]
 anyhow = "1.0.93"
@@ -25,3 +21,14 @@ reqwest = { version = "0.12.12", features = ["blocking"] }
 url = "2.5.4"
 dirs = "6.0.0"
 bytes = "1.9.0"
+glob = "0.3.2"
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["html_reports"] }
+
+[rust]
+debuginfo-level = 1
+
+[[bench]]
+name = "fs"
+harness = false

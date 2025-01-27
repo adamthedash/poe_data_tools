@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use bytes::Bytes;
 use nom::{
     bytes::complete::take,
     combinator::rest,
@@ -7,6 +8,7 @@ use nom::{
     number::complete::{le_u32, le_u64},
     IResult,
 };
+use url::Url;
 
 use crate::bundle::{fetch_bundle_content, load_bundle_content, parse_bundle};
 
@@ -37,7 +39,7 @@ pub struct BundleIndex {
     pub bundles: Vec<BundleInfo>,
     pub files: Vec<FileInfo>,
     pub paths: Vec<PathRep>,
-    pub path_rep_bundle: Vec<u8>,
+    pub path_rep_bundle: Bytes,
 }
 
 // Parser for a UTF-8 string of given length
@@ -127,23 +129,21 @@ pub fn parse_bundle_index(input: &[u8]) -> IResult<&[u8], BundleIndex> {
             bundles,
             files,
             paths,
-            path_rep_bundle: path_rep_bundle.read_content(),
+            path_rep_bundle: path_rep_bundle.read_all(),
         },
     ))
 }
 
 /// Load an index file from disk
 pub fn load_index_file(path: &Path) -> BundleIndex {
-    let index_content = load_bundle_content(path);
+    let index_content = load_bundle_content(path).read_all();
     let (_, index) = parse_bundle_index(&index_content).expect("Failed to parse bundle as index");
-
     index
 }
 
 /// Fetch an index file from the CDN (or cache)
-pub fn fetch_index_file(patch: &str, cache_dir: &Path, path: &Path) -> BundleIndex {
-    let index_content = fetch_bundle_content(patch, cache_dir, path);
+pub fn fetch_index_file(base_url: &Url, cache_dir: &Path, path: &Path) -> BundleIndex {
+    let index_content = fetch_bundle_content(base_url, cache_dir, path).read_all();
     let (_, index) = parse_bundle_index(&index_content).expect("Failed to parse bundle as index");
-
     index
 }

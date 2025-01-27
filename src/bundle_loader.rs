@@ -22,29 +22,9 @@ pub struct CDNLoader {
 }
 
 impl CDNLoader {
-    pub fn new(version: &str, cache_dir: &str) -> Self {
-        let base_url = match version {
-            // Latest PoE 1
-            "1" => cur_url_poe(),
-            // Latest PoE 2
-            "2" => cur_url_poe2(),
-            // Specific PoE 1 patch
-            v if v.starts_with("3.") => {
-                Url::parse(format!("https://patch.poecdn.com/{}/", v).as_str())
-                    .with_context(|| "Failed to parse URL")
-            }
-            // Specific PoE 2 patch
-            v if v.starts_with("4.") => {
-                Url::parse(format!("https://patch-poe2.poecdn.com/{}/", v).as_str())
-                    .with_context(|| "Failed to parse URL")
-            }
-            // Invalid patch
-            _ => panic!("Invalid version provided"),
-        }
-        .unwrap_or_else(|_| panic!("Failed to get URL for version: {}", version));
-
+    pub fn new(base_url: &Url, cache_dir: &str) -> Self {
         Self {
-            base_url,
+            base_url: base_url.clone(),
             cache_dir: cache_dir.to_string(),
         }
     }
@@ -60,7 +40,6 @@ impl CDNLoader {
         let cache_path =
             PathBuf::from(&self.cache_dir).join(url.to_string().trim_start_matches("https://"));
         if let Ok(bytes) = fs::read(&cache_path) {
-            eprintln!("Using cached bundle: {}", cache_path.to_str().unwrap());
             return Ok(Bytes::from(bytes));
         }
 
@@ -71,17 +50,35 @@ impl CDNLoader {
             .connect_timeout(Duration::from_secs(10))
             .timeout(None)
             .build()?;
-        let bytes = client
-            .get(url.clone())
-            .send()?
-            .error_for_status()?
-            .bytes()?;
+        let bytes = client.get(url).send()?.error_for_status()?.bytes()?;
         // Save data to file - data first then ETag in case of failure mid-download
         fs::create_dir_all(cache_path.parent().expect("Failed to get path parent"))?;
         fs::write(&cache_path, &bytes)?;
 
         Ok(bytes)
     }
+}
+
+pub fn cdn_base_url(version: &str) -> Url {
+    let url = match version {
+        // Latest PoE 1
+        "1" => cur_url_poe(),
+        // Latest PoE 2
+        "2" => cur_url_poe2(),
+        // Specific PoE 1 patch
+        v if v.starts_with("3.") => Url::parse(format!("https://patch.poecdn.com/{}/", v).as_str())
+            .with_context(|| "Failed to parse URL"),
+        // Specific PoE 2 patch
+        v if v.starts_with("4.") => {
+            Url::parse(format!("https://patch-poe2.poecdn.com/{}/", v).as_str())
+                .with_context(|| "Failed to parse URL")
+        }
+        // Invalid patch
+        _ => panic!("Invalid version provided"),
+    }
+    .unwrap_or_else(|_| panic!("Failed to get URL for version: {}", version));
+    eprintln!("Using CDN URL: {}", url);
+    url
 }
 
 fn cur_url_poe() -> anyhow::Result<Url> {
