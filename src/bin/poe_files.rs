@@ -1,6 +1,10 @@
 use clap::{error::ErrorKind, ArgAction, Args, CommandFactory, Parser, Subcommand};
 use glob::Pattern;
-use poe_game_data_parser::bundle_fs::{from_cdn, from_steam};
+use poe_game_data_parser::{
+    bundle_fs::{from_cdn, from_steam},
+    bundle_loader::cdn_base_url,
+    steam::steam_folder_search,
+};
 use std::{
     fs::{self, File},
     io::{self, BufWriter, Write},
@@ -76,24 +80,6 @@ struct GlobalOpts {
     steam_folder: Option<PathBuf>,
 }
 
-fn steam_folder_search(patch: &str) -> Option<PathBuf> {
-    let home = dirs::home_dir().unwrap();
-    let game = match patch {
-        "1" => "Path of Exile",
-        "2" => "Path of Exile 2",
-        _ => return None,
-    };
-    [
-        home.join(".local/share/Steam/steamapps/common"),
-        home.join("Library/Application Support/Steam/steamapps/common"),
-        PathBuf::from("C:\\Program Files (x86)\\Grinding Gear Games"),
-        PathBuf::from("/mnt/e/SteamLibrary/steamapps/common"),
-    ]
-    .iter()
-    .map(|p| p.join(game))
-    .find(|p| p.exists())
-}
-
 fn main() {
     let args = Cli::parse();
 
@@ -107,7 +93,7 @@ fn main() {
                 )
                 .exit(),
         },
-        false => from_cdn(&args.global_opts.cache_dir, args.global_opts.patch.as_str()),
+        false => from_cdn(&cdn_base_url(args.global_opts.patch.as_str()), &args.global_opts.cache_dir),
     };
 
     match args.command {
@@ -143,6 +129,7 @@ fn main() {
                 out_file
                     .write_all(&contents)
                     .expect("Failed to write to file.");
+                eprintln!("{}", p);
             });
         }
     }

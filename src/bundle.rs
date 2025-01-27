@@ -9,6 +9,7 @@ use nom::{
     IResult,
 };
 use oozextract::Extractor;
+use url::Url;
 
 use crate::bundle_loader::CDNLoader;
 
@@ -155,10 +156,11 @@ pub fn load_bundle_content(path: &Path) -> Bundle {
 }
 
 // Fetch a bundle file from the CDN (or cache)
-pub fn fetch_bundle_content(patch: &str, cache_dir: &Path, path: &Path) -> Bundle {
-    let bundle_content = CDNLoader::new(patch, cache_dir.to_str().unwrap())
+pub fn fetch_bundle_content(base_url: &Url, cache_dir: &Path, path: &Path) -> Bundle {
+    let bundle_content = CDNLoader::new(base_url, cache_dir.to_str().unwrap())
         .load(path)
         .expect("Failed to load bundle");
+
     let (_, bundle) = parse_bundle(&bundle_content).expect("Failed to parse bundle");
     bundle
 }

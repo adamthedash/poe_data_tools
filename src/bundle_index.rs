@@ -8,6 +8,7 @@ use nom::{
     number::complete::{le_u32, le_u64},
     IResult,
 };
+use url::Url;
 
 use crate::bundle::{fetch_bundle_content, load_bundle_content, parse_bundle};
 
@@ -141,8 +142,8 @@ pub fn load_index_file(path: &Path) -> BundleIndex {
 }
 
 /// Fetch an index file from the CDN (or cache)
-pub fn fetch_index_file(patch: &str, cache_dir: &Path, path: &Path) -> BundleIndex {
-    let index_content = fetch_bundle_content(patch, cache_dir, path).read_all();
+pub fn fetch_index_file(base_url: &Url, cache_dir: &Path, path: &Path) -> BundleIndex {
+    let index_content = fetch_bundle_content(base_url, cache_dir, path).read_all();
     let (_, index) = parse_bundle_index(&index_content).expect("Failed to parse bundle as index");
     index
 }

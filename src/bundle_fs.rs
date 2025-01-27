@@ -5,6 +5,7 @@ use std::{
 };
 
 use bytes::Bytes;
+use url::Url;
 
 use crate::{
     bundle::{fetch_bundle_content, load_bundle_content},
@@ -17,7 +18,7 @@ pub struct FS {
     index: BundleIndex,
     lut: HashMap<u64, usize>,
     steam_folder: Option<PathBuf>,
-    patch: Option<String>,
+    base_url: Option<Url>,
     cache_dir: Option<PathBuf>,
 }
 
@@ -28,13 +29,13 @@ pub fn from_steam(steam_folder: PathBuf) -> FS {
         index,
         lut: HashMap::new(),
         steam_folder: Some(steam_folder.clone()),
-        patch: None,
+        base_url: None,
         cache_dir: None,
     }
 }
-pub fn from_cdn(cache_dir: &Path, patch: &str) -> FS {
+pub fn from_cdn(base_url: &Url, cache_dir: &Path) -> FS {
     let index = fetch_index_file(
-        patch,
+        base_url,
         cache_dir,
         PathBuf::from("Bundles2/_.index.bin").as_ref(),
     );
@@ -42,7 +43,7 @@ pub fn from_cdn(cache_dir: &Path, patch: &str) -> FS {
         index,
         lut: HashMap::new(),
         steam_folder: None,
-        patch: Some(patch.to_string()),
+        base_url: Some(base_url.clone()),
         cache_dir: Some(cache_dir.to_path_buf()),
     }
 }
@@ -78,12 +79,6 @@ impl FS {
             .unwrap_or_else(|| panic!("Path not found in index: {}", path));
         let file = &self.index.files[*index];
 
-        // FIXME: This is expensive and gets repeated even for files in bundles
-        // we've already seen
-        //
-        // I need to either optimize it heavily for random reads, or extract the
-        // entire bundle and cache all the files so when we are after a
-        // different file in the bundle we can skip this
         let bundle = match self.steam_folder {
             Some(ref steam_folder) => {
                 let bundle_path = steam_folder.join(format!(
@@ -93,7 +88,7 @@ impl FS {
                 load_bundle_content(bundle_path.as_ref())
             }
             None => fetch_bundle_content(
-                self.patch.as_ref().unwrap(),
+                self.base_url.as_ref().unwrap(),
                 self.cache_dir.as_ref().unwrap(),
                 PathBuf::from(format!(
                     "Bundles2/{}.bundle.bin",
@@ -102,8 +97,6 @@ impl FS {
                 .as_ref(),
             ),
         };
-
-        eprintln!("Extracting: {}", path);
 
         // Pull out the file's contents
         let content = bundle.read_range(file.offset as usize, file.size as usize);
