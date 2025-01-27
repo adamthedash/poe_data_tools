@@ -51,29 +51,8 @@ impl Bundle {
     /// Return the entire content of the bundle
     /// todo: decode blocks in parallel
     ///     Also return a result instead of panicing
-    pub fn read_content(&self) -> Bytes {
-        let mut ext = Extractor::new();
-        let mut buf = vec![0; self.head.uncompressed_size as usize];
-
-        let bundle_content = self
-            .blocks
-            .iter()
-            .enumerate()
-            .flat_map(|(i, b)| {
-                let decompressed_length = if i == self.blocks.len() - 1 {
-                    self.head.uncompressed_size as usize - 256 * 1024 * (self.blocks.len() - 1)
-                } else {
-                    self.head.uncompressed_block_granularity as usize
-                };
-
-                ext.read_from_slice(b, &mut buf[..decompressed_length])
-                    .expect("Failed to decompress bundle block");
-
-                buf[..decompressed_length].to_vec()
-            })
-            .collect::<Bytes>();
-
-        bundle_content
+    pub fn read_all(&self) -> Bytes {
+        self.read_range(0, self.head.uncompressed_size as usize)
     }
     pub fn read_range(&self, offset: usize, len: usize) -> Bytes {
         let mut ext = Extractor::new();
