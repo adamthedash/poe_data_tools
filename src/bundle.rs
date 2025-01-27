@@ -1,7 +1,7 @@
-use std::{fs, path::Path};
+use std::{cmp::min, fs, path::Path};
 
 use anyhow::Context;
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use nom::{
     bytes::complete::take,
     multi::count,
@@ -53,7 +53,7 @@ impl Bundle {
     ///     Also return a result instead of panicing
     pub fn read_content(&self) -> Bytes {
         let mut ext = Extractor::new();
-        let mut buf = vec![0; self.head.uncompressed_block_granularity as usize];
+        let mut buf = vec![0; self.head.uncompressed_size as usize];
 
         let bundle_content = self
             .blocks
@@ -74,6 +74,32 @@ impl Bundle {
             .collect::<Bytes>();
 
         bundle_content
+    }
+    pub fn read_range(&self, offset: usize, len: usize) -> Bytes {
+        let mut ext = Extractor::new();
+        let mut chunk_buf = vec![0; self.head.uncompressed_size as usize];
+        let mut bundle_content = BytesMut::with_capacity(len);
+
+        let first_block = offset / (256 * 1024);
+        let last_block = (offset + len).div_ceil(256 * 1024);
+        self.blocks[first_block..last_block]
+            .iter()
+            .enumerate()
+            .for_each(|(i, b)| {
+                let start = if i == 0 { offset % (256 * 1024) } else { 0 };
+                let left = len - bundle_content.len();
+                let decompressed_length = if first_block + i == self.blocks.len() - 1 {
+                    self.head.uncompressed_size as usize - 256 * 1024 * (self.blocks.len() - 1)
+                } else {
+                    self.head.uncompressed_block_granularity as usize
+                };
+                ext.read_from_slice(b, &mut chunk_buf[..decompressed_length])
+                    .expect("Failed to decompress bundle block");
+
+                bundle_content.put_slice(&chunk_buf[start..start + min(decompressed_length, left)])
+            });
+
+        bundle_content.freeze()
     }
 }
 
@@ -139,21 +165,21 @@ pub fn parse_bundle(input: &[u8]) -> IResult<&[u8], Bundle> {
 }
 
 /// Load a bundle file from disk
-pub fn load_bundle_content(path: &Path) -> Bytes {
+pub fn load_bundle_content(path: &Path) -> Bundle {
     // todo: figure how to properly do error propogation with nom
     let bundle_content = fs::read(path)
         .context(format!("{:?}", path))
         .expect("Failed to read bundle file");
 
     let (_, bundle) = parse_bundle(&bundle_content).expect("Failed to parse bundle");
-    bundle.read_content()
+    bundle
 }
 
 // Fetch a bundle file from the CDN (or cache)
-pub fn fetch_bundle_content(patch: &str, cache_dir: &Path, path: &Path) -> Bytes {
+pub fn fetch_bundle_content(patch: &str, cache_dir: &Path, path: &Path) -> Bundle {
     let bundle_content = CDNLoader::new(patch, cache_dir.to_str().unwrap())
         .load(path)
         .expect("Failed to load bundle");
     let (_, bundle) = parse_bundle(&bundle_content).expect("Failed to parse bundle");
-    bundle.read_content()
+    bundle
 }

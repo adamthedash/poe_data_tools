@@ -59,7 +59,6 @@ impl FS {
     }
     pub fn read(&mut self, path: String) -> anyhow::Result<Bytes> {
         if self.lut.is_empty() {
-            eprintln!("Building lookup-table");
             self.lut = self
                 .index
                 .files
@@ -104,9 +103,10 @@ impl FS {
             ),
         };
 
-        println!("Extracting: {}", path);
+        eprintln!("Extracting: {}", path);
 
         // Pull out the file's contents
-        Ok(bundle.slice(file.offset as usize..file.offset as usize + file.size as usize))
+        let content = bundle.read_range(file.offset as usize, file.size as usize);
+        Ok(content)
     }
 }
