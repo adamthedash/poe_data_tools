@@ -58,7 +58,7 @@ impl FS {
         });
         paths
     }
-    pub fn read(&mut self, path: String) -> anyhow::Result<Bytes> {
+    pub fn read(&mut self, path: &str) -> anyhow::Result<Bytes> {
         if self.lut.is_empty() {
             self.lut = self
                 .index

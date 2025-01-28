@@ -1,16 +1,12 @@
-use anyhow::ensure;
-use anyhow::Result;
+use anyhow::{ensure, Context, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 use glob::Pattern;
 use poe_game_data_parser::{
     bundle_fs::{from_cdn, from_steam},
     bundle_loader::cdn_base_url,
+    commands::{cat::cat_file, extract::extract_files, list::list_files},
 };
-use std::{
-    fs::{self, File},
-    io::{self, BufWriter, Write},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 enum Patch {
@@ -141,41 +137,12 @@ fn main() -> Result<()> {
     };
 
     match args.command {
-        Command::List { glob } => {
-            // Use a buffered writer since we're dumping a lot of data
-            let stdout = io::stdout().lock();
-            let mut out = BufWriter::new(stdout);
-
-            fs.list().iter().filter(|p| glob.matches(p)).for_each(|p| {
-                writeln!(out, "{}", p).expect("Failed to write to stdout");
-            });
-
-            out.flush().expect("Failed to flush stdout");
-        }
-        Command::Cat { path } => {
-            let result = fs.read(path).expect("Failed to read file");
-            let stdout = io::stdout().lock();
-            let mut out = BufWriter::new(stdout);
-            out.write_all(&result).expect("Failed to write to stdout");
-            out.flush().expect("Failed to flush stdout");
-        }
+        Command::List { glob } => list_files(&fs, &glob).context("List command failed")?,
+        Command::Cat { path } => cat_file(&mut fs, &path).context("Cat command failed")?,
         Command::Extract {
             glob,
             output_folder,
-        } => {
-            fs.list().iter().filter(|p| glob.matches(p)).for_each(|p| {
-                // Dump it to disk
-                let contents = fs.read(p.to_string()).expect("Failed to read file");
-                let out_filename = output_folder.as_path().join(p);
-                fs::create_dir_all(out_filename.parent().unwrap())
-                    .expect("Failed to create folder");
-                let mut out_file = File::create(out_filename).expect("Failed to create file.");
-                out_file
-                    .write_all(&contents)
-                    .expect("Failed to write to file.");
-                eprintln!("{}", p);
-            });
-        }
+        } => extract_files(&mut fs, &glob, &output_folder).context("Extract command filed")?,
     }
 
     Ok(())
