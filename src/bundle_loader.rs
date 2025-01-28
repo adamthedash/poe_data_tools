@@ -40,6 +40,7 @@ impl CDNLoader {
         let cache_path =
             PathBuf::from(&self.cache_dir).join(url.to_string().trim_start_matches("https://"));
         if let Ok(bytes) = fs::read(&cache_path) {
+            eprintln!("Loading bundle from cache: {:?}", path_stub);
             return Ok(Bytes::from(bytes));
         }
 

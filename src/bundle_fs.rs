@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use anyhow::Context;
 use bytes::Bytes;
 use url::Url;
 
@@ -68,6 +69,7 @@ impl FS {
                 .map(|(i, f)| (f.hash, i))
                 .collect();
         }
+
         let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let mut hasher = hash_builder.build_hasher();
         hasher.write(path.to_lowercase().as_bytes());
@@ -76,26 +78,24 @@ impl FS {
         let index = self
             .lut
             .get(&hash)
-            .unwrap_or_else(|| panic!("Path not found in index: {}", path));
+            .with_context(|| format!("Path not found in index: {}", path))?;
         let file = &self.index.files[*index];
 
-        let bundle = match self.steam_folder {
-            Some(ref steam_folder) => {
-                let bundle_path = steam_folder.join(format!(
-                    "Bundles2/{}.bundle.bin",
-                    self.index.bundles[file.bundle_index as usize].name
-                ));
-                load_bundle_content(bundle_path.as_ref())
-            }
-            None => fetch_bundle_content(
+        let bundle = if let Some(steam_folder) = &self.steam_folder {
+            let bundle_path = steam_folder.join(format!(
+                "Bundles2/{}.bundle.bin",
+                self.index.bundles[file.bundle_index as usize].name
+            ));
+            load_bundle_content(&bundle_path)
+        } else {
+            fetch_bundle_content(
                 self.base_url.as_ref().unwrap(),
                 self.cache_dir.as_ref().unwrap(),
-                PathBuf::from(format!(
+                &PathBuf::from(format!(
                     "Bundles2/{}.bundle.bin",
                     self.index.bundles[file.bundle_index as usize].name
-                ))
-                .as_ref(),
-            ),
+                )),
+            )
         };
 
         // Pull out the file's contents
