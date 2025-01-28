@@ -5,7 +5,7 @@ use crate::{
         table_view::DatTable,
     },
 };
-use anyhow::{bail, ensure, Context};
+use anyhow::{anyhow, bail, ensure, Context};
 use glob::glob;
 use std::{
     fs::{self, create_dir_all, File},
@@ -301,7 +301,9 @@ fn save_to_csv(table: &mut DataFrame, path: &Path) {
 fn process_file(dat_path: &Path, output_path: &Path, schema: &DatTableSchema) -> Result<()> {
     // Load dat file
     let bytes = fs::read(dat_path).context("Failed to read table file")?;
-    let (_, table) = DatTable::from_raw_bytes(&bytes).expect("Failed to parse table data");
+    let (_, table) = DatTable::from_raw_bytes(&bytes)
+        .map_err(|e| anyhow!("Failed to parse table data: {:?}: {:?}", dat_path, e))?;
+
     ensure!(!table.rows.is_empty(), "Empty table");
 
     // Apply it

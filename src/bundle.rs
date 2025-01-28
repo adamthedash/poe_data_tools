@@ -1,7 +1,7 @@
-use std::{cmp::min, fs, path::Path};
+use std::{fs, path::Path};
 
 use anyhow::Context;
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use nom::{
     bytes::complete::take,
     multi::count,
@@ -9,6 +9,7 @@ use nom::{
     IResult,
 };
 use oozextract::Extractor;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use url::Url;
 
 use crate::bundle_loader::CDNLoader;
@@ -55,31 +56,34 @@ impl Bundle {
     pub fn read_all(&self) -> Bytes {
         self.read_range(0, self.head.uncompressed_size as usize)
     }
+
     pub fn read_range(&self, offset: usize, len: usize) -> Bytes {
-        let mut ext = Extractor::new();
-        let mut chunk_buf = vec![0; self.head.uncompressed_size as usize];
-        let mut bundle_content = BytesMut::with_capacity(len);
+        let block_size = self.head.uncompressed_block_granularity as usize;
 
-        let first_block = offset / (256 * 1024);
-        let last_block = (offset + len).div_ceil(256 * 1024);
-        self.blocks[first_block..last_block]
-            .iter()
-            .enumerate()
-            .for_each(|(i, b)| {
-                let start = if i == 0 { offset % (256 * 1024) } else { 0 };
-                let left = len - bundle_content.len();
-                let decompressed_length = if first_block + i == self.blocks.len() - 1 {
-                    self.head.uncompressed_size as usize - 256 * 1024 * (self.blocks.len() - 1)
-                } else {
-                    self.head.uncompressed_block_granularity as usize
-                };
-                ext.read_from_slice(b, &mut chunk_buf[..decompressed_length])
-                    .expect("Failed to decompress bundle block");
+        // Create a buffer, needs to be block-aligned since we're decoding entire blocks into it
+        let block_start = offset / block_size;
+        let block_end = (offset + len).div_ceil(block_size);
+        let buf_size = (block_end * block_size).min(self.head.uncompressed_size as usize)
+            - block_start * block_size;
+        let mut buf = vec![0; buf_size];
 
-                bundle_content.put_slice(&chunk_buf[start..start + min(decompressed_length, left)])
+        // Chunk into slices which can be written to in parallel
+        let chunks = buf.chunks_mut(block_size).collect::<Vec<_>>();
+
+        // Decode blocks in parallel
+        chunks
+            .into_par_iter()
+            .zip(&self.blocks[block_start..block_end])
+            .for_each(|(chunk, block)| {
+                let mut ext = Extractor::new();
+
+                ext.read_from_slice(block, chunk)
+                    .context("Failed to decompress bundle block")
+                    .unwrap();
             });
 
-        bundle_content.freeze()
+        // Grab subset form block aligned buffer
+        Bytes::from(buf).slice(offset % block_size..offset % block_size + len)
     }
 }
 
