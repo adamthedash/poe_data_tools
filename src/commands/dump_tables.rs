@@ -300,12 +300,12 @@ fn save_to_csv(table: &mut DataFrame, path: &Path) {
 
 fn process_file(dat_path: &Path, output_path: &Path, schema: &DatTableSchema) -> Result<()> {
     // Load dat file
-    let bytes = fs::read(dat_path).expect("Failed to read table file");
+    let bytes = fs::read(dat_path).context("Failed to read table file")?;
     let (_, table) = DatTable::from_raw_bytes(&bytes).expect("Failed to parse table data");
     ensure!(!table.rows.is_empty(), "Empty table");
 
     // Apply it
-    let mut df = parse_table(&table, schema).with_context(|| "Failed to apply schema to table")?;
+    let mut df = parse_table(&table, schema).context("Failed to apply schema to table")?;
 
     // Save table out as CSV todo: / JSON / SQLLite table
     save_to_csv(&mut df, output_path);
