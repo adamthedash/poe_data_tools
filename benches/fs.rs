@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use dirs::cache_dir;
-use poe_game_data_parser::{
-    bundle_fs::{from_cdn, from_steam},
+use poe_tools::{
+    bundle_fs::{from_cdn, from_steam, FS},
     bundle_loader::cdn_base_url,
     steam::steam_folder_search,
 };
@@ -15,13 +15,13 @@ fn fs_benchmark_cdn(c: &mut Criterion) {
     read_some_files("cdn", c, fs);
 }
 
-fn read_some_files(source: &str, c: &mut Criterion, mut fs: poe_game_data_parser::bundle_fs::FS) {
+fn read_some_files(source: &str, c: &mut Criterion, mut fs: FS) {
     let glob = glob::Pattern::new("data/skill*.datc64").unwrap();
 
     let list = fs.list();
     // warm caches
     list.iter().filter(|p| glob.matches(p)).for_each(|p| {
-        let _contents = fs.read(p.to_string()).expect("Failed to read file");
+        let _contents = fs.read(p).expect("Failed to read file");
     });
 
     let mut list = fs.list();
@@ -31,7 +31,7 @@ fn read_some_files(source: &str, c: &mut Criterion, mut fs: poe_game_data_parser
                 .iter()
                 .filter(|p| glob.matches(p))
                 .for_each(|p| {
-                    let _contents = fs.read(p.to_string()).expect("Failed to read file");
+                    let _contents = fs.read(p).expect("Failed to read file");
                 });
         })
     });

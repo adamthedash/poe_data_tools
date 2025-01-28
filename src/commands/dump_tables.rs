@@ -1,40 +1,24 @@
+use crate::{
+    commands::Patch,
+    dat::{
+        ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
+        table_view::DatTable,
+    },
+};
 use anyhow::{bail, ensure, Context};
 use glob::glob;
-use poe_game_data_parser::dat::{
-    ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
-    table_view::DatTable,
-};
 use std::{
     fs::{self, create_dir_all, File},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use anyhow::Result;
-use clap::{command, Parser};
 use polars::{
     frame::DataFrame,
     io::SerWriter,
     prelude::{Column, CsvWriter, DataType, NamedFrom},
     series::Series,
 };
-
-/// A simple CLI tool that parses table data from a datc64 file
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
-    /// The path to the folder contining datc64 files on disk
-    datc64_root: PathBuf,
-
-    /// A schema to apply to the tables
-    schema_path: PathBuf,
-
-    /// Path to write out the parsed tables to - Only supports CSV for now
-    output_folder: PathBuf,
-
-    /// Version of PoE, either 1 or 2
-    #[arg(short, long, default_value = "1")]
-    poe_version: u32,
-}
 
 fn parse_foreignrow(bytes: &[u8]) -> u64 {
     // todo: polars doesn't support u128, so figure something out later. For now
@@ -329,22 +313,33 @@ fn process_file(dat_path: &Path, output_path: &Path, schema: &DatTableSchema) ->
     Ok(())
 }
 
-fn main() {
-    let args = Cli::parse();
+/// Convert datc64 tables into CSV files
+pub fn dump_tables(
+    datc64_root: &Path,
+    schema_path: &Path,
+    output_folder: &Path,
+    version: &Patch,
+) -> Result<()> {
+    let version = match version {
+        Patch::One => 1,
+        Patch::Two => 2,
+        _ => bail!("Only patch versions 1/2 supported for table extraction."),
+    };
 
     // Load schema: todo: Get this from Ivy's CDN / cache it
     let schemas: SchemaCollection = serde_json::from_str(
-        &fs::read_to_string(args.schema_path).expect("Failed to read schema file"),
+        &fs::read_to_string(schema_path).context("Failed to read schema file")?,
     )
-    .expect("Failed to parse schema file");
+    .context("Failed to parse schema file")?;
 
     // Find the dat files
-    let glob_pattern = args
-        .datc64_root
+    let glob_pattern = datc64_root
         .join("**/*.datc64")
         .to_string_lossy()
         .to_string();
-    let files = glob(&glob_pattern).unwrap().filter_map(Result::ok);
+    let files = glob(&glob_pattern)
+        .context("Failed to glob datc files")?
+        .filter_map(Result::ok);
 
     for dat_path in files {
         // Load table schema - todo: HashMap rather than vector
@@ -352,7 +347,7 @@ fn main() {
             .tables
             .iter()
             // valid_for == 3 is common between both games
-            .filter(|t| t.valid_for == args.poe_version || t.valid_for == 3)
+            .filter(|t| t.valid_for == version || t.valid_for == 3)
             .find(|t| *t.name.to_lowercase() == *dat_path.file_stem().unwrap());
 
         let schema = if let Some(schema) = schema {
@@ -363,9 +358,8 @@ fn main() {
         };
 
         // Convert the data table
-        let output_path = args
-            .output_folder
-            .join(dat_path.strip_prefix(&args.datc64_root).unwrap())
+        let output_path = output_folder
+            .join(dat_path.strip_prefix(datc64_root).unwrap())
             .with_extension("csv");
 
         let res = process_file(&dat_path, &output_path, schema)
@@ -375,4 +369,6 @@ fn main() {
             eprintln!("{:?}", e);
         }
     }
+
+    Ok(())
 }
