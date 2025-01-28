@@ -1,6 +1,5 @@
 # Parsing tools for Path of Exile Bundle files
-
-Tested on linux with the Steam version of PoE, patch 3.25.3.1
+Tested on linux (WSL) and Windows with the Steam version of PoE, patch 3.25.3.1   
 
 ## Usage
 

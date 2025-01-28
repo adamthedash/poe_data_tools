@@ -3,6 +3,7 @@ pub mod bundle_fs;
 pub mod bundle_index;
 pub mod bundle_loader;
 pub mod commands;
+pub mod dat;
 pub mod hasher;
 pub mod path;
 pub mod steam;

@@ -1,31 +1,14 @@
 use anyhow::{ensure, Context, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 use glob::Pattern;
-use poe_game_data_parser::{
+use poe_tools::{
     bundle_fs::{from_cdn, from_steam},
     bundle_loader::cdn_base_url,
-    commands::{cat::cat_file, extract::extract_files, list::list_files},
+    commands::{
+        cat::cat_file, dump_tables::dump_tables, extract::extract_files, list::list_files, Patch,
+    },
 };
 use std::path::PathBuf;
-
-#[derive(Debug, Clone)]
-enum Patch {
-    One,
-    Two,
-    Specific(String),
-}
-
-impl std::str::FromStr for Patch {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "1" => Ok(Patch::One),
-            "2" => Ok(Patch::Two),
-            _ => Ok(Patch::Specific(s.to_string())),
-        }
-    }
-}
 
 #[derive(Debug, Subcommand)]
 enum Command {
@@ -47,6 +30,17 @@ enum Command {
     Cat {
         /// Path to the file to extract
         path: String,
+    },
+    /// Converts datc64 files into CSV files
+    DumpTables {
+        /// The path to the folder contining datc64 files on disk
+        datc64_root: PathBuf,
+
+        /// A schema to apply to the tables
+        schema_path: PathBuf,
+
+        /// Path to write out the parsed tables to - Only supports CSV for now
+        output_folder: PathBuf,
     },
 }
 
@@ -126,12 +120,12 @@ fn main() -> Result<()> {
 
     let mut fs = match args.source {
         Source::Cdn { cache_dir } => {
-            let version_string = match args.patch {
-                Patch::One => "1".to_string(),
-                Patch::Two => "2".to_string(),
+            let version_string = match &args.patch {
+                Patch::One => "1",
+                Patch::Two => "2",
                 Patch::Specific(v) => v,
             };
-            from_cdn(&cdn_base_url(&version_string), &cache_dir)
+            from_cdn(&cdn_base_url(version_string), &cache_dir)
         }
         Source::Steam { steam_folder } => from_steam(steam_folder),
     };
@@ -143,6 +137,12 @@ fn main() -> Result<()> {
             glob,
             output_folder,
         } => extract_files(&mut fs, &glob, &output_folder).context("Extract command filed")?,
+        Command::DumpTables {
+            datc64_root,
+            schema_path,
+            output_folder,
+        } => dump_tables(&datc64_root, &schema_path, &output_folder, &args.patch)
+            .context("Dump Tables command failed")?,
     }
 
     Ok(())
