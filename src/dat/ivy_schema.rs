@@ -43,12 +43,13 @@ pub struct References {
 mod tests {
     use std::fs::File;
 
-    use crate::ivy_schema::SchemaCollection;
+    use crate::dat::ivy_schema::SchemaCollection;
 
     #[test]
     fn load_schema() {
         let schema: SchemaCollection =
-            serde_json::from_reader(File::open("schema.json").unwrap()).unwrap();
+            serde_json::from_reader(File::open("/home/adam/Downloads/schema.min.json").unwrap())
+                .unwrap();
         println!("{:#?}", schema);
     }
 }

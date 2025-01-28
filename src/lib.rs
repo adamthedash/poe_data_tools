@@ -5,8 +5,5 @@ pub mod bundle_loader;
 pub mod commands;
 pub mod dat;
 pub mod hasher;
-pub mod hasher;
-pub mod path;
 pub mod path;
 pub mod steam;
-pub mod table_view;
