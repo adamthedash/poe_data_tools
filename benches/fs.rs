@@ -8,23 +8,50 @@ use poe_tools::{
 
 fn fs_benchmark_steam(c: &mut Criterion) {
     let fs = from_steam(steam_folder_search("2").expect("Can't find steam folder"));
-    read_some_files("steam", c, fs);
+    read_some_files("steam", c, fs, "data/skill*.datc64");
 }
-fn fs_benchmark_cdn(c: &mut Criterion) {
-    let fs = from_cdn(&cdn_base_url("2"), cache_dir().unwrap().as_path());
-    read_some_files("cdn", c, fs);
+fn fs_benchmark_cdn_dats(c: &mut Criterion) {
+    let fs = from_cdn(
+        &cdn_base_url("2"),
+        &cache_dir().unwrap().join("poe_data_tools"),
+    );
+    read_some_files("cdn", c, fs, "data/skill*.datc64");
+}
+
+fn fs_benchmark_cdn_small_art(c: &mut Criterion) {
+    let fs = from_cdn(
+        &cdn_base_url("2"),
+        &cache_dir().unwrap().join("poe_data_tools"),
+    );
+    read_some_files("cdn", c, fs, "minimap/**/*.dds");
+}
+
+fn fs_benchmark_cdn_large_art(c: &mut Criterion) {
+    let fs = from_cdn(
+        &cdn_base_url("2"),
+        &cache_dir().unwrap().join("poe_data_tools"),
+    );
+    read_some_files(
+        "cdn",
+        c,
+        fs,
+        "art/textures/interface/2d/2dart/uiimages/login/4k/**/*.dds",
+    );
 }
 
 fn fs_load_index(c: &mut Criterion) {
     c.bench_function("load_index", |b| {
         b.iter(|| {
-            let _fs = from_cdn(&cdn_base_url("2"), cache_dir().unwrap().as_path());
+            let _fs = from_cdn(
+                &cdn_base_url("2"),
+                &cache_dir().unwrap().join("poe_data_tools"),
+            );
         });
     });
 }
 
-fn read_some_files(source: &str, c: &mut Criterion, mut fs: FS) {
-    let glob = glob::Pattern::new("data/skill*.datc64").unwrap();
+fn read_some_files(source: &str, c: &mut Criterion, mut fs: FS, pattern: &str) {
+    let glob = glob::Pattern::new(pattern).unwrap();
 
     let list = fs.list();
     // warm caches
@@ -45,10 +72,15 @@ fn read_some_files(source: &str, c: &mut Criterion, mut fs: FS) {
     });
 }
 
-criterion_group!(small_files, fs_benchmark_cdn, fs_benchmark_steam);
+criterion_group!(
+    name=large_files;
+    config=Criterion::default().sample_size(10);
+    targets=fs_benchmark_cdn_large_art, fs_benchmark_cdn_small_art
+);
+criterion_group!(small_files, fs_benchmark_cdn_dats, fs_benchmark_steam);
 criterion_group!(
     name=index;
     config=Criterion::default().sample_size(10);
     targets=fs_load_index
 );
-criterion_main!(index, small_files);
+criterion_main!(index, small_files, large_files);
