@@ -1,10 +1,8 @@
-use std::fs;
-use std::path::PathBuf;
-use std::{
-    io::{Read, Write},
-    net::TcpStream,
-    path::Path,
-    time::Duration,
+use std::path::{Path, PathBuf};
+use std::{fs, time::Duration};
+use {
+    std::io::{Read, Write},
+    std::net::TcpStream,
 };
 
 use anyhow::{bail, Context};
@@ -64,12 +62,9 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
     // Check cache for version URL
     let cache_dir = cache_dir.join("cdn_url").join(version);
     let cache_file = cache_dir.join(version);
-    if let Ok(metadata) = std::fs::metadata(&cache_file) {
-        if metadata.modified()?.elapsed()?.as_secs() < 3600 {
-            let url_string = fs::read_to_string(&cache_file)?;
-            let url = Url::parse(&url_string).with_context(|| "Failed to parse URL")?;
-            return Ok(url);
-        }
+    if fs::metadata(&cache_file)?.modified()?.elapsed()?.as_secs() < 3600 {
+        return Url::parse(fs::read_to_string(&cache_file)?.as_str())
+            .with_context(|| "Failed to parse URL");
     }
     let url = match version {
         // Latest PoE 1
@@ -88,8 +83,8 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
         _ => panic!("Invalid version provided"),
     }
     .unwrap_or_else(|_| panic!("Failed to get URL for version: {}", version));
-    std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
-    std::fs::write(&cache_file, url.as_str()).expect("Failed to write URL to cache");
+    fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
+    fs::write(&cache_file, url.as_str()).expect("Failed to write URL to cache");
     eprintln!("Refreshed CDN URL: {}", url);
     Ok(url)
 }
