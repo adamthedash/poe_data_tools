@@ -135,7 +135,7 @@ fn main() -> Result<()> {
                 Patch::Two => "2",
                 Patch::Specific(v) => v,
             };
-            from_cdn(&cdn_base_url(version_string), &cache_dir)
+            from_cdn(&cdn_base_url(&cache_dir, version_string)?, &cache_dir)
         }
         Source::Steam { steam_folder } => from_steam(steam_folder),
     };

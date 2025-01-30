@@ -27,6 +27,7 @@ serde_json = "1.0.137"
 polars = {version = "0.45.1", features=["csv", "lazy", "list_eval", "dtype-full"]}
 rayon = "1.10.0"
 image = { git = "https://github.com/RunDevelopment/image", branch = "new-dds-decoder" }
+httpdate = "1.0.3"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }

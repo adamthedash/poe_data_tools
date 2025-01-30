@@ -7,47 +7,43 @@ use poe_tools::{
 };
 
 fn fs_benchmark_steam(c: &mut Criterion) {
-    let fs = from_steam(steam_folder_search("2").expect("Can't find steam folder"));
-    read_some_files("steam", c, fs, "data/skill*.datc64");
+    read_some_files("steam", c, steam_fs(), "data/skill*.datc64");
 }
 fn fs_benchmark_cdn_dats(c: &mut Criterion) {
-    let fs = from_cdn(
-        &cdn_base_url("2"),
-        &cache_dir().unwrap().join("poe_data_tools"),
-    );
-    read_some_files("cdn", c, fs, "data/skill*.datc64");
+    read_some_files("cdn", c, cdn_fs(), "data/skill*.datc64");
 }
 
 fn fs_benchmark_cdn_small_art(c: &mut Criterion) {
-    let fs = from_cdn(
-        &cdn_base_url("2"),
-        &cache_dir().unwrap().join("poe_data_tools"),
-    );
-    read_some_files("cdn", c, fs, "minimap/**/*.dds");
+    read_some_files("cdn", c, cdn_fs(), "minimap/**/*.dds");
 }
 
 fn fs_benchmark_cdn_large_art(c: &mut Criterion) {
-    let fs = from_cdn(
-        &cdn_base_url("2"),
-        &cache_dir().unwrap().join("poe_data_tools"),
-    );
     read_some_files(
         "cdn",
         c,
-        fs,
+        cdn_fs(),
         "art/textures/interface/2d/2dart/uiimages/login/4k/**/*.dds",
     );
 }
 
 fn fs_load_index(c: &mut Criterion) {
+    let cache_dir = cache_dir().unwrap().join("poe_data_tools");
+    let base_url = cdn_base_url(&cache_dir, "2").expect("Failed to get base url");
     c.bench_function("load_index", |b| {
         b.iter(|| {
-            let _fs = from_cdn(
-                &cdn_base_url("2"),
-                &cache_dir().unwrap().join("poe_data_tools"),
-            );
+            let _fs = from_cdn(&base_url, &cache_dir);
         });
     });
+}
+
+fn steam_fs() -> FS {
+    from_steam(steam_folder_search("2").expect("Can't find steam folder"))
+}
+
+fn cdn_fs() -> FS {
+    let cache_dir = cache_dir().unwrap().join("poe_data_tools");
+    let base_url = cdn_base_url(&cache_dir, "2").expect("Failed to get base url");
+    from_cdn(&base_url, &cache_dir)
 }
 
 fn read_some_files(source: &str, c: &mut Criterion, mut fs: FS, pattern: &str) {

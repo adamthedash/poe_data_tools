@@ -66,7 +66,6 @@ impl Bundle {
         let buf_size = (block_end * block_size).min(self.head.uncompressed_size as usize)
             - block_start * block_size;
         let mut buf = vec![0; buf_size];
-
         // Chunk into slices which can be written to in parallel
         let chunks = buf.chunks_mut(block_size).collect::<Vec<_>>();
 
