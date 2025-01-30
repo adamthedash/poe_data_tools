@@ -10,16 +10,16 @@ fn fs_benchmark_steam(c: &mut Criterion) {
     read_some_files("steam", c, steam_fs(), "data/skill*.datc64");
 }
 fn fs_benchmark_cdn_dats(c: &mut Criterion) {
-    read_some_files("cdn", c, cdn_fs(), "data/skill*.datc64");
+    read_some_files("cdn_dats", c, cdn_fs(), "data/skill*.datc64");
 }
 
 fn fs_benchmark_cdn_small_art(c: &mut Criterion) {
-    read_some_files("cdn", c, cdn_fs(), "minimap/**/*.dds");
+    read_some_files("cdn_small_art", c, cdn_fs(), "minimap/**/*.dds");
 }
 
 fn fs_benchmark_cdn_large_art(c: &mut Criterion) {
     read_some_files(
-        "cdn",
+        "cdn_large_art",
         c,
         cdn_fs(),
         "art/textures/interface/2d/2dart/uiimages/login/4k/**/*.dds",

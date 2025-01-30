@@ -46,37 +46,42 @@ pub fn fetch_schema(cache_dir: &std::path::Path) -> anyhow::Result<SchemaCollect
     let etag_path = schema_path.with_extension("json.etag");
     let client = reqwest::blocking::Client::new();
 
-    if etag_path.exists() && schema_path.exists() {
-        // check if the schema file was modified more than an hour ago and just return it if not
-        let metadata = std::fs::metadata(&schema_path)?;
+    // File fresh? Use it
+    if let Ok(metadata) = std::fs::metadata(&schema_path) {
         if metadata.modified()?.elapsed()?.as_secs() < 3600 {
-            let schema: SchemaCollection =
-                serde_json::from_reader(std::fs::File::open(schema_path)?)?;
-            return Ok(schema);
-        }
-
-        // check if the etag has changed
-        let etag = std::fs::read_to_string(&etag_path)?;
-        let response = client
-            .head(SCHEMA_URL)
-            .header("If-None-Match", etag)
-            .send()?
-            .error_for_status()?;
-        if response.status().as_u16() == 304 {
-            let schema: SchemaCollection =
-                serde_json::from_reader(std::fs::File::open(schema_path)?)?;
-            return Ok(schema);
+            return Ok(serde_json::from_str(
+                std::fs::read_to_string(schema_path)?.as_str(),
+            )?);
         }
     }
 
-    let response = client.get(SCHEMA_URL).send()?.error_for_status()?;
-    let etag = response.headers().get("etag").unwrap().to_str().unwrap();
-    std::fs::write(etag_path, etag)?;
-    let content = response.bytes()?;
+    let mut req = client.get(SCHEMA_URL);
+
+    // Got an etag? Use it
+    if let Ok(etag) = std::fs::read_to_string(&etag_path) {
+        req = req.header("If-None-Match", etag);
+    }
+
+    let schema_file = std::fs::read_to_string(&schema_path);
+
+    let response = req.send()?.error_for_status()?;
+    if response.status().as_u16() == 304 && schema_file.is_ok() {
+        // Not modified
+        return Ok(serde_json::from_str(schema_file.unwrap().as_str())?);
+    }
+
     std::fs::create_dir_all(cache_dir)?;
+
+    std::fs::write(
+        etag_path,
+        response.headers().get("etag").unwrap().to_str().unwrap(),
+    )?;
+
+    let content = response.bytes()?;
     std::fs::write(&schema_path, content)?;
-    let schema: SchemaCollection = serde_json::from_reader(std::fs::File::open(schema_path)?)?;
-    Ok(schema)
+    Ok(serde_json::from_str(
+        std::fs::read_to_string(schema_path)?.as_str(),
+    )?)
 }
 
 #[cfg(test)]
