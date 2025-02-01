@@ -13,7 +13,7 @@ pub fn extract_files(fs: &mut FS, pattern: &Pattern, output_folder: &Path) -> Re
     fs.list()
         .iter()
         .filter(|filename| pattern.matches(filename))
-        .try_for_each(|filename| -> Result<(), anyhow::Error> {
+        .map(|filename| -> Result<_, anyhow::Error> {
             // Dump it to disk
             let contents = fs.read(filename).context("Failed to read file")?;
 
@@ -22,10 +22,13 @@ pub fn extract_files(fs: &mut FS, pattern: &Pattern, output_folder: &Path) -> Re
                 .context("Failed to create folder")?;
 
             fs::write(out_filename, &contents).context("Failed to write file")?;
-            eprintln!("{}", filename);
 
-            Ok(())
-        })?;
+            Ok(filename)
+        })
+        .for_each(|result| match result {
+            Ok(filename) => eprintln!("Extracted file: {}", filename),
+            Err(e) => eprintln!("Failed to extract file: {:?}", e),
+        });
 
     Ok(())
 }
