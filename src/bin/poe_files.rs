@@ -64,6 +64,7 @@ enum Command {
         .multiple(false) // Only one can be used at a time
     )
 )]
+#[clap(version)]
 struct Cli {
     /// Specify the patch version (1, 2, or specific_patch)
     #[arg(long, required = true)]
