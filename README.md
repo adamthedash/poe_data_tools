@@ -31,10 +31,11 @@ poe_files --help
 ![bundle index file format](./images/bundle_index_spec.png)
 
 **TODO List**
-
-- Directly use Murmur64A as the Hasher for my LUTs, rather than using the hashes as keys with the default Hasher
-- Proper error propogation in the lib crate using Anyhow
 - Proper documentation for the lib crate
+- Hook up dump-tables to the bundle FS directly
+- Auto-fetching of dat table schemas
+- Swap image.rs version once [DDS support is merged](https://github.com/image-rs/image/pull/2258)
+
 
 # Testing
 Tested on linux (WSL) and Windows with the Steam version of PoE 1, and rolling latest patch from the CDN for PoE 2.
