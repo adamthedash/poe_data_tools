@@ -5,7 +5,8 @@ use poe_tools::{
     bundle_fs::{from_cdn, from_steam},
     bundle_loader::cdn_base_url,
     commands::{
-        cat::cat_file, dump_tables::dump_tables, extract::extract_files, list::list_files, Patch,
+        cat::cat_file, dump_art::extract_art, dump_tables::dump_tables, extract::extract_files,
+        list::list_files, Patch,
     },
 };
 use std::path::PathBuf;
@@ -41,6 +42,13 @@ enum Command {
 
         /// Path to write out the parsed tables to - Only supports CSV for now
         output_folder: PathBuf,
+    },
+    DumpArt {
+        /// Path to the folder to output the extracted files
+        output_folder: PathBuf,
+        /// Glob pattern to filter the list of files
+        #[clap(default_value = "*")]
+        glob: Pattern,
     },
 }
 
@@ -143,6 +151,10 @@ fn main() -> Result<()> {
             output_folder,
         } => dump_tables(&datc64_root, &schema_path, &output_folder, &args.patch)
             .context("Dump Tables command failed")?,
+        Command::DumpArt {
+            output_folder,
+            glob,
+        } => extract_art(&mut fs, &glob, &output_folder).context("Dump Art command failed")?,
     }
 
     Ok(())

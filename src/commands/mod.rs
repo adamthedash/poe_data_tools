@@ -1,4 +1,5 @@
 pub mod cat;
+pub mod dump_art;
 pub mod dump_tables;
 pub mod extract;
 pub mod list;
