@@ -34,20 +34,21 @@ enum Command {
     },
     /// Converts datc64 files into CSV files
     DumpTables {
-        /// The path to the folder contining datc64 files on disk
-        datc64_root: PathBuf,
+        /// Path to write out the parsed tables to
+        output_folder: PathBuf,
 
         /// A schema to apply to the tables
         schema_path: PathBuf,
 
-        /// Path to write out the parsed tables to - Only supports CSV for now
-        output_folder: PathBuf,
+        /// Glob pattern to filter the list of files
+        #[clap(default_value = "*.datc64")]
+        glob: Pattern,
     },
     DumpArt {
         /// Path to the folder to output the extracted files
         output_folder: PathBuf,
         /// Glob pattern to filter the list of files
-        #[clap(default_value = "*")]
+        #[clap(default_value = "*.dds")]
         glob: Pattern,
     },
 }
@@ -147,10 +148,10 @@ fn main() -> Result<()> {
             output_folder,
         } => extract_files(&mut fs, &glob, &output_folder).context("Extract command filed")?,
         Command::DumpTables {
-            datc64_root,
             schema_path,
             output_folder,
-        } => dump_tables(&datc64_root, &schema_path, &output_folder, &args.patch)
+            glob,
+        } => dump_tables(&mut fs, &glob, &schema_path, &output_folder, &args.patch)
             .context("Dump Tables command failed")?,
         Command::DumpArt {
             output_folder,

@@ -1,4 +1,5 @@
 use crate::{
+    bundle_fs::FS,
     commands::Patch,
     dat::{
         ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
@@ -6,10 +7,11 @@ use crate::{
     },
 };
 use anyhow::{anyhow, bail, ensure, Context};
-use glob::glob;
+use bytes::Bytes;
+use glob::Pattern;
 use std::{
     fs::{self, create_dir_all, File},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use anyhow::Result;
@@ -298,11 +300,10 @@ fn save_to_csv(table: &mut DataFrame, path: &Path) {
         .expect("Failed to write DF to file");
 }
 
-fn process_file(dat_path: &Path, output_path: &Path, schema: &DatTableSchema) -> Result<()> {
+fn process_file(bytes: &Bytes, output_path: &Path, schema: &DatTableSchema) -> Result<()> {
     // Load dat file
-    let bytes = fs::read(dat_path).context("Failed to read table file")?;
-    let (_, table) = DatTable::from_raw_bytes(&bytes)
-        .map_err(|e| anyhow!("Failed to parse table data: {:?}: {:?}", dat_path, e))?;
+    let (_, table) = DatTable::from_raw_bytes(bytes)
+        .map_err(|e| anyhow!("Failed to parse table data: {:?}", e))?;
 
     ensure!(!table.rows.is_empty(), "Empty table");
 
@@ -317,11 +318,17 @@ fn process_file(dat_path: &Path, output_path: &Path, schema: &DatTableSchema) ->
 
 /// Convert datc64 tables into CSV files
 pub fn dump_tables(
-    datc64_root: &Path,
+    fs: &mut FS,
+    pattern: &Pattern,
     schema_path: &Path,
     output_folder: &Path,
     version: &Patch,
 ) -> Result<()> {
+    ensure!(
+        pattern.as_str().ends_with(".datc64"),
+        "Only .datc64 table export is supported."
+    );
+
     let version = match version {
         Patch::One => 1,
         Patch::Two => 2,
@@ -334,43 +341,33 @@ pub fn dump_tables(
     )
     .context("Failed to parse schema file")?;
 
-    // Find the dat files
-    let glob_pattern = datc64_root
-        .join("**/*.datc64")
-        .to_string_lossy()
-        .to_string();
-    let files = glob(&glob_pattern)
-        .context("Failed to glob datc files")?
-        .filter_map(Result::ok);
+    fs.list()
+        .iter()
+        .filter(|filename| pattern.matches(filename))
+        .map(|filename| -> Result<_, anyhow::Error> {
+            // Load table schema - todo: HashMap rather than vector
+            let schema = schemas
+                .tables
+                .iter()
+                // valid_for == 3 is common between both games
+                .filter(|t| t.valid_for == version || t.valid_for == 3)
+                .find(|t| *t.name.to_lowercase() == *PathBuf::from(filename).file_stem().unwrap())
+                .with_context(|| format!("Couldn't find schema for {:?}", filename))?;
 
-    for dat_path in files {
-        // Load table schema - todo: HashMap rather than vector
-        let schema = schemas
-            .tables
-            .iter()
-            // valid_for == 3 is common between both games
-            .filter(|t| t.valid_for == version || t.valid_for == 3)
-            .find(|t| *t.name.to_lowercase() == *dat_path.file_stem().unwrap());
+            // Load the table contents
+            let contents = fs.read(filename).context("Failed to read file")?;
 
-        let schema = if let Some(schema) = schema {
-            schema
-        } else {
-            eprintln!("Couldn't find schema for {:?}", dat_path.file_name());
-            continue;
-        };
+            // Convert the data table
+            let output_path = output_folder.join(filename).with_extension("csv");
+            process_file(&contents, &output_path, schema)
+                .with_context(|| format!("Failed to process file: {:?}", filename))?;
 
-        // Convert the data table
-        let output_path = output_folder
-            .join(dat_path.strip_prefix(datc64_root).unwrap())
-            .with_extension("csv");
-
-        let res = process_file(&dat_path, &output_path, schema)
-            .with_context(|| format!("Failed to process file: {:?}", dat_path.file_name()));
-
-        if let Err(e) = res {
-            eprintln!("{:?}", e);
-        }
-    }
+            Ok(filename)
+        })
+        .for_each(|result| match result {
+            Ok(filename) => eprintln!("Extracted table: {}", filename),
+            Err(e) => eprintln!("Failed to extract table: {:?}", e),
+        });
 
     Ok(())
 }
