@@ -1,4 +1,8 @@
+use std::path::Path;
+
+use anyhow::Result;
 use serde::Deserialize;
+use std::fs;
 
 #[derive(Deserialize, Debug)]
 pub struct SchemaCollection {
@@ -39,48 +43,51 @@ pub struct References {
     pub table: String,
 }
 
-pub fn fetch_schema(cache_dir: &std::path::Path) -> anyhow::Result<SchemaCollection> {
+pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
     const SCHEMA_URL: &str =
         "https://github.com/poe-tool-dev/dat-schema/releases/download/latest/schema.min.json";
+
+    let cache_dir = cache_dir.join("schema");
     let schema_path = cache_dir.join("schema.min.json");
     let etag_path = schema_path.with_extension("json.etag");
-    let client = reqwest::blocking::Client::new();
 
     // File fresh? Use it
-    if let Ok(metadata) = std::fs::metadata(&schema_path) {
+    if let Ok(metadata) = fs::metadata(&schema_path) {
         if metadata.modified()?.elapsed()?.as_secs() < 3600 {
+            eprintln!("Using cached schema");
             return Ok(serde_json::from_str(
-                std::fs::read_to_string(schema_path)?.as_str(),
+                fs::read_to_string(schema_path)?.as_str(),
             )?);
         }
     }
 
+    eprintln!("Fetching schema from github");
+    let client = reqwest::blocking::Client::new();
     let mut req = client.get(SCHEMA_URL);
 
     // Got an etag? Use it
-    if let Ok(etag) = std::fs::read_to_string(&etag_path) {
+    if let Ok(etag) = fs::read_to_string(&etag_path) {
         req = req.header("If-None-Match", etag);
     }
 
-    let schema_file = std::fs::read_to_string(&schema_path);
-
     let response = req.send()?.error_for_status()?;
-    if response.status().as_u16() == 304 && schema_file.is_ok() {
+    if response.status().as_u16() == 304 {
         // Not modified
-        return Ok(serde_json::from_str(schema_file.unwrap().as_str())?);
+        let schema_file = fs::read_to_string(&schema_path)?;
+        return Ok(serde_json::from_str(&schema_file)?);
     }
 
-    std::fs::create_dir_all(cache_dir)?;
-
-    std::fs::write(
+    // Save out to cache
+    fs::create_dir_all(cache_dir)?;
+    fs::write(
         etag_path,
         response.headers().get("etag").unwrap().to_str().unwrap(),
     )?;
-
     let content = response.bytes()?;
-    std::fs::write(&schema_path, content)?;
+    fs::write(&schema_path, content)?;
+
     Ok(serde_json::from_str(
-        std::fs::read_to_string(schema_path)?.as_str(),
+        fs::read_to_string(schema_path)?.as_str(),
     )?)
 }
 

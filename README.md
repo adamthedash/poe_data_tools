@@ -32,8 +32,6 @@ poe_files --help
 
 **TODO List**
 - Proper documentation for the lib crate
-- Hook up dump-tables to the bundle FS directly
-- Auto-fetching of dat table schemas
 - Swap image.rs version once [DDS support is merged](https://github.com/image-rs/image/pull/2258)
 
 

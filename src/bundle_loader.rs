@@ -60,12 +60,17 @@ impl CDNLoader {
 
 pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
     // Check cache for version URL
-    let cache_dir = cache_dir.join("cdn_url").join(version);
+    let cache_dir = cache_dir.join("cdn_url");
     let cache_file = cache_dir.join(version);
-    if fs::metadata(&cache_file)?.modified()?.elapsed()?.as_secs() < 3600 {
-        return Url::parse(fs::read_to_string(&cache_file)?.as_str())
-            .with_context(|| "Failed to parse URL");
+
+    // If we have a recently cached version, just use that instead
+    if cache_file.exists() && fs::metadata(&cache_file)?.modified()?.elapsed()?.as_secs() < 3600 {
+        let url = Url::parse(fs::read_to_string(&cache_file)?.as_str())
+            .with_context(|| "Failed to parse URL")?;
+        eprintln!("Using cached CDN URL: {}", url);
+        return Ok(url);
     }
+
     let url = match version {
         // Latest PoE 1
         "1" => cur_url("patch.pathofexile.com:12995".to_string(), &[1, 6]),
@@ -83,8 +88,9 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
         _ => panic!("Invalid version provided"),
     }
     .unwrap_or_else(|_| panic!("Failed to get URL for version: {}", version));
-    fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
-    fs::write(&cache_file, url.as_str()).expect("Failed to write URL to cache");
+
+    fs::create_dir_all(&cache_dir).context("Failed to create cache directory")?;
+    fs::write(&cache_file, url.as_str()).context("Failed to write URL to cache")?;
     eprintln!("Refreshed CDN URL: {}", url);
     Ok(url)
 }

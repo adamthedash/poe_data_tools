@@ -37,9 +37,6 @@ enum Command {
         /// Path to write out the parsed tables to
         output_folder: PathBuf,
 
-        /// A schema to apply to the tables
-        schema_path: PathBuf,
-
         /// Glob pattern to filter the list of files
         #[clap(default_value = "*.datc64")]
         glob: Pattern,
@@ -94,21 +91,24 @@ struct Args {
     patch: Patch,
     source: Source,
     command: Command,
+    cache_dir: PathBuf,
 }
 
 /// Validates user input and constructs a valid input state
 fn parse_args() -> Result<Args> {
     let cli = Cli::parse();
 
+    let cache_dir = cli
+        .cache_dir
+        .unwrap_or_else(|| dirs::cache_dir().unwrap().join("poe_data_tools"));
+
     let source = if let Some(steam_folder) = cli.steam {
         ensure!(steam_folder.exists(), "Steam folder doesn't exist");
         Source::Steam { steam_folder }
     } else {
-        let cache_dir = cli
-            .cache_dir
-            .unwrap_or_else(|| dirs::cache_dir().unwrap().join("poe_data_tools"));
-
-        Source::Cdn { cache_dir }
+        Source::Cdn {
+            cache_dir: cache_dir.clone(),
+        }
     };
 
     if matches!(source, Source::Steam { .. }) {
@@ -122,6 +122,7 @@ fn parse_args() -> Result<Args> {
         patch: cli.patch,
         source,
         command: cli.command,
+        cache_dir,
     })
 }
 
@@ -148,10 +149,9 @@ fn main() -> Result<()> {
             output_folder,
         } => extract_files(&mut fs, &glob, &output_folder).context("Extract command filed")?,
         Command::DumpTables {
-            schema_path,
             output_folder,
             glob,
-        } => dump_tables(&mut fs, &glob, &schema_path, &output_folder, &args.patch)
+        } => dump_tables(&mut fs, &glob, &args.cache_dir, &output_folder, &args.patch)
             .context("Dump Tables command failed")?,
         Command::DumpArt {
             output_folder,
