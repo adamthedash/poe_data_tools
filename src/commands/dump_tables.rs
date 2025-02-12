@@ -2,7 +2,7 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     dat::{
-        ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
+        ivy_schema::{fetch_schema, ColumnSchema, DatTableSchema},
         table_view::DatTable,
     },
 };
@@ -10,7 +10,7 @@ use anyhow::{anyhow, bail, ensure, Context};
 use bytes::Bytes;
 use glob::Pattern;
 use std::{
-    fs::{self, create_dir_all, File},
+    fs::{create_dir_all, File},
     path::{Path, PathBuf},
 };
 
@@ -320,7 +320,7 @@ fn process_file(bytes: &Bytes, output_path: &Path, schema: &DatTableSchema) -> R
 pub fn dump_tables(
     fs: &mut FS,
     pattern: &Pattern,
-    schema_path: &Path,
+    cache_dir: &Path,
     output_folder: &Path,
     version: &Patch,
 ) -> Result<()> {
@@ -336,10 +336,7 @@ pub fn dump_tables(
     };
 
     // Load schema: todo: Get this from Ivy's CDN / cache it
-    let schemas: SchemaCollection = serde_json::from_str(
-        &fs::read_to_string(schema_path).context("Failed to read schema file")?,
-    )
-    .context("Failed to parse schema file")?;
+    let schemas = fetch_schema(cache_dir).context("Failed to fetch schema file")?;
 
     fs.list()
         .iter()

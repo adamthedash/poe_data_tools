@@ -1,10 +1,8 @@
-use std::fs;
-use std::path::PathBuf;
-use std::{
-    io::{Read, Write},
-    net::TcpStream,
-    path::Path,
-    time::Duration,
+use std::path::{Path, PathBuf};
+use std::{fs, time::Duration};
+use {
+    std::io::{Read, Write},
+    std::net::TcpStream,
 };
 
 use anyhow::{bail, Context};
@@ -40,7 +38,7 @@ impl CDNLoader {
         let cache_path =
             PathBuf::from(&self.cache_dir).join(url.to_string().trim_start_matches("https://"));
         if let Ok(bytes) = fs::read(&cache_path) {
-            eprintln!("Loading bundle from cache: {:?}", path_stub);
+            //eprintln!("Loading bundle from cache: {:?}", path_stub);
             return Ok(Bytes::from(bytes));
         }
 
@@ -60,12 +58,24 @@ impl CDNLoader {
     }
 }
 
-pub fn cdn_base_url(version: &str) -> Url {
+pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
+    // Check cache for version URL
+    let cache_dir = cache_dir.join("cdn_url");
+    let cache_file = cache_dir.join(version);
+
+    // If we have a recently cached version, just use that instead
+    if cache_file.exists() && fs::metadata(&cache_file)?.modified()?.elapsed()?.as_secs() < 3600 {
+        let url = Url::parse(fs::read_to_string(&cache_file)?.as_str())
+            .with_context(|| "Failed to parse URL")?;
+        eprintln!("Using cached CDN URL: {}", url);
+        return Ok(url);
+    }
+
     let url = match version {
         // Latest PoE 1
-        "1" => cur_url_poe(),
+        "1" => cur_url("patch.pathofexile.com:12995".to_string(), &[1, 6]),
         // Latest PoE 2
-        "2" => cur_url_poe2(),
+        "2" => cur_url("patch.pathofexile2.com:13060".to_string(), &[1, 7]),
         // Specific PoE 1 patch
         v if v.starts_with("3.") => Url::parse(format!("https://patch.poecdn.com/{}/", v).as_str())
             .with_context(|| "Failed to parse URL"),
@@ -78,15 +88,11 @@ pub fn cdn_base_url(version: &str) -> Url {
         _ => panic!("Invalid version provided"),
     }
     .unwrap_or_else(|_| panic!("Failed to get URL for version: {}", version));
-    eprintln!("Using CDN URL: {}", url);
-    url
-}
 
-fn cur_url_poe() -> anyhow::Result<Url> {
-    cur_url("patch.pathofexile.com:12995".to_string(), &[1, 6])
-}
-fn cur_url_poe2() -> anyhow::Result<Url> {
-    cur_url("patch.pathofexile2.com:13060".to_string(), &[1, 7])
+    fs::create_dir_all(&cache_dir).context("Failed to create cache directory")?;
+    fs::write(&cache_file, url.as_str()).context("Failed to write URL to cache")?;
+    eprintln!("Refreshed CDN URL: {}", url);
+    Ok(url)
 }
 
 fn parse_response(input: &[u8]) -> IResult<&[u8], Vec<String>> {
