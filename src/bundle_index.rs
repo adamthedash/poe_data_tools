@@ -11,6 +11,7 @@ use nom::{
 use url::Url;
 
 use crate::bundle::{fetch_bundle_content, load_bundle_content, parse_bundle};
+use anyhow::{anyhow, Context, Result};
 
 #[derive(Debug)]
 pub struct BundleInfo {
@@ -135,15 +136,21 @@ pub fn parse_bundle_index(input: &[u8]) -> IResult<&[u8], BundleIndex> {
 }
 
 /// Load an index file from disk
-pub fn load_index_file(path: &Path) -> BundleIndex {
-    let index_content = load_bundle_content(path).read_all();
-    let (_, index) = parse_bundle_index(&index_content).expect("Failed to parse bundle as index");
-    index
+pub fn load_index_file(path: &Path) -> Result<BundleIndex> {
+    let index_content = load_bundle_content(path)
+        .context("Failed to read bundle index")?
+        .read_all();
+    let (_, index) = parse_bundle_index(&index_content)
+        .map_err(|_| anyhow!("Failed to parse bundle as index"))?;
+    Ok(index)
 }
 
 /// Fetch an index file from the CDN (or cache)
-pub fn fetch_index_file(base_url: &Url, cache_dir: &Path, path: &Path) -> BundleIndex {
-    let index_content = fetch_bundle_content(base_url, cache_dir, path).read_all();
-    let (_, index) = parse_bundle_index(&index_content).expect("Failed to parse bundle as index");
-    index
+pub fn fetch_index_file(base_url: &Url, cache_dir: &Path, path: &Path) -> Result<BundleIndex> {
+    let index_content = fetch_bundle_content(base_url, cache_dir, path)
+        .context("Failed to fetch bundle index")?
+        .read_all();
+    let (_, index) = parse_bundle_index(&index_content)
+        .map_err(|_| anyhow!("Failed to parse bundle as index"))?;
+    Ok(index)
 }

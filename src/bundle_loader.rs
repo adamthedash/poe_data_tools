@@ -30,9 +30,11 @@ impl CDNLoader {
     /// Loads the contents of the bundle file. Either reads from the local cache or from the CDN if
     /// it's not cached.
     pub fn load(&self, path_stub: &Path) -> anyhow::Result<Bytes> {
-        let url = self
-            .base_url
-            .join(path_stub.to_str().expect("Failed to parse path as string"))?;
+        let url = self.base_url.join(
+            path_stub
+                .to_str()
+                .context("Failed to parse path as string")?,
+        )?;
 
         // If already cached, assume nothing has changed due to version immutability
         let cache_path =
@@ -51,7 +53,7 @@ impl CDNLoader {
             .build()?;
         let bytes = client.get(url).send()?.error_for_status()?.bytes()?;
         // Save data to file - data first then ETag in case of failure mid-download
-        fs::create_dir_all(cache_path.parent().expect("Failed to get path parent"))?;
+        fs::create_dir_all(cache_path.parent().context("Failed to get path parent")?)?;
         fs::write(&cache_path, &bytes)?;
 
         Ok(bytes)

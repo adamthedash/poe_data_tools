@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Context;
+use anyhow::Result;
 use bytes::Bytes;
 use url::Url;
 
@@ -23,30 +24,32 @@ pub struct FS {
     cache_dir: Option<PathBuf>,
 }
 
-pub fn from_steam(steam_folder: PathBuf) -> FS {
+pub fn from_steam(steam_folder: PathBuf) -> Result<FS> {
     let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
-    let index = load_index_file(&index_path);
-    FS {
+    let index = load_index_file(&index_path).context("Failed to load bundle index")?;
+    Ok(FS {
         index,
         lut: HashMap::new(),
         steam_folder: Some(steam_folder.clone()),
         base_url: None,
         cache_dir: None,
-    }
+    })
 }
-pub fn from_cdn(base_url: &Url, cache_dir: &Path) -> FS {
+pub fn from_cdn(base_url: &Url, cache_dir: &Path) -> Result<FS> {
     let index = fetch_index_file(
         base_url,
         cache_dir,
         PathBuf::from("Bundles2/_.index.bin").as_ref(),
-    );
-    FS {
+    )
+    .context("Failed to load bundle index")?;
+
+    Ok(FS {
         index,
         lut: HashMap::new(),
         steam_folder: None,
         base_url: Some(base_url.clone()),
         cache_dir: Some(cache_dir.to_path_buf()),
-    }
+    })
 }
 
 impl FS {
@@ -59,7 +62,7 @@ impl FS {
         });
         paths
     }
-    pub fn read(&mut self, path: &str) -> anyhow::Result<Bytes> {
+    pub fn read(&mut self, path: &str) -> Result<Bytes> {
         if self.lut.is_empty() {
             self.lut = self
                 .index
@@ -87,15 +90,18 @@ impl FS {
                 self.index.bundles[file.bundle_index as usize].name
             ));
             load_bundle_content(&bundle_path)
+                .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path))?
         } else {
+            let bundle_path = PathBuf::from(format!(
+                "Bundles2/{}.bundle.bin",
+                self.index.bundles[file.bundle_index as usize].name
+            ));
             fetch_bundle_content(
                 self.base_url.as_ref().unwrap(),
                 self.cache_dir.as_ref().unwrap(),
-                &PathBuf::from(format!(
-                    "Bundles2/{}.bundle.bin",
-                    self.index.bundles[file.bundle_index as usize].name
-                )),
+                &bundle_path,
             )
+            .with_context(|| format!("Failed to fetch bundle file: {:?}", bundle_path))?
         };
 
         // Pull out the file's contents
