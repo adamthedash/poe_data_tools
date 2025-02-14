@@ -13,6 +13,8 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterato
 use url::Url;
 
 use crate::bundle_loader::CDNLoader;
+use anyhow::anyhow;
+use anyhow::Result;
 
 /// Encoded as a u32
 #[derive(Debug)]
@@ -149,22 +151,23 @@ pub fn parse_bundle(input: &[u8]) -> IResult<&[u8], Bundle> {
 }
 
 /// Load a bundle file from disk
-pub fn load_bundle_content(path: &Path) -> Bundle {
+pub fn load_bundle_content(path: &Path) -> Result<Bundle> {
     // todo: figure how to properly do error propogation with nom
-    let bundle_content = fs::read(path)
-        .context(format!("{:?}", path))
-        .expect("Failed to read bundle file");
+    let bundle_content = fs::read(path).context("Failed to read bundle file")?;
 
-    let (_, bundle) = parse_bundle(&bundle_content).expect("Failed to parse bundle");
-    bundle
+    let (_, bundle) =
+        parse_bundle(&bundle_content).map_err(|_| anyhow!("Failed to parse bundle"))?;
+    Ok(bundle)
 }
 
 // Fetch a bundle file from the CDN (or cache)
-pub fn fetch_bundle_content(base_url: &Url, cache_dir: &Path, path: &Path) -> Bundle {
+pub fn fetch_bundle_content(base_url: &Url, cache_dir: &Path, path: &Path) -> Result<Bundle> {
     let bundle_content = CDNLoader::new(base_url, cache_dir.to_str().unwrap())
         .load(path)
-        .expect("Failed to load bundle");
+        .context("Failed to load bundle")?;
 
-    let (_, bundle) = parse_bundle(&bundle_content).expect("Failed to parse bundle");
-    bundle
+    let (_, bundle) =
+        parse_bundle(&bundle_content).map_err(|_| anyhow!("Failed to parse bundle"))?;
+
+    Ok(bundle)
 }

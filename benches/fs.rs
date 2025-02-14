@@ -38,12 +38,13 @@ fn fs_load_index(c: &mut Criterion) {
 
 fn steam_fs() -> FS {
     from_steam(steam_folder_search("2").expect("Can't find steam folder"))
+        .expect("Failed to load file system")
 }
 
 fn cdn_fs() -> FS {
     let cache_dir = cache_dir().unwrap().join("poe_data_tools");
     let base_url = cdn_base_url(&cache_dir, "2").expect("Failed to get base url");
-    from_cdn(&base_url, &cache_dir)
+    from_cdn(&base_url, &cache_dir).expect("Failed to load file system")
 }
 
 fn read_some_files(source: &str, c: &mut Criterion, mut fs: FS, pattern: &str) {

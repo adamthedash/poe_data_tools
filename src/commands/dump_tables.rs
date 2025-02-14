@@ -250,7 +250,7 @@ fn parse_table(table: &DatTable, schema: &DatTableSchema) -> Result<DataFrame> {
 
     // Collect em into a dataframe
     let df = DataFrame::new(parsed_columns.into_iter().map(Column::from).collect())
-        .expect("Failed to create df");
+        .context("Failed to create df")?;
     Ok(df)
 }
 
@@ -268,7 +268,7 @@ fn series_to_string(series: &Series) -> String {
 }
 
 /// Save the dataframe to a table, handling list columns
-fn save_to_csv(table: &mut DataFrame, path: &Path) {
+fn save_to_csv(table: &mut DataFrame, path: &Path) -> Result<()> {
     // Stringify list columns
     let new_cols = table
         .get_columns()
@@ -292,12 +292,12 @@ fn save_to_csv(table: &mut DataFrame, path: &Path) {
         table.with_column(col).unwrap();
     });
 
-    create_dir_all(path.parent().expect("No parent directory"))
-        .expect("Failed to create output dirs");
+    create_dir_all(path.parent().context("No parent directory")?)
+        .context("Failed to create output dirs")?;
 
-    CsvWriter::new(File::create(path).expect("Failed to create output file"))
+    CsvWriter::new(File::create(path).context("Failed to create output file")?)
         .finish(&mut table)
-        .expect("Failed to write DF to file");
+        .context("Failed to write DF to file")
 }
 
 fn process_file(bytes: &Bytes, output_path: &Path, schema: &DatTableSchema) -> Result<()> {
@@ -311,7 +311,7 @@ fn process_file(bytes: &Bytes, output_path: &Path, schema: &DatTableSchema) -> R
     let mut df = parse_table(&table, schema).context("Failed to apply schema to table")?;
 
     // Save table out as CSV todo: / JSON / SQLLite table
-    save_to_csv(&mut df, output_path);
+    save_to_csv(&mut df, output_path).context("Failed to write CSV")?;
 
     Ok(())
 }

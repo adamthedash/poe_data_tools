@@ -139,7 +139,8 @@ fn main() -> Result<()> {
             from_cdn(&cdn_base_url(&cache_dir, version_string)?, &cache_dir)
         }
         Source::Steam { steam_folder } => from_steam(steam_folder),
-    };
+    }
+    .context("Failed to initialise file system")?;
 
     match args.command {
         Command::List { glob } => list_files(&fs, &glob).context("List command failed")?,
