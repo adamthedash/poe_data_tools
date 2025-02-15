@@ -23,35 +23,38 @@ pub struct FS {
     cache_dir: Option<PathBuf>,
 }
 
-pub fn from_steam(steam_folder: PathBuf) -> Result<FS> {
-    let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
-    let index = load_index_file(&index_path).context("Failed to load bundle index")?;
-    Ok(FS {
-        index,
-        lut: HashMap::new(),
-        steam_folder: Some(steam_folder.clone()),
-        base_url: None,
-        cache_dir: None,
-    })
-}
-pub fn from_cdn(base_url: &Url, cache_dir: &Path) -> Result<FS> {
-    let index = fetch_index_file(
-        base_url,
-        cache_dir,
-        PathBuf::from("Bundles2/_.index.bin").as_ref(),
-    )
-    .context("Failed to load bundle index")?;
-
-    Ok(FS {
-        index,
-        lut: HashMap::new(),
-        steam_folder: None,
-        base_url: Some(base_url.clone()),
-        cache_dir: Some(cache_dir.to_path_buf()),
-    })
-}
-
 impl FS {
+    /// Initialise a file system over a steam folder
+    pub fn from_steam(steam_folder: PathBuf) -> Result<FS> {
+        let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
+        let index = load_index_file(&index_path).context("Failed to load bundle index")?;
+        Ok(FS {
+            index,
+            lut: HashMap::new(),
+            steam_folder: Some(steam_folder.clone()),
+            base_url: None,
+            cache_dir: None,
+        })
+    }
+
+    /// Initialise a file system using the CDN background
+    pub fn from_cdn(base_url: &Url, cache_dir: &Path) -> Result<FS> {
+        let index = fetch_index_file(
+            base_url,
+            cache_dir,
+            PathBuf::from("Bundles2/_.index.bin").as_ref(),
+        )
+        .context("Failed to load bundle index")?;
+
+        Ok(FS {
+            index,
+            lut: HashMap::new(),
+            steam_folder: None,
+            base_url: Some(base_url.clone()),
+            cache_dir: Some(cache_dir.to_path_buf()),
+        })
+    }
+
     pub fn list(&self) -> Vec<String> {
         let mut paths = Vec::new();
         // Loop over each folder
