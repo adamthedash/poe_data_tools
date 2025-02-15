@@ -13,15 +13,14 @@ pub fn extract_art(fs: &mut FS, pattern: &Pattern, output_folder: &Path) -> Resu
     );
 
     fs.list()
-        .iter()
         .filter(|filename| pattern.matches(filename))
         .map(|filename| -> Result<_, anyhow::Error> {
             // Dump it to disk
-            let contents = fs.read(filename).context("Failed to read file")?;
+            let contents = fs.read(&filename).context("Failed to read file")?;
 
             let img = image::load_from_memory(&contents).context("Failed to pares DDS image")?;
 
-            let out_filename = output_folder.join(filename).with_extension("png");
+            let out_filename = output_folder.join(&filename).with_extension("png");
             fs::create_dir_all(out_filename.parent().unwrap())
                 .context("Failed to create folder")?;
 

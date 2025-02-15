@@ -11,13 +11,12 @@ use crate::bundle_fs::FS;
 /// Extract files to disk matching a glob pattern
 pub fn extract_files(fs: &mut FS, pattern: &Pattern, output_folder: &Path) -> Result<()> {
     fs.list()
-        .iter()
         .filter(|filename| pattern.matches(filename))
         .map(|filename| -> Result<_, anyhow::Error> {
             // Dump it to disk
-            let contents = fs.read(filename).context("Failed to read file")?;
+            let contents = fs.read(&filename).context("Failed to read file")?;
 
-            let out_filename = output_folder.join(filename);
+            let out_filename = output_folder.join(&filename);
             fs::create_dir_all(out_filename.parent().unwrap())
                 .context("Failed to create folder")?;
 

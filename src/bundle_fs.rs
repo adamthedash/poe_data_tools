@@ -28,9 +28,17 @@ impl FS {
     pub fn from_steam(steam_folder: PathBuf) -> Result<FS> {
         let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
         let index = load_index_file(&index_path).context("Failed to load bundle index")?;
+
+        let lut = index
+            .files
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.hash, i))
+            .collect();
+
         Ok(FS {
             index,
-            lut: HashMap::new(),
+            lut,
             steam_folder: Some(steam_folder.clone()),
             base_url: None,
             cache_dir: None,
@@ -46,35 +54,31 @@ impl FS {
         )
         .context("Failed to load bundle index")?;
 
+        let lut = index
+            .files
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (f.hash, i))
+            .collect();
+
         Ok(FS {
             index,
-            lut: HashMap::new(),
+            lut,
             steam_folder: None,
             base_url: Some(base_url.clone()),
             cache_dir: Some(cache_dir.to_path_buf()),
         })
     }
 
-    pub fn list(&self) -> Vec<String> {
-        let mut paths = Vec::new();
-        // Loop over each folder
-        self.index.paths.iter().for_each(|pr| {
-            let parsed = parse_paths(&self.index.path_rep_bundle, pr);
-            paths.append(&mut parsed.get_paths());
-        });
-        paths
+    /// Lists all paths in the index
+    pub fn list(&self) -> impl Iterator<Item = String> + '_ {
+        self.index
+            .paths
+            .iter()
+            .flat_map(|p| parse_paths(&self.index.path_rep_bundle, p).get_paths())
     }
-    pub fn read(&mut self, path: &str) -> Result<Bytes> {
-        if self.lut.is_empty() {
-            self.lut = self
-                .index
-                .files
-                .iter()
-                .enumerate()
-                .map(|(i, f)| (f.hash, i))
-                .collect();
-        }
 
+    pub fn read(&self, path: &str) -> Result<Bytes> {
         let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let mut hasher = hash_builder.build_hasher();
         hasher.write(path.to_lowercase().as_bytes());
