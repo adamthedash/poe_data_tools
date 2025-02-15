@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use nom::{
     bytes::complete::take,
@@ -11,7 +12,6 @@ use nom::{
 use url::Url;
 
 use crate::bundle::{fetch_bundle_content, load_bundle_content, parse_bundle};
-use anyhow::{anyhow, Context, Result};
 
 #[derive(Debug)]
 pub struct BundleInfo {

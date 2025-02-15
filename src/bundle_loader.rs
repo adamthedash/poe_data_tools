@@ -1,16 +1,14 @@
-use std::path::{Path, PathBuf};
-use std::{fs, time::Duration};
-use {
-    std::io::{Read, Write},
-    std::net::TcpStream,
+use std::{
+    fs,
+    io::{Read, Write},
+    net::TcpStream,
+    path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::{bail, Context};
 use bytes::Bytes;
-use nom::bytes::complete::take;
-use nom::multi::count;
-use nom::number::complete::le_u8;
-use nom::IResult;
+use nom::{bytes::complete::take, multi::count, number::complete::le_u8, IResult};
 use reqwest::blocking::Client;
 use url::Url;
 

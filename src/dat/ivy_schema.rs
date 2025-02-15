@@ -1,8 +1,7 @@
-use std::path::Path;
+use std::{fs, path::Path};
 
 use anyhow::Result;
 use serde::Deserialize;
-use std::fs;
 
 #[derive(Deserialize, Debug)]
 pub struct SchemaCollection {
@@ -93,8 +92,9 @@ pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
 
 #[cfg(test)]
 mod tests {
-    use crate::dat::ivy_schema::fetch_schema;
     use dirs::cache_dir;
+
+    use crate::dat::ivy_schema::fetch_schema;
 
     #[test]
     fn load_schema() {

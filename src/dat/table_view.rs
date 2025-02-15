@@ -1,8 +1,6 @@
 use std::fmt::Display;
 
-use anyhow::ensure;
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{ensure, Context, Result};
 use nom::{
     bytes::complete::{tag, take_until},
     combinator::map_res,

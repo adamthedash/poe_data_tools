@@ -1,9 +1,9 @@
 use std::{fs, path::Path};
 
+use anyhow::{ensure, Context, Result};
 use glob::Pattern;
 
 use crate::bundle_fs::FS;
-use anyhow::{ensure, Context, Result};
 
 /// Extract files to disk matching a glob pattern
 pub fn extract_art(fs: &mut FS, pattern: &Pattern, output_folder: &Path) -> Result<()> {

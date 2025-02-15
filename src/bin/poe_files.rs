@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::{ensure, Context, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 use glob::Pattern;
@@ -9,7 +11,6 @@ use poe_tools::{
         list::list_files, Patch,
     },
 };
-use std::path::PathBuf;
 
 #[derive(Debug, Subcommand)]
 enum Command {

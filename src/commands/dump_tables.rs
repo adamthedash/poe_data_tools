@@ -1,3 +1,18 @@
+use std::{
+    fs::{create_dir_all, File},
+    path::{Path, PathBuf},
+};
+
+use anyhow::{anyhow, bail, ensure, Context, Result};
+use bytes::Bytes;
+use glob::Pattern;
+use polars::{
+    frame::DataFrame,
+    io::SerWriter,
+    prelude::{Column, CsvWriter, DataType, NamedFrom},
+    series::Series,
+};
+
 use crate::{
     bundle_fs::FS,
     commands::Patch,
@@ -5,21 +20,6 @@ use crate::{
         ivy_schema::{fetch_schema, ColumnSchema, DatTableSchema},
         table_view::DatTable,
     },
-};
-use anyhow::{anyhow, bail, ensure, Context};
-use bytes::Bytes;
-use glob::Pattern;
-use std::{
-    fs::{create_dir_all, File},
-    path::{Path, PathBuf},
-};
-
-use anyhow::Result;
-use polars::{
-    frame::DataFrame,
-    io::SerWriter,
-    prelude::{Column, CsvWriter, DataType, NamedFrom},
-    series::Series,
 };
 
 fn parse_foreignrow(bytes: &[u8]) -> u64 {

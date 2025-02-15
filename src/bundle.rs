@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use nom::{
     bytes::complete::take,
@@ -13,8 +13,6 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterato
 use url::Url;
 
 use crate::bundle_loader::CDNLoader;
-use anyhow::anyhow;
-use anyhow::Result;
 
 /// Encoded as a u32
 #[derive(Debug)]
