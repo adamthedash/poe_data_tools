@@ -1,3 +1,4 @@
+pub mod art;
 pub mod bundle;
 pub mod bundle_fs;
 pub mod bundle_index;
