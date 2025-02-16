@@ -10,13 +10,24 @@ use crate::bundle_fs::FS;
 
 /// Extract files to disk matching a glob pattern
 pub fn extract_files(fs: &mut FS, pattern: &Pattern, output_folder: &Path) -> Result<()> {
-    fs.list()
+    let filenames = fs
+        .list()
         .filter(|filename| pattern.matches(filename))
-        .map(|filename| -> Result<_, anyhow::Error> {
-            // Dump it to disk
-            let contents = fs.read(&filename).context("Failed to read file")?;
+        .collect::<Vec<_>>();
+    let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
 
-            let out_filename = output_folder.join(&filename);
+    fs.batch_read(&filenames)
+        // Print and filter out errors
+        .filter_map(|f| match f {
+            Ok(x) => Some(x),
+            Err((path, e)) => {
+                eprintln!("Failed to extract file: {:?}: {:?}", path, e);
+                None
+            }
+        })
+        // Attempt to read file contents
+        .map(|(filename, contents)| -> Result<_, anyhow::Error> {
+            let out_filename = output_folder.join(filename);
             fs::create_dir_all(out_filename.parent().unwrap())
                 .context("Failed to create folder")?;
 
@@ -24,6 +35,7 @@ pub fn extract_files(fs: &mut FS, pattern: &Pattern, output_folder: &Path) -> Re
 
             Ok(filename)
         })
+        // Report results
         .for_each(|result| match result {
             Ok(filename) => eprintln!("Extracted file: {}", filename),
             Err(e) => eprintln!("Failed to extract file: {:?}", e),

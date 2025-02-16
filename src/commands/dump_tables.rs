@@ -338,9 +338,23 @@ pub fn dump_tables(
     // Load schema: todo: Get this from Ivy's CDN / cache it
     let schemas = fetch_schema(cache_dir).context("Failed to fetch schema file")?;
 
-    fs.list()
+    let filenames = fs
+        .list()
         .filter(|filename| pattern.matches(filename))
-        .map(|filename| -> Result<_, anyhow::Error> {
+        .collect::<Vec<_>>();
+    let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
+
+    fs.batch_read(&filenames)
+        // Print and filter out errors
+        .filter_map(|f| match f {
+            Ok(x) => Some(x),
+            Err((path, e)) => {
+                eprintln!("Failed to extract file: {:?}: {:?}", path, e);
+                None
+            }
+        })
+        // Attempt to read file contents
+        .map(|(filename, contents)| -> Result<_, anyhow::Error> {
             // Load table schema - todo: HashMap rather than vector
             let schema = schemas
                 .tables
@@ -350,16 +364,14 @@ pub fn dump_tables(
                 .find(|t| *t.name.to_lowercase() == *PathBuf::from(&filename).file_stem().unwrap())
                 .with_context(|| format!("Couldn't find schema for {:?}", &filename))?;
 
-            // Load the table contents
-            let contents = fs.read(&filename).context("Failed to read file")?;
-
             // Convert the data table
-            let output_path = output_folder.join(&filename).with_extension("csv");
+            let output_path = output_folder.join(filename).with_extension("csv");
             process_file(&contents, &output_path, schema)
                 .with_context(|| format!("Failed to process file: {:?}", filename))?;
 
             Ok(filename)
         })
+        // Report results
         .for_each(|result| match result {
             Ok(filename) => eprintln!("Extracted table: {}", filename),
             Err(e) => eprintln!("Failed to extract table: {:?}", e),
