@@ -66,7 +66,7 @@ fn parse_column(
     column: &ColumnSchema,
     cur_offset: usize,
     cur_unknown: usize,
-) -> Result<(bool, usize, Series)> {
+) -> Result<(bool, usize, Result<Series>)> {
     // Parse column name
     let (is_unknown, col_name) = if let Some(name) = column.name.clone() {
         (false, name)
@@ -81,60 +81,63 @@ fn parse_column(
                 "string" => table
                     .view_col_as_array_of_strings(cur_offset)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>()?,
+                    .collect::<Result<Vec<_>>>(),
 
                 "foreignrow" => table
                     .view_col_as_array_of(cur_offset, 16, parse_foreignrow)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>()?,
+                    .collect::<Result<Vec<_>>>(),
 
                 "row" => table
                     .view_col_as_array_of(cur_offset, 16, parse_foreignrow)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>()?,
+                    .collect::<Result<Vec<_>>>(),
 
                 "enumrow" => table
                     .view_col_as_array_of(cur_offset, 4, parse_u32)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>()?,
+                    .collect::<Result<Vec<_>>>(),
 
                 "f32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_f32)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>()?,
+                    .collect::<Result<Vec<_>>>(),
 
                 "i32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_i32)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>()?,
+                    .collect::<Result<Vec<_>>>(),
 
                 "i16" => table
                     .view_col_as_array_of(cur_offset, 2, parse_i16)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>()?,
+                    .collect::<Result<Vec<_>>>(),
 
                 "u16" => table
                     .view_col_as_array_of(cur_offset, 2, parse_u16)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>()?,
+                    .collect::<Result<Vec<_>>>(),
 
                 _ => bail!("Unknown column type: {:?}", column),
-            };
+            }
+            .map(|s| Series::new(col_name.into(), s));
 
-            let series = Series::new(col_name.into(), series);
             (16, series)
         }
 
         // Interval
         (false, true) => match column.column_type.as_str() {
             "i32" => {
-                let values = table
-                    .view_col(cur_offset, 8)?
-                    .map(|bytes| bytes.chunks_exact(4).map(parse_i32).collect::<Vec<_>>())
-                    .map(|x| Series::new("".into(), &x))
-                    .collect::<Vec<_>>();
+                let series = table
+                    .view_col(cur_offset, 8)
+                    .map(|values| {
+                        values
+                            .map(|bytes| bytes.chunks_exact(4).map(parse_i32).collect::<Vec<_>>())
+                            .map(|x| Series::new("".into(), &x))
+                            .collect::<Vec<_>>()
+                    })
+                    .map(|s| Series::new(col_name.into(), s));
 
-                let series = Series::new(col_name.into(), values);
                 (8, series)
             }
             _ => bail!("Unknown column type: {:?}", column),
@@ -143,82 +146,74 @@ fn parse_column(
         // Scalar
         (false, false) => match column.column_type.as_str() {
             "string" => {
-                let values = table
-                    .view_col_as_string(cur_offset)?
-                    .collect::<Result<Vec<_>>>()?;
-                let series = Series::new(col_name.into(), values);
+                let series = table
+                    .view_col_as_string(cur_offset)
+                    .and_then(|strings| strings.collect::<Result<Vec<_>>>())
+                    .map(|s| Series::new(col_name.into(), s));
                 (8, series)
             }
 
             "foreignrow" => {
-                let values = table
-                    .view_col(cur_offset, 16)?
-                    .map(parse_maybe_foreignrow)
-                    .collect::<Vec<_>>();
-                let series = Series::new(col_name.into(), values);
+                let series = table
+                    .view_col(cur_offset, 16)
+                    .map(|items| items.map(parse_maybe_foreignrow).collect::<Vec<_>>())
+                    .map(|s| Series::new(col_name.into(), s));
                 (16, series)
             }
 
             "row" => {
-                let values = table
-                    .view_col(cur_offset, 16)?
-                    .map(parse_maybe_foreignrow)
-                    .collect::<Vec<_>>();
-                let series = Series::new(col_name.into(), values);
+                let series = table
+                    .view_col(cur_offset, 16)
+                    .map(|items| items.map(parse_maybe_foreignrow).collect::<Vec<_>>())
+                    .map(|s| Series::new(col_name.into(), s));
                 (16, series)
             }
 
             "enumrow" => {
-                let values = table
-                    .view_col(cur_offset, 4)?
-                    .map(parse_u32)
-                    .collect::<Vec<_>>();
-                let series = Series::new(col_name.into(), values);
+                let series = table
+                    .view_col(cur_offset, 4)
+                    .map(|items| items.map(parse_u32).collect::<Vec<_>>())
+                    .map(|s| Series::new(col_name.into(), s));
                 (4, series)
             }
 
             "f32" => {
-                let values = table
-                    .view_col(cur_offset, 4)?
-                    .map(parse_f32)
-                    .collect::<Vec<_>>();
-                let series = Series::new(col_name.into(), values);
+                let series = table
+                    .view_col(cur_offset, 4)
+                    .map(|items| items.map(parse_f32).collect::<Vec<_>>())
+                    .map(|s| Series::new(col_name.into(), s));
                 (4, series)
             }
 
             "i32" => {
-                let values = table
-                    .view_col(cur_offset, 4)?
-                    .map(parse_i32)
-                    .collect::<Vec<_>>();
-                let series = Series::new(col_name.into(), values);
+                let series = table
+                    .view_col(cur_offset, 4)
+                    .map(|items| items.map(parse_i32).collect::<Vec<_>>())
+                    .map(|s| Series::new(col_name.into(), s));
                 (4, series)
             }
 
             "i16" => {
-                let values = table
-                    .view_col(cur_offset, 2)?
-                    .map(parse_i16)
-                    .collect::<Vec<_>>();
-                let series = Series::new(col_name.into(), values);
+                let series = table
+                    .view_col(cur_offset, 2)
+                    .map(|items| items.map(parse_i16).collect::<Vec<_>>())
+                    .map(|s| Series::new(col_name.into(), s));
                 (2, series)
             }
 
             "u16" => {
-                let values = table
-                    .view_col(cur_offset, 2)?
-                    .map(parse_u16)
-                    .collect::<Vec<_>>();
-                let series = Series::new(col_name.into(), values);
+                let series = table
+                    .view_col(cur_offset, 2)
+                    .map(|items| items.map(parse_u16).collect::<Vec<_>>())
+                    .map(|s| Series::new(col_name.into(), s));
                 (2, series)
             }
 
             "bool" => {
-                let values = table
-                    .view_col(cur_offset, 1)?
-                    .map(parse_bool)
-                    .collect::<Result<Vec<_>>>()?;
-                let series = Series::new(col_name.into(), values);
+                let series = table
+                    .view_col(cur_offset, 1)
+                    .and_then(|items| items.map(parse_bool).collect::<Result<Vec<_>>>())
+                    .map(|s| Series::new(col_name.into(), s));
                 (1, series)
             }
 
@@ -241,7 +236,16 @@ fn parse_table(table: &DatTable, schema: &DatTableSchema) -> Result<DataFrame> {
             parse_column(table, column, cur_offset, num_unknowns)
                 .with_context(|| format!("Failed to parse column: {:?}", column))?;
 
-        parsed_columns.push(series);
+        // If we successfully parse the data, add it to the table
+        match series {
+            Ok(series) => {
+                parsed_columns.push(series);
+            }
+            Err(e) => eprintln!(
+                "Failed to parse column {:?}, skipping: {:?}",
+                column.name, e
+            ),
+        }
         cur_offset += bytes_taken;
         if is_unknown {
             num_unknowns += 1;
