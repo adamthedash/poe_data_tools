@@ -33,6 +33,8 @@ poe_files --help
 **TODO List**
 - Proper documentation for the lib crate
 - Swap image.rs version once [DDS support is merged](https://github.com/image-rs/image/pull/2258)
+- Skill tree data export
+- Partially export dat tables when some schema columns fail to validate
 
 
 # Testing
