@@ -4,7 +4,7 @@ use anyhow::{ensure, Context, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 use glob::Pattern;
 use poe_tools::{
-    bundle_fs::{from_cdn, from_steam},
+    bundle_fs::FS,
     bundle_loader::cdn_base_url,
     commands::{
         cat::cat_file, dump_art::extract_art, dump_tables::dump_tables, extract::extract_files,
@@ -137,9 +137,9 @@ fn main() -> Result<()> {
                 Patch::Two => "2",
                 Patch::Specific(v) => v,
             };
-            from_cdn(&cdn_base_url(&cache_dir, version_string)?, &cache_dir)
+            FS::from_cdn(&cdn_base_url(&cache_dir, version_string)?, &cache_dir)
         }
-        Source::Steam { steam_folder } => from_steam(steam_folder),
+        Source::Steam { steam_folder } => FS::from_steam(steam_folder),
     }
     .context("Failed to initialise file system")?;
 

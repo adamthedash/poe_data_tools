@@ -12,7 +12,6 @@ pub fn list_files(file_system: &FS, pattern: &Pattern) -> Result<()> {
 
     file_system
         .list()
-        .iter()
         .filter(|p| pattern.matches(p))
         .try_for_each(|p| writeln!(stdout, "{}", p).context("Failed to write to stdout"))?;
 
