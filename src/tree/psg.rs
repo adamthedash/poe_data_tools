@@ -123,14 +123,14 @@ mod tests {
 
         let bytes = std::fs::read(path).unwrap();
         let (_input, psg) = parse_psg(&bytes).unwrap();
-        //println!("{:#?}", psg);
+        println!("{:#?}", psg);
 
-        psg.groups.iter().for_each(|g| {
-            g.passives.iter().for_each(|p| {
-                p.connections.iter().for_each(|c| {
-                    println!("{} -> {}", p.id, c.id);
-                })
-            })
-        });
+        //psg.groups.iter().for_each(|g| {
+        //    g.passives.iter().for_each(|p| {
+        //        p.connections.iter().for_each(|c| {
+        //            println!("{} -> {}", p.id, c.id);
+        //        })
+        //    })
+        //});
     }
 }
