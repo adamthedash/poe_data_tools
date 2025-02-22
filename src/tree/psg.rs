@@ -116,6 +116,12 @@ mod tests {
 
     #[test]
     fn test() {
+        // passiveskills.csv
+        // - Ascendency -> foreign ID
+        // - Stats -> foreign ID
+        // - Name
+        // - Icon -> dds to png
+
         let path = "/home/adam/poe_data/raw/metadata/passiveskillgraph.psg";
         //let path = "/home/adam/poe_data/raw/metadata/atlasskillgraphs/atlasskillgraph.psg";
         //let path =
