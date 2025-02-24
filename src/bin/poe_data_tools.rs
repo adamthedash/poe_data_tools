@@ -7,8 +7,8 @@ use poe_data_tools::{
     bundle_fs::FS,
     bundle_loader::cdn_base_url,
     commands::{
-        cat::cat_file, dump_art::extract_art, dump_tables::dump_tables, extract::extract_files,
-        list::list_files, Patch,
+        cat::cat_file, dump_art::extract_art, dump_tables::dump_tables, dump_tree::dump_tree,
+        extract::extract_files, list::list_files, Patch,
     },
     VERBOSE,
 };
@@ -53,6 +53,10 @@ enum Command {
         #[clap(default_value = "**/*.dds")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
+    },
+    // Extracts the passive skill tree as JSON
+    DumpTree {
+        output_folder: PathBuf,
     },
 }
 
@@ -177,6 +181,10 @@ fn main() -> Result<()> {
             output_folder,
             globs,
         } => extract_art(&mut fs, &globs, &output_folder).context("Dump Art command failed")?,
+        Command::DumpTree { output_folder } => {
+            dump_tree(&mut fs, &args.cache_dir, &output_folder, &args.patch)
+                .context("Dump Tree command failed")?
+        }
     }
 
     Ok(())

@@ -88,7 +88,7 @@ pub struct PassiveSkillGraph<'a> {
 }
 
 /// https://gist.github.com/qcrist/3078c2bbc55401d911583819a65e8bf9
-fn parse_psg(input: &[u8]) -> IResult<&[u8], PassiveSkillGraph> {
+pub fn parse_psg(input: &[u8]) -> IResult<&[u8], PassiveSkillGraph> {
     let (input, version) = u8(input)?;
     assert_eq!(version, 3, "Only PSG version 3 supported.");
 
@@ -112,12 +112,8 @@ fn parse_psg(input: &[u8]) -> IResult<&[u8], PassiveSkillGraph> {
 
 #[cfg(test)]
 mod tests {
-    use std::{path::PathBuf, str::FromStr};
-
-    use anyhow::Context;
 
     use super::parse_psg;
-    use crate::dat::ivy_schema::fetch_schema;
 
     #[test]
     fn test() {
@@ -143,14 +139,5 @@ mod tests {
         //        })
         //    })
         //});
-    }
-
-    #[test]
-    fn test2() {
-        let cache_dir = PathBuf::from_str("").unwrap();
-        // Load schema: todo: Get this from Ivy's CDN / cache it
-        let _schemas = fetch_schema(&cache_dir)
-            .context("Failed to fetch schema file")
-            .unwrap();
     }
 }
