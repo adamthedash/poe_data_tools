@@ -1,6 +1,7 @@
 pub mod cat;
 pub mod dump_art;
 pub mod dump_tables;
+#[allow(dead_code, unused_variables)]
 pub mod dump_tree;
 pub mod extract;
 pub mod list;
