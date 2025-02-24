@@ -17,7 +17,7 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     dat::{
-        ivy_schema::{fetch_schema, ColumnSchema, DatTableSchema},
+        ivy_schema::{fetch_schema, ColumnSchema, DatTableSchema, SchemaCollection},
         table_view::DatTable,
     },
 };
@@ -36,6 +36,17 @@ fn parse_maybe_foreignrow(bytes: &[u8]) -> Option<u64> {
     }
 }
 
+fn parse_maybe_row(bytes: &[u8]) -> Option<u64> {
+    if bytes == [0xfe; 8] {
+        None
+    } else {
+        Some(parse_u64(bytes))
+    }
+}
+
+fn parse_u64(bytes: &[u8]) -> u64 {
+    u64::from_le_bytes(bytes.try_into().unwrap())
+}
 fn parse_u32(bytes: &[u8]) -> u32 {
     u32::from_le_bytes(bytes.try_into().unwrap())
 }
@@ -78,6 +89,9 @@ fn parse_column(
         // Array
         (true, false) => {
             let series = match column.column_type.as_str() {
+                // Array of "array" is used to indicate an unknown data type as far as I can tell
+                "array" => Err(anyhow!("Unknown array type")),
+
                 "string" => table
                     .view_col_as_array_of_strings(cur_offset)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
@@ -89,11 +103,16 @@ fn parse_column(
                     .collect::<Result<Vec<_>>>(),
 
                 "row" => table
-                    .view_col_as_array_of(cur_offset, 16, parse_foreignrow)?
+                    .view_col_as_array_of(cur_offset, 8, parse_maybe_row)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
                     .collect::<Result<Vec<_>>>(),
 
                 "enumrow" => table
+                    .view_col_as_array_of(cur_offset, 4, parse_u32)?
+                    .map(|row| row.map(|x| Series::new("".into(), &x)))
+                    .collect::<Result<Vec<_>>>(),
+
+                "u32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_u32)?
                     .map(|row| row.map(|x| Series::new("".into(), &x)))
                     .collect::<Result<Vec<_>>>(),
@@ -163,13 +182,21 @@ fn parse_column(
 
             "row" => {
                 let series = table
-                    .view_col(cur_offset, 16)
-                    .map(|items| items.map(parse_maybe_foreignrow).collect::<Vec<_>>())
+                    .view_col(cur_offset, 8)
+                    .map(|items| items.map(parse_maybe_row).collect::<Vec<_>>())
                     .map(|s| Series::new(col_name.into(), s));
-                (16, series)
+                (8, series)
             }
 
             "enumrow" => {
+                let series = table
+                    .view_col(cur_offset, 4)
+                    .map(|items| items.map(parse_u32).collect::<Vec<_>>())
+                    .map(|s| Series::new(col_name.into(), s));
+                (4, series)
+            }
+
+            "u32" => {
                 let series = table
                     .view_col(cur_offset, 4)
                     .map(|items| items.map(parse_u32).collect::<Vec<_>>())
@@ -226,7 +253,7 @@ fn parse_column(
 }
 
 /// Parse a table with the given schema into a Polars DataFrame
-fn parse_table(table: &DatTable, schema: &DatTableSchema) -> Result<DataFrame> {
+pub fn parse_table(table: &DatTable, schema: &DatTableSchema) -> Result<DataFrame> {
     // Parse each of the columns
     let mut parsed_columns = vec![];
     let mut cur_offset = 0;
@@ -318,6 +345,35 @@ fn process_file(bytes: &Bytes, output_path: &Path, schema: &DatTableSchema) -> R
     save_to_csv(&mut df, output_path).context("Failed to write CSV")?;
 
     Ok(())
+}
+
+/// Loads a table into a parsed dataframe
+pub fn load_parsed_table(
+    fs: &mut FS,
+    schemas: &SchemaCollection,
+    filename: &str,
+    version: u32,
+) -> Result<DataFrame> {
+    // Load table schema - todo: HashMap rather than vector
+    let schema = schemas
+        .tables
+        .iter()
+        // valid_for == 3 is common between both games
+        .filter(|t| t.valid_for == version || t.valid_for == 3)
+        .find(|t| *t.name.to_lowercase() == *PathBuf::from(&filename).file_stem().unwrap())
+        .with_context(|| format!("Couldn't find schema for {:?}", &filename))?;
+
+    // Load dat file
+    let bytes = fs.read(filename)?;
+    let (_, table) = DatTable::from_raw_bytes(&bytes)
+        .map_err(|e| anyhow!("Failed to parse table data: {:?}", e))?;
+
+    ensure!(!table.rows.is_empty(), "Empty table");
+
+    // Apply it
+    let df = parse_table(&table, schema).context("Failed to apply schema to table")?;
+
+    Ok(df)
 }
 
 /// Convert datc64 tables into CSV files

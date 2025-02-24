@@ -164,15 +164,27 @@ impl DatTable {
         &self,
         offset: usize,
     ) -> Result<impl Iterator<Item = Result<Vec<Option<String>>>> + '_> {
-        let iter = self.view_col_as_array_of(offset, 8, |bytes| {
-            let pointer = u64::from_le_bytes(bytes.try_into().unwrap()) as usize;
-            let string = take_utf16_string(&self.variable_data[pointer - 8..]);
-            if string.is_empty() {
-                None
-            } else {
-                Some(string)
-            }
-        })?;
+        let iter = self
+            .view_col_as_array_of(offset, 8, |bytes| {
+                let pointer = u64::from_le_bytes(bytes.try_into().unwrap()) as usize;
+
+                ensure!(pointer >= 8, "String pointer underflow");
+                ensure!(
+                    pointer - 8 < self.variable_data.len(),
+                    "String pointer overflow"
+                );
+
+                let string = take_utf16_string(&self.variable_data[pointer - 8..]);
+                let string = if string.is_empty() {
+                    None
+                } else {
+                    Some(string)
+                };
+
+                Ok(string)
+            })?
+            // Pull the Result up to the item level
+            .map(|x| x?.into_iter().collect::<Result<Vec<_>>>());
 
         Ok(iter)
     }
