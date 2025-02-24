@@ -7,3 +7,4 @@ pub mod dat;
 pub mod hasher;
 pub mod path;
 pub mod steam;
+pub mod tree;

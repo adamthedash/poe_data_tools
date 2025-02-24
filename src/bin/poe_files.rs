@@ -7,8 +7,8 @@ use poe_tools::{
     bundle_fs::FS,
     bundle_loader::cdn_base_url,
     commands::{
-        cat::cat_file, dump_art::extract_art, dump_tables::dump_tables, extract::extract_files,
-        list::list_files, Patch,
+        cat::cat_file, dump_art::extract_art, dump_tables::dump_tables, dump_tree::dump_tree,
+        extract::extract_files, list::list_files, Patch,
     },
 };
 
@@ -33,7 +33,7 @@ enum Command {
         /// Path to the file to extract
         path: String,
     },
-    /// Converts datc64 files into CSV files
+    /// Extracts datc64 files into CSV files
     DumpTables {
         /// Path to write out the parsed tables to
         output_folder: PathBuf,
@@ -42,12 +42,17 @@ enum Command {
         #[clap(default_value = "*.datc64")]
         glob: Pattern,
     },
+    // Extracts dds files into png files
     DumpArt {
         /// Path to the folder to output the extracted files
         output_folder: PathBuf,
         /// Glob pattern to filter the list of files
         #[clap(default_value = "*.dds")]
         glob: Pattern,
+    },
+    // Extracts the passive skill tree as JSON
+    DumpTree {
+        output_folder: PathBuf,
     },
 }
 
@@ -159,6 +164,10 @@ fn main() -> Result<()> {
             output_folder,
             glob,
         } => extract_art(&mut fs, &glob, &output_folder).context("Dump Art command failed")?,
+        Command::DumpTree { output_folder } => {
+            dump_tree(&mut fs, &args.cache_dir, &output_folder, &args.patch)
+                .context("Dump Tree command failed")?
+        }
     }
 
     Ok(())
