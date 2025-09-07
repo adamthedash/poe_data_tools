@@ -28,7 +28,12 @@ rayon = "1.10.0"
 image = { git = "https://github.com/RunDevelopment/image", branch = "new-dds-decoder" }
 iterators_extended = "0.2.0"
 itertools = "0.14.0"
-arrow = {version = "56.1.0", default-fetures=false, features= ["csv"]}
+
+# Arrow - for dataframe stuff
+arrow-csv = "56.1.0"
+arrow-array = "56.1.0"
+arrow-cast = "56.1.0"
+arrow-schema = "56.1.0"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
