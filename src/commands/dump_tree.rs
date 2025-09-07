@@ -1,7 +1,11 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::{anyhow, bail, Context, Result};
-use arrow::array::{Int32Array, RecordBatch, StringArray, UInt16Array};
+use arrow::array::{Int32Array, RecordBatch, StringArray, UInt16Array, ListArray, UInt64Array};
+use arrow::datatypes::DataType;
+use arrow::record_batch::Column;
+use datafusion::dataframe::DataFrame;
+use datafusion::logical_expr::Expr;
 use itertools::izip;
 
 use super::Patch;
@@ -109,30 +113,42 @@ impl DataFrameHelpers for DataFrame {
 /// data/ascendancy.datc64
 fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy>, Vec<usize>)> {
     let ids = table
-        .try_get_col_by_name("Id")?
-        .str()?
-        .into_iter()
+        .column_by_name("Id")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .context("Failed to cast column")?
+        .iter()
         .map(|id| id.expect("No value for ascendancy ID"))
         .collect::<Vec<_>>();
 
     let names = table
-        .try_get_col_by_name("Name")?
-        .str()?
-        .into_iter()
+        .column_by_name("Name")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .context("Failed to cast column")?
+        .iter()
         .map(|id| id.expect("No value for ascendancy ID"))
         .collect::<Vec<_>>();
 
     let flavour_text = table
-        .try_get_col_by_name("FlavourText")?
-        .str()?
-        .into_iter()
+        .column_by_name("FlavourText")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .context("Failed to cast column")?
+        .iter()
         .collect::<Vec<_>>();
 
     // TODO: RGB to hex
     let flavour_text_colour = table
-        .try_get_col_by_name("RGBFlavourTextColour")?
-        .str()?
-        .into_iter()
+        .column_by_name("RGBFlavourTextColour")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .context("Failed to cast column")?
+        .iter()
         .collect::<Vec<_>>();
 
     // TODO
@@ -157,13 +173,18 @@ fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy>, Vec<u
     .collect::<Vec<_>>();
 
     let parent_classes = table
-        .try_get_col_by_name("Characters")?
-        .list()?
+        .column_by_name("Characters")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .context("Failed to cast column")?
         .into_iter()
         .map(|s| -> Result<_> {
             let parent_class_id = s
                 .context("No value for parent class")?
-                .u64()?
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .context("Failed to cast list element to UInt64Array")?
                 .into_iter()
                 .next()
                 .context("Parent class list is empty")?
@@ -199,16 +220,22 @@ fn parse_character_table(table: &RecordBatch) -> Result<Vec<Class>> {
         .collect::<Vec<_>>();
 
     let base_strs = table
-        .try_get_col_by_name("BaseStrength")?
-        .i32()?
-        .into_iter()
+        .column_by_name("BaseStrength")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .context("Failed to cast column")?
+        .iter()
         .map(|x| x.expect("No value for base strength"))
         .collect::<Vec<_>>();
 
     let base_ints = table
-        .try_get_col_by_name("BaseIntelligence")?
-        .i32()?
-        .into_iter()
+        .column_by_name("BaseIntelligence")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .context("Failed to cast column")?
+        .iter()
         .map(|x| x.expect("No value for base intelligence"))
         .collect::<Vec<_>>();
 
@@ -228,45 +255,65 @@ fn parse_character_table(table: &RecordBatch) -> Result<Vec<Class>> {
 /// data/passiveskills.datc64
 fn parse_passive_table(table: &RecordBatch) -> Result<()> {
     let skill_graph_node_ids = table
-        .try_get_col_by_name("PassiveSkillGraphId")?
-        .u64()?
-        .into_iter()
+        .column_by_name("PassiveSkillGraphId")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<UInt16Array>()
+        .context("Failed to cast column")?
+        .iter()
         .map(|x| x.expect("Unexpected null value"))
         .collect::<Vec<_>>();
 
     let names = table
-        .try_get_col_by_name("Name")?
-        .str()?
-        .into_iter()
+        .column_by_name("Name")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .context("Failed to cast column")?
+        .iter()
         .collect::<Vec<_>>();
 
     let ascendancy_id = table
-        .try_get_col_by_name("Ascendancy")?
-        .u64()?
-        .into_iter()
+        .column_by_name("Ascendancy")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<UInt64Array>()
+        .context("Failed to cast column")?
+        .iter()
         .collect::<Vec<_>>();
 
     let mastery_group = table
-        .try_get_col_by_name("MasteryGroup")?
-        .u64()?
-        .into_iter()
+        .column_by_name("MasteryGroup")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<UInt64Array>()
+        .context("Failed to cast column")?
+        .iter()
         .collect::<Vec<_>>();
 
     // TODO: The only one that's null is the starting root node
     let icon_dds_file = table
-        .try_get_col_by_name("Icon_DDSFile")?
-        .str()?
-        .into_iter()
+        .column_by_name("Icon_DDSFile")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .context("Failed to cast column")?
+        .iter()
         .collect::<Vec<_>>();
 
     let stats = table
-        .try_get_col_by_name("Stats")?
-        .list()?
+        .column_by_name("Stats")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .context("Failed to cast column")?
         .into_iter()
         .map(|s| {
             let stat_ids = s
                 .expect("Stats list is null")
-                .u64()?
+                .as_any()
+                .downcast_ref::<UInt64Array>()
+                .context("Failed to cast list element to UInt64Array")?
                 .into_iter()
                 .map(|x| x.expect("Stat ID value is null"))
                 .collect::<Vec<_>>();
@@ -278,9 +325,12 @@ fn parse_passive_table(table: &RecordBatch) -> Result<()> {
     let stat_values = (0..4)
         .map(|i| {
             let stat_value = table
-                .try_get_col_by_name(&format!("Stat{}Value", i + 1))?
-                .i32()?
-                .into_iter()
+                .column_by_name(&format!("Stat{}Value", i + 1))
+                .context("Column not found")?
+                .as_any()
+                .downcast_ref::<Int32Array>()
+                .context("Failed to cast column")?
+                .iter()
                 .map(|x| x.expect("Stat value is null"))
                 .collect::<Vec<_>>();
 
