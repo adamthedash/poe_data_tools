@@ -1,8 +1,8 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::{anyhow, bail, Context, Result};
+use arrow::array::{Int32Array, RecordBatch, StringArray, UInt16Array};
 use itertools::izip;
-use polars::{frame::DataFrame, prelude::Column};
 
 use super::Patch;
 use crate::{
@@ -107,7 +107,7 @@ impl DataFrameHelpers for DataFrame {
 }
 
 /// data/ascendancy.datc64
-fn parse_ascendancy_table(table: &DataFrame) -> Result<(Vec<Ascendancy>, Vec<usize>)> {
+fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy>, Vec<usize>)> {
     let ids = table
         .try_get_col_by_name("Id")?
         .str()?
@@ -177,18 +177,24 @@ fn parse_ascendancy_table(table: &DataFrame) -> Result<(Vec<Ascendancy>, Vec<usi
 }
 
 /// data/characters.datc64
-fn parse_character_table(table: &DataFrame) -> Result<Vec<Class>> {
+fn parse_character_table(table: &RecordBatch) -> Result<Vec<Class>> {
     let names = table
-        .try_get_col_by_name("Name")?
-        .str()?
-        .into_iter()
+        .column_by_name("Name")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .context("Failed to cast column")?
+        .iter()
         .map(|x| x.expect("No value for character name"))
         .collect::<Vec<_>>();
 
     let base_dexs = table
-        .try_get_col_by_name("BaseDexterity")?
-        .i32()?
-        .into_iter()
+        .column_by_name("BaseDexterity")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .context("Failed to cast column")?
+        .iter()
         .map(|x| x.expect("No value for base dexterity"))
         .collect::<Vec<_>>();
 
@@ -220,7 +226,7 @@ fn parse_character_table(table: &DataFrame) -> Result<Vec<Class>> {
 }
 
 /// data/passiveskills.datc64
-fn parse_passive_table(table: &DataFrame) -> Result<()> {
+fn parse_passive_table(table: &RecordBatch) -> Result<()> {
     let skill_graph_node_ids = table
         .try_get_col_by_name("PassiveSkillGraphId")?
         .u64()?
@@ -316,9 +322,12 @@ pub fn dump_tree(
 
     // Create LUT between passive skill ID and passive row
     let _passive_lut = passive_table
-        .try_get_col_by_name("PassiveSkillGraphId")?
-        .u16()?
-        .into_iter()
+        .column_by_name("PassiveSkillGraphId")
+        .context("Column not found")?
+        .as_any()
+        .downcast_ref::<UInt16Array>()
+        .context("Failed to cast column")?
+        .iter()
         .enumerate()
         .fold(HashMap::new(), |mut hm, (row, passive_id)| {
             if let Some(passive_id) = passive_id {
