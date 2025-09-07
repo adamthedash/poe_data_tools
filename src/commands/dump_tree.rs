@@ -1,11 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::{anyhow, bail, Context, Result};
-use arrow::array::{Int32Array, RecordBatch, StringArray, UInt16Array, ListArray, UInt64Array};
-use arrow::datatypes::DataType;
-use arrow::record_batch::Column;
-use datafusion::dataframe::DataFrame;
-use datafusion::logical_expr::Expr;
+use arrow::array::{Int32Array, ListArray, RecordBatch, StringArray, UInt16Array, UInt64Array};
 use itertools::izip;
 
 use super::Patch;
@@ -96,22 +92,8 @@ struct Root<'a> {
     points: HashMap<&'a str, usize>,
 }
 
-pub trait DataFrameHelpers {
-    fn try_get_col_by_name(&self, name: &str) -> Result<&Column>;
-}
-
-impl DataFrameHelpers for DataFrame {
-    fn try_get_col_by_name(&self, name: &str) -> Result<&Column> {
-        let col_index = self
-            .try_get_column_index(name)
-            .context(format!("Column not found in dat table: {:?}", name))?;
-
-        Ok(&self[col_index])
-    }
-}
-
 /// data/ascendancy.datc64
-fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy>, Vec<usize>)> {
+fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy<'_>>, Vec<usize>)> {
     let ids = table
         .column_by_name("Id")
         .context("Column not found")?
@@ -178,7 +160,7 @@ fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy>, Vec<u
         .as_any()
         .downcast_ref::<ListArray>()
         .context("Failed to cast column")?
-        .into_iter()
+        .iter()
         .map(|s| -> Result<_> {
             let parent_class_id = s
                 .context("No value for parent class")?
@@ -198,7 +180,7 @@ fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy>, Vec<u
 }
 
 /// data/characters.datc64
-fn parse_character_table(table: &RecordBatch) -> Result<Vec<Class>> {
+fn parse_character_table(table: &RecordBatch) -> Result<Vec<Class<'_>>> {
     let names = table
         .column_by_name("Name")
         .context("Column not found")?
@@ -307,7 +289,7 @@ fn parse_passive_table(table: &RecordBatch) -> Result<()> {
         .as_any()
         .downcast_ref::<ListArray>()
         .context("Failed to cast column")?
-        .into_iter()
+        .iter()
         .map(|s| {
             let stat_ids = s
                 .expect("Stats list is null")
