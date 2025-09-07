@@ -10,6 +10,7 @@ use poe_tools::{
         cat::cat_file, dump_art::extract_art, dump_tables::dump_tables, extract::extract_files,
         list::list_files, Patch,
     },
+    VERBOSE,
 };
 
 #[derive(Debug, Subcommand)]
@@ -66,7 +67,7 @@ enum Command {
 #[clap(version)]
 struct Cli {
     /// Specify the patch version (1, 2, or specific_patch)
-    #[arg(long, required = true)]
+    #[arg(short, long, required = true)]
     patch: Patch,
 
     /// Specify the Steam folder path (optional)
@@ -76,6 +77,10 @@ struct Cli {
     /// Specify the cache directory (optional)
     #[arg(long)]
     cache_dir: Option<PathBuf>,
+
+    /// Verbose printing of non-fatal error messages
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
 
     #[command(subcommand)]
     command: Command,
@@ -93,6 +98,7 @@ struct Args {
     source: Source,
     command: Command,
     cache_dir: PathBuf,
+    verbose: bool,
 }
 
 /// Validates user input and constructs a valid input state
@@ -124,11 +130,13 @@ fn parse_args() -> Result<Args> {
         source,
         command: cli.command,
         cache_dir,
+        verbose: cli.verbose,
     })
 }
 
 fn main() -> Result<()> {
     let args = parse_args()?;
+    VERBOSE.set(args.verbose).unwrap();
 
     let mut fs = match args.source {
         Source::Cdn { cache_dir } => {

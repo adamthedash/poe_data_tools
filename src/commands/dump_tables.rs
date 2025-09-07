@@ -26,6 +26,7 @@ use crate::{
         ivy_schema::{fetch_schema, ColumnSchema, DatTableSchema, SchemaCollection},
         table_view::DatTable,
     },
+    VERBOSE,
 };
 
 fn parse_foreignrow(bytes: &[u8]) -> u64 {
@@ -370,7 +371,9 @@ pub fn parse_table(table: &DatTable, schema: &DatTableSchema) -> Result<RecordBa
         };
         column_names.push(col_name);
 
-        // Parse column data
+        // Parse column data.
+        // We return out on parse failure as it may impact the interpretation of followon columns
+        // if the offset is incorrect.
         let (bytes_taken, series) = parse_column(table, column, cur_offset)
             .with_context(|| format!("Failed to parse column: {:?}", column))?;
 
@@ -379,10 +382,17 @@ pub fn parse_table(table: &DatTable, schema: &DatTableSchema) -> Result<RecordBa
             Ok(series) => {
                 parsed_columns.push(series);
             }
-            Err(e) => eprintln!(
-                "Failed to parse column {:?}, skipping: {:?}",
-                column.name, e
-            ),
+            Err(e) => {
+                let error_message = if *VERBOSE.get().unwrap() {
+                    format!("{e:?}")
+                } else {
+                    format!("{e}")
+                };
+                eprintln!(
+                    "Failed to parse column {:?}, skipping: {error_message}",
+                    column.name
+                );
+            }
         }
         cur_offset += bytes_taken;
     }
@@ -539,7 +549,14 @@ pub fn dump_tables(
         // Report results
         .for_each(|result| match result {
             Ok(filename) => eprintln!("Extracted table: {}", filename),
-            Err(e) => eprintln!("Failed to extract table: {:?}", e),
+            Err(e) => {
+                let error_message = if *VERBOSE.get().unwrap() {
+                    format!("{e:?}")
+                } else {
+                    format!("{e}")
+                };
+                eprintln!("Failed to extract table: {error_message}");
+            }
         });
 
     Ok(())
