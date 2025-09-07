@@ -1,17 +1,22 @@
 use std::{
     fs::{create_dir_all, File},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use anyhow::{anyhow, bail, ensure, Context, Result};
+use arrow::{
+    array::{
+        ArrayRef, BooleanArray, Float32Array, Float32Builder, Int16Array, Int16Builder, Int32Array,
+        Int32Builder, ListBuilder, RecordBatch, StringArray, StringBuilder, UInt16Array,
+        UInt16Builder, UInt32Array, UInt32Builder, UInt64Array, UInt64Builder,
+    },
+    csv::Writer,
+    datatypes::{DataType, SchemaBuilder},
+    util::display::{ArrayFormatter, FormatOptions},
+};
 use bytes::Bytes;
 use glob::Pattern;
-use polars::{
-    frame::DataFrame,
-    io::SerWriter,
-    prelude::{Column, CsvWriter, DataType, NamedFrom},
-    series::Series,
-};
 
 use crate::{
     bundle_fs::FS,
@@ -76,15 +81,7 @@ fn parse_column(
     table: &DatTable,
     column: &ColumnSchema,
     cur_offset: usize,
-    cur_unknown: usize,
-) -> Result<(bool, usize, Result<Series>)> {
-    // Parse column name
-    let (is_unknown, col_name) = if let Some(name) = column.name.clone() {
-        (false, name)
-    } else {
-        (true, format!("unknown_{}", cur_unknown))
-    };
-
+) -> Result<(usize, Result<ArrayRef>)> {
     let (bytes_taken, series) = match (column.array, column.interval) {
         // Array
         (true, false) => {
@@ -94,52 +91,142 @@ fn parse_column(
 
                 "string" => table
                     .view_col_as_array_of_strings(cur_offset)?
-                    .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>(),
+                    .collect::<Result<Vec<_>>>()
+                    .map(|s| {
+                        let mut builder = ListBuilder::new(StringBuilder::new());
+                        for row in s {
+                            for val in row {
+                                builder.values().append_option(val)
+                            }
+                            builder.append(true);
+                        }
+
+                        builder.finish()
+                    }),
 
                 "foreignrow" => table
                     .view_col_as_array_of(cur_offset, 16, parse_foreignrow)?
-                    .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>(),
+                    .collect::<Result<Vec<_>>>()
+                    .map(|s| {
+                        let mut builder = ListBuilder::new(UInt64Builder::new());
+                        for row in s {
+                            for val in row {
+                                builder.values().append_value(val)
+                            }
+                            builder.append(true);
+                        }
+
+                        builder.finish()
+                    }),
 
                 "row" => table
                     .view_col_as_array_of(cur_offset, 8, parse_maybe_row)?
-                    .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>(),
+                    .collect::<Result<Vec<_>>>()
+                    .map(|s| {
+                        let mut builder = ListBuilder::new(UInt64Builder::new());
+                        for row in s {
+                            for val in row {
+                                builder.values().append_option(val)
+                            }
+                            builder.append(true);
+                        }
+
+                        builder.finish()
+                    }),
 
                 "enumrow" => table
                     .view_col_as_array_of(cur_offset, 4, parse_u32)?
-                    .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>(),
+                    .collect::<Result<Vec<_>>>()
+                    .map(|s| {
+                        let mut builder = ListBuilder::new(UInt32Builder::new());
+                        for row in s {
+                            for val in row {
+                                builder.values().append_value(val)
+                            }
+                            builder.append(true);
+                        }
+
+                        builder.finish()
+                    }),
 
                 "u32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_u32)?
-                    .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>(),
+                    .collect::<Result<Vec<_>>>()
+                    .map(|s| {
+                        let mut builder = ListBuilder::new(UInt32Builder::new());
+                        for row in s {
+                            for val in row {
+                                builder.values().append_value(val)
+                            }
+                            builder.append(true);
+                        }
+
+                        builder.finish()
+                    }),
 
                 "f32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_f32)?
-                    .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>(),
+                    .collect::<Result<Vec<_>>>()
+                    .map(|s| {
+                        let mut builder = ListBuilder::new(Float32Builder::new());
+                        for row in s {
+                            for val in row {
+                                builder.values().append_value(val)
+                            }
+                            builder.append(true);
+                        }
+
+                        builder.finish()
+                    }),
 
                 "i32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_i32)?
-                    .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>(),
+                    .collect::<Result<Vec<_>>>()
+                    .map(|s| {
+                        let mut builder = ListBuilder::new(Int32Builder::new());
+                        for row in s {
+                            for val in row {
+                                builder.values().append_value(val)
+                            }
+                            builder.append(true);
+                        }
+
+                        builder.finish()
+                    }),
 
                 "i16" => table
                     .view_col_as_array_of(cur_offset, 2, parse_i16)?
-                    .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>(),
+                    .collect::<Result<Vec<_>>>()
+                    .map(|s| {
+                        let mut builder = ListBuilder::new(Int16Builder::new());
+                        for row in s {
+                            for val in row {
+                                builder.values().append_value(val)
+                            }
+                            builder.append(true);
+                        }
+
+                        builder.finish()
+                    }),
 
                 "u16" => table
                     .view_col_as_array_of(cur_offset, 2, parse_u16)?
-                    .map(|row| row.map(|x| Series::new("".into(), &x)))
-                    .collect::<Result<Vec<_>>>(),
+                    .collect::<Result<Vec<_>>>()
+                    .map(|s| {
+                        let mut builder = ListBuilder::new(UInt16Builder::new());
+                        for row in s {
+                            for val in row {
+                                builder.values().append_value(val)
+                            }
+                            builder.append(true);
+                        }
+
+                        builder.finish()
+                    }),
 
                 _ => bail!("Unknown column type: {:?}", column),
             }
-            .map(|s| Series::new(col_name.into(), s));
+            .map(|s| Arc::new(s) as _);
 
             (16, series)
         }
@@ -147,15 +234,18 @@ fn parse_column(
         // Interval
         (false, true) => match column.column_type.as_str() {
             "i32" => {
-                let series = table
-                    .view_col(cur_offset, 8)
-                    .map(|values| {
-                        values
-                            .map(|bytes| bytes.chunks_exact(4).map(parse_i32).collect::<Vec<_>>())
-                            .map(|x| Series::new("".into(), &x))
-                            .collect::<Vec<_>>()
-                    })
-                    .map(|s| Series::new(col_name.into(), s));
+                let series = table.view_col(cur_offset, 8).map(|values| {
+                    let mut builder = ListBuilder::new(Int32Builder::new());
+                    values.for_each(|bytes| {
+                        bytes
+                            .chunks_exact(4)
+                            .map(parse_i32)
+                            .for_each(|val| builder.values().append_value(val));
+                        builder.append(true);
+                    });
+
+                    Arc::new(builder.finish()) as _
+                });
 
                 (8, series)
             }
@@ -168,7 +258,8 @@ fn parse_column(
                 let series = table
                     .view_col_as_string(cur_offset)
                     .and_then(|strings| strings.collect::<Result<Vec<_>>>())
-                    .map(|s| Series::new(col_name.into(), s));
+                    // .map(|s| Series::new(col_name.into(), s));
+                    .map(|s| Arc::new(StringArray::from(s)) as _);
                 (8, series)
             }
 
@@ -176,7 +267,8 @@ fn parse_column(
                 let series = table
                     .view_col(cur_offset, 16)
                     .map(|items| items.map(parse_maybe_foreignrow).collect::<Vec<_>>())
-                    .map(|s| Series::new(col_name.into(), s));
+                    // .map(|s| Series::new(col_name.into(), s));
+                    .map(|s| Arc::new(UInt64Array::from(s)) as _);
                 (16, series)
             }
 
@@ -184,7 +276,8 @@ fn parse_column(
                 let series = table
                     .view_col(cur_offset, 8)
                     .map(|items| items.map(parse_maybe_row).collect::<Vec<_>>())
-                    .map(|s| Series::new(col_name.into(), s));
+                    // .map(|s| Series::new(col_name.into(), s));
+                    .map(|s| Arc::new(UInt64Array::from(s)) as _);
                 (8, series)
             }
 
@@ -192,7 +285,8 @@ fn parse_column(
                 let series = table
                     .view_col(cur_offset, 4)
                     .map(|items| items.map(parse_u32).collect::<Vec<_>>())
-                    .map(|s| Series::new(col_name.into(), s));
+                    // .map(|s| Series::new(col_name.into(), s));
+                    .map(|s| Arc::new(UInt32Array::from(s)) as _);
                 (4, series)
             }
 
@@ -200,7 +294,8 @@ fn parse_column(
                 let series = table
                     .view_col(cur_offset, 4)
                     .map(|items| items.map(parse_u32).collect::<Vec<_>>())
-                    .map(|s| Series::new(col_name.into(), s));
+                    // .map(|s| Series::new(col_name.into(), s));
+                    .map(|s| Arc::new(UInt32Array::from(s)) as _);
                 (4, series)
             }
 
@@ -208,7 +303,8 @@ fn parse_column(
                 let series = table
                     .view_col(cur_offset, 4)
                     .map(|items| items.map(parse_f32).collect::<Vec<_>>())
-                    .map(|s| Series::new(col_name.into(), s));
+                    // .map(|s| Series::new(col_name.into(), s));
+                    .map(|s| Arc::new(Float32Array::from(s)) as _);
                 (4, series)
             }
 
@@ -216,7 +312,8 @@ fn parse_column(
                 let series = table
                     .view_col(cur_offset, 4)
                     .map(|items| items.map(parse_i32).collect::<Vec<_>>())
-                    .map(|s| Series::new(col_name.into(), s));
+                    // .map(|s| Series::new(col_name.into(), s));
+                    .map(|s| Arc::new(Int32Array::from(s)) as _);
                 (4, series)
             }
 
@@ -224,7 +321,8 @@ fn parse_column(
                 let series = table
                     .view_col(cur_offset, 2)
                     .map(|items| items.map(parse_i16).collect::<Vec<_>>())
-                    .map(|s| Series::new(col_name.into(), s));
+                    // .map(|s| Series::new(col_name.into(), s));
+                    .map(|s| Arc::new(Int16Array::from(s)) as _);
                 (2, series)
             }
 
@@ -232,7 +330,8 @@ fn parse_column(
                 let series = table
                     .view_col(cur_offset, 2)
                     .map(|items| items.map(parse_u16).collect::<Vec<_>>())
-                    .map(|s| Series::new(col_name.into(), s));
+                    // .map(|s| Series::new(col_name.into(), s));
+                    .map(|s| Arc::new(UInt16Array::from(s)) as _);
                 (2, series)
             }
 
@@ -240,7 +339,8 @@ fn parse_column(
                 let series = table
                     .view_col(cur_offset, 1)
                     .and_then(|items| items.map(parse_bool).collect::<Result<Vec<_>>>())
-                    .map(|s| Series::new(col_name.into(), s));
+                    // .map(|s| Series::new(col_name.into(), s));
+                    .map(|s| Arc::new(BooleanArray::from(s)) as _);
                 (1, series)
             }
 
@@ -249,19 +349,29 @@ fn parse_column(
         _ => bail!("Can't be both array and interval"),
     };
 
-    Ok((is_unknown, bytes_taken, series))
+    Ok((bytes_taken, series))
 }
 
-/// Parse a table with the given schema into a Polars DataFrame
-pub fn parse_table(table: &DatTable, schema: &DatTableSchema) -> Result<DataFrame> {
+/// Parse a table with the given schema into an Arrow RecordBatch
+pub fn parse_table(table: &DatTable, schema: &DatTableSchema) -> Result<RecordBatch> {
     // Parse each of the columns
     let mut parsed_columns = vec![];
+    let mut column_names = vec![];
     let mut cur_offset = 0;
     let mut num_unknowns = 0;
     for column in &schema.columns {
-        let (is_unknown, bytes_taken, series) =
-            parse_column(table, column, cur_offset, num_unknowns)
-                .with_context(|| format!("Failed to parse column: {:?}", column))?;
+        // Parse column name
+        let col_name = if let Some(name) = column.name.clone() {
+            name
+        } else {
+            num_unknowns += 1;
+            format!("unknown_{}", num_unknowns - 1)
+        };
+        column_names.push(col_name);
+
+        // Parse column data
+        let (bytes_taken, series) = parse_column(table, column, cur_offset)
+            .with_context(|| format!("Failed to parse column: {:?}", column))?;
 
         // If we successfully parse the data, add it to the table
         match series {
@@ -274,60 +384,54 @@ pub fn parse_table(table: &DatTable, schema: &DatTableSchema) -> Result<DataFram
             ),
         }
         cur_offset += bytes_taken;
-        if is_unknown {
-            num_unknowns += 1;
-        }
     }
 
     // Collect em into a dataframe
-    let df = DataFrame::new(parsed_columns.into_iter().map(Column::from).collect())
+    let df = RecordBatch::try_from_iter(column_names.into_iter().zip(parsed_columns))
         .context("Failed to create df")?;
     Ok(df)
 }
 
-/// Stringify the Series into an escaped list
-fn series_to_string(series: &Series) -> String {
-    let string_func = match series.dtype() {
-        // If it's a string, escape it
-        DataType::String => |x| format!("{:?}", x),
-        _ => |x| format!("{}", x),
-        //_ => panic!("Invalid dtype"),
-    };
-
-    let stringy_vals = series.iter().map(string_func).collect::<Vec<_>>();
-    format!("[{}]", stringy_vals.join(","))
-}
-
 /// Save the dataframe to a table, handling list columns
-fn save_to_csv(table: &mut DataFrame, path: &Path) -> Result<()> {
-    // Stringify list columns
-    let new_cols = table
-        .get_columns()
-        .iter()
-        .filter(|col| matches!(col.dtype(), DataType::List(..)))
-        .map(|col| {
-            // Stringify the column
-            let string_col = col
-                .list()
-                .unwrap()
-                .into_iter()
-                .map(|row_vals| series_to_string(&row_vals.unwrap()))
-                .collect::<Vec<_>>();
-            Column::new(col.name().clone(), string_col)
-        })
-        .collect::<Vec<_>>();
+fn save_to_csv(table: &RecordBatch, path: &Path) -> Result<()> {
+    let (schema, mut columns, _) = table.clone().into_parts();
+    let mut schema_builder = SchemaBuilder::from(&*schema);
 
-    // Put them into the dataframe
-    let mut table = table.clone();
-    new_cols.into_iter().for_each(|col| {
-        table.with_column(col).unwrap();
-    });
+    // Stringify list columns
+    columns
+        .iter_mut()
+        .enumerate()
+        .filter(|(_, c)| c.data_type().is_nested())
+        .for_each(|(i, c)| {
+            // Use arrow's formatter to format the sub-array
+            let stringy_vals = {
+                let options = FormatOptions::default();
+                let formatter =
+                    ArrayFormatter::try_new(c, &options).expect("Failed to create table formatter");
+
+                (0..c.len())
+                    .map(|i| format!("{}", formatter.value(i)))
+                    .collect::<Vec<_>>()
+            };
+
+            // Update the table data / schema
+            *c = Arc::new(StringArray::from(stringy_vals)) as _;
+
+            let field = (**schema_builder.field(i))
+                .clone()
+                .with_data_type(DataType::Utf8);
+
+            *schema_builder.field_mut(i) = Arc::new(field);
+        });
+
+    let schema = Arc::new(schema_builder.finish());
+    let table = RecordBatch::try_new(schema, columns).context("Failed to re-create table")?;
 
     create_dir_all(path.parent().context("No parent directory")?)
         .context("Failed to create output dirs")?;
 
-    CsvWriter::new(File::create(path).context("Failed to create output file")?)
-        .finish(&mut table)
+    Writer::new(File::create(path).context("Failed to create output file")?)
+        .write(&table)
         .context("Failed to write DF to file")
 }
 
@@ -339,10 +443,10 @@ fn process_file(bytes: &Bytes, output_path: &Path, schema: &DatTableSchema) -> R
     ensure!(!table.rows.is_empty(), "Empty table");
 
     // Apply it
-    let mut df = parse_table(&table, schema).context("Failed to apply schema to table")?;
+    let df = parse_table(&table, schema).context("Failed to apply schema to table")?;
 
     // Save table out as CSV todo: / JSON / SQLLite table
-    save_to_csv(&mut df, output_path).context("Failed to write CSV")?;
+    save_to_csv(&df, output_path).context("Failed to write CSV")?;
 
     Ok(())
 }
@@ -353,7 +457,7 @@ pub fn load_parsed_table(
     schemas: &SchemaCollection,
     filename: &str,
     version: u32,
-) -> Result<DataFrame> {
+) -> Result<RecordBatch> {
     // Load table schema - todo: HashMap rather than vector
     let schema = schemas
         .tables

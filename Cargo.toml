@@ -24,10 +24,11 @@ bytes = "1.9.0"
 glob = "0.3.2"
 serde = {version = "1.0.217", features = ["derive"]}
 serde_json = "1.0.137"
-polars = {version = "0.45.1", features=["csv", "lazy", "list_eval", "dtype-full"]}
 rayon = "1.10.0"
 image = { git = "https://github.com/RunDevelopment/image", branch = "new-dds-decoder" }
 iterators_extended = "0.2.0"
+itertools = "0.14.0"
+arrow = {version = "56.1.0", default-fetures=false, features= ["csv"]}
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
