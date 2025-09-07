@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::{anyhow, bail, Context, Result};
-use arrow::array::{Int32Array, ListArray, RecordBatch, StringArray, UInt16Array, UInt64Array};
+use arrow_array::{Int32Array, ListArray, RecordBatch, StringArray, UInt16Array, UInt64Array};
 use itertools::izip;
 
 use super::Patch;
