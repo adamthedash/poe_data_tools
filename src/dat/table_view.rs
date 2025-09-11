@@ -108,7 +108,7 @@ impl DatTable {
             let end = start
                 .checked_add(length.checked_mul(dtype_width).context("Overflow")?)
                 .context("Overflow")?;
-            ensure!(end < self.variable_data.len(), "Array slice oveflow");
+            ensure!(end <= self.variable_data.len(), "Array slice oveflow");
 
             let bytes = self.variable_data[start..end]
                 .chunks_exact(dtype_width)
