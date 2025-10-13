@@ -19,7 +19,8 @@ enum Command {
     List {
         /// Glob pattern to filter the list of files
         #[clap(default_value = "*")]
-        glob: Pattern,
+        #[arg(num_args = 1..)]
+        globs: Vec<Pattern>,
     },
     /// Extract matched files to a folder
     Extract {
@@ -27,7 +28,8 @@ enum Command {
         output_folder: PathBuf,
         /// Glob pattern to filter the list of files
         #[clap(default_value = "*")]
-        glob: Pattern,
+        #[arg(num_args = 1..)]
+        globs: Vec<Pattern>,
     },
     /// Extract a single file to stdout
     Cat {
@@ -152,12 +154,12 @@ fn main() -> Result<()> {
     .context("Failed to initialise file system")?;
 
     match args.command {
-        Command::List { glob } => list_files(&fs, &glob).context("List command failed")?,
+        Command::List { globs } => list_files(&fs, &globs).context("List command failed")?,
         Command::Cat { path } => cat_file(&mut fs, &path).context("Cat command failed")?,
         Command::Extract {
-            glob,
+            globs,
             output_folder,
-        } => extract_files(&mut fs, &glob, &output_folder).context("Extract command filed")?,
+        } => extract_files(&mut fs, &globs, &output_folder).context("Extract command filed")?,
         Command::DumpTables {
             output_folder,
             glob,
