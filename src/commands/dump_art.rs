@@ -1,7 +1,7 @@
 use std::{fs, path::Path};
 
 use anyhow::{ensure, Context, Result};
-use glob::Pattern;
+use glob::{MatchOptions, Pattern};
 
 use crate::bundle_fs::FS;
 
@@ -14,7 +14,15 @@ pub fn extract_art(fs: &mut FS, pattern: &Pattern, output_folder: &Path) -> Resu
 
     let filenames = fs
         .list()
-        .filter(|filename| pattern.matches(filename))
+        .filter(|filename| {
+            pattern.matches_with(
+                filename,
+                MatchOptions {
+                    require_literal_separator: true,
+                    ..Default::default()
+                },
+            )
+        })
         .collect::<Vec<_>>();
     let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
 

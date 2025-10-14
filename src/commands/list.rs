@@ -1,7 +1,7 @@
 use std::io::{self, BufWriter, Write};
 
 use anyhow::{Context, Result};
-use glob::Pattern;
+use glob::{MatchOptions, Pattern};
 
 use crate::bundle_fs::FS;
 
@@ -12,7 +12,17 @@ pub fn list_files(file_system: &FS, patterns: &[Pattern]) -> Result<()> {
 
     file_system
         .list()
-        .filter(|path| patterns.iter().any(|pattern| pattern.matches(path)))
+        .filter(|path| {
+            patterns.iter().any(|pattern| {
+                pattern.matches_with(
+                    path,
+                    MatchOptions {
+                        require_literal_separator: true,
+                        ..Default::default()
+                    },
+                )
+            })
+        })
         .try_for_each(|p| writeln!(stdout, "{}", p).context("Failed to write to stdout"))?;
 
     stdout.flush().context("Failed to flush stdout")

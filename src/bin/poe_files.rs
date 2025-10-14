@@ -17,7 +17,7 @@ use poe_tools::{
 enum Command {
     /// List files
     List {
-        /// Glob pattern to filter the list of files
+        /// Glob patterns to filter the list of files
         #[clap(default_value = "*")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
@@ -26,7 +26,7 @@ enum Command {
     Extract {
         /// Path to the folder to output the extracted files
         output_folder: PathBuf,
-        /// Glob pattern to filter the list of files
+        /// Glob patterns to filter the list of files
         #[clap(default_value = "*")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
@@ -41,9 +41,10 @@ enum Command {
         /// Path to write out the parsed tables to
         output_folder: PathBuf,
 
-        /// Glob pattern to filter the list of files
+        /// Glob patterns to filter the list of files
         #[clap(default_value = "*.datc64")]
-        glob: Pattern,
+        #[arg(num_args = 1..)]
+        glob: Vec<Pattern>,
     },
     DumpArt {
         /// Path to the folder to output the extracted files

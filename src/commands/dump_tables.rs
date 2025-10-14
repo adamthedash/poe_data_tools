@@ -17,7 +17,7 @@ use arrow_cast::display::{ArrayFormatter, FormatOptions};
 use arrow_csv::Writer;
 use arrow_schema::{DataType, SchemaBuilder};
 use bytes::Bytes;
-use glob::Pattern;
+use glob::{MatchOptions, Pattern};
 
 use crate::{
     bundle_fs::FS,
@@ -494,15 +494,17 @@ pub fn load_parsed_table(
 /// Convert datc64 tables into CSV files
 pub fn dump_tables(
     fs: &mut FS,
-    pattern: &Pattern,
+    patterns: &[Pattern],
     cache_dir: &Path,
     output_folder: &Path,
     version: &Patch,
 ) -> Result<()> {
-    ensure!(
-        pattern.as_str().ends_with(".datc64"),
-        "Only .datc64 table export is supported."
-    );
+    for pattern in patterns {
+        ensure!(
+            pattern.as_str().ends_with(".datc64"),
+            "Only .datc64 table export is supported."
+        );
+    }
 
     let version = match version {
         Patch::One => 1,
@@ -515,7 +517,17 @@ pub fn dump_tables(
 
     let filenames = fs
         .list()
-        .filter(|filename| pattern.matches(filename))
+        .filter(|filename| {
+            patterns.iter().all(|p| {
+                p.matches_with(
+                    filename,
+                    MatchOptions {
+                        require_literal_separator: true,
+                        ..Default::default()
+                    },
+                )
+            })
+        })
         .collect::<Vec<_>>();
     let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
 

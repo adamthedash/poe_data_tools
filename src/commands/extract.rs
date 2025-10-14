@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use glob::Pattern;
+use glob::{MatchOptions, Pattern};
 
 use crate::bundle_fs::FS;
 
@@ -12,7 +12,17 @@ use crate::bundle_fs::FS;
 pub fn extract_files(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Result<()> {
     let filenames = fs
         .list()
-        .filter(|filename| patterns.iter().any(|p| p.matches(filename)))
+        .filter(|filename| {
+            patterns.iter().any(|p| {
+                p.matches_with(
+                    filename,
+                    MatchOptions {
+                        require_literal_separator: true,
+                        ..Default::default()
+                    },
+                )
+            })
+        })
         .collect::<Vec<_>>();
     let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
 
