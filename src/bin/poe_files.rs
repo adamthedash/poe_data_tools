@@ -44,14 +44,15 @@ enum Command {
         /// Glob patterns to filter the list of files
         #[clap(default_value = "*.datc64")]
         #[arg(num_args = 1..)]
-        glob: Vec<Pattern>,
+        globs: Vec<Pattern>,
     },
     DumpArt {
         /// Path to the folder to output the extracted files
         output_folder: PathBuf,
         /// Glob pattern to filter the list of files
         #[clap(default_value = "*.dds")]
-        glob: Pattern,
+        #[arg(num_args = 1..)]
+        globs: Vec<Pattern>,
     },
 }
 
@@ -163,13 +164,19 @@ fn main() -> Result<()> {
         } => extract_files(&mut fs, &globs, &output_folder).context("Extract command filed")?,
         Command::DumpTables {
             output_folder,
-            glob,
-        } => dump_tables(&mut fs, &glob, &args.cache_dir, &output_folder, &args.patch)
-            .context("Dump Tables command failed")?,
+            globs,
+        } => dump_tables(
+            &mut fs,
+            &globs,
+            &args.cache_dir,
+            &output_folder,
+            &args.patch,
+        )
+        .context("Dump Tables command failed")?,
         Command::DumpArt {
             output_folder,
-            glob,
-        } => extract_art(&mut fs, &glob, &output_folder).context("Dump Art command failed")?,
+            globs,
+        } => extract_art(&mut fs, &globs, &output_folder).context("Dump Art command failed")?,
     }
 
     Ok(())

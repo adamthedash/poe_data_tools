@@ -518,8 +518,8 @@ pub fn dump_tables(
     let filenames = fs
         .list()
         .filter(|filename| {
-            patterns.iter().all(|p| {
-                p.matches_with(
+            patterns.iter().any(|pattern| {
+                pattern.matches_with(
                     filename,
                     MatchOptions {
                         require_literal_separator: true,
