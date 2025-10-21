@@ -13,8 +13,8 @@ pub fn extract_files(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) ->
     let filenames = fs
         .list()
         .filter(|filename| {
-            patterns.iter().any(|p| {
-                p.matches_with(
+            patterns.iter().any(|pattern| {
+                pattern.matches_with(
                     filename,
                     MatchOptions {
                         require_literal_separator: true,

@@ -6,22 +6,26 @@ use glob::{MatchOptions, Pattern};
 use crate::bundle_fs::FS;
 
 /// Extract files to disk matching a glob pattern
-pub fn extract_art(fs: &mut FS, pattern: &Pattern, output_folder: &Path) -> Result<()> {
-    ensure!(
-        pattern.as_str().ends_with(".dds"),
-        "Only .dds art export is supported."
-    );
+pub fn extract_art(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Result<()> {
+    for pattern in patterns {
+        ensure!(
+            pattern.as_str().ends_with(".dds"),
+            "Only .dds art export is supported."
+        );
+    }
 
     let filenames = fs
         .list()
         .filter(|filename| {
-            pattern.matches_with(
-                filename,
-                MatchOptions {
-                    require_literal_separator: true,
-                    ..Default::default()
-                },
-            )
+            patterns.iter().any(|pattern| {
+                pattern.matches_with(
+                    filename,
+                    MatchOptions {
+                        require_literal_separator: true,
+                        ..Default::default()
+                    },
+                )
+            })
         })
         .collect::<Vec<_>>();
     let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
