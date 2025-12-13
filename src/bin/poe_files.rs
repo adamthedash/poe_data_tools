@@ -18,7 +18,7 @@ enum Command {
     /// List files
     List {
         /// Glob patterns to filter the list of files
-        #[clap(default_value = "*")]
+        #[clap(default_value = "**")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
     },
@@ -27,7 +27,7 @@ enum Command {
         /// Path to the folder to output the extracted files
         output_folder: PathBuf,
         /// Glob patterns to filter the list of files
-        #[clap(default_value = "*")]
+        #[clap(default_value = "**")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
     },
@@ -42,7 +42,7 @@ enum Command {
         output_folder: PathBuf,
 
         /// Glob patterns to filter the list of files
-        #[clap(default_value = "*.datc64")]
+        #[clap(default_value = "**/*.datc64")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
     },
@@ -50,7 +50,7 @@ enum Command {
         /// Path to the folder to output the extracted files
         output_folder: PathBuf,
         /// Glob pattern to filter the list of files
-        #[clap(default_value = "*.dds")]
+        #[clap(default_value = "**/*.dds")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
     },
