@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 pub mod bundle;
 pub mod bundle_fs;
 pub mod bundle_index;
@@ -7,3 +9,6 @@ pub mod dat;
 pub mod hasher;
 pub mod path;
 pub mod steam;
+
+/// Application-level verbosity
+pub static VERBOSE: OnceLock<bool> = OnceLock::new();

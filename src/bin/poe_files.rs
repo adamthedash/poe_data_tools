@@ -10,23 +10,26 @@ use poe_tools::{
         cat::cat_file, dump_art::extract_art, dump_tables::dump_tables, extract::extract_files,
         list::list_files, Patch,
     },
+    VERBOSE,
 };
 
 #[derive(Debug, Subcommand)]
 enum Command {
     /// List files
     List {
-        /// Glob pattern to filter the list of files
+        /// Glob patterns to filter the list of files
         #[clap(default_value = "*")]
-        glob: Pattern,
+        #[arg(num_args = 1..)]
+        globs: Vec<Pattern>,
     },
     /// Extract matched files to a folder
     Extract {
         /// Path to the folder to output the extracted files
         output_folder: PathBuf,
-        /// Glob pattern to filter the list of files
+        /// Glob patterns to filter the list of files
         #[clap(default_value = "*")]
-        glob: Pattern,
+        #[arg(num_args = 1..)]
+        globs: Vec<Pattern>,
     },
     /// Extract a single file to stdout
     Cat {
@@ -38,16 +41,18 @@ enum Command {
         /// Path to write out the parsed tables to
         output_folder: PathBuf,
 
-        /// Glob pattern to filter the list of files
+        /// Glob patterns to filter the list of files
         #[clap(default_value = "*.datc64")]
-        glob: Pattern,
+        #[arg(num_args = 1..)]
+        globs: Vec<Pattern>,
     },
     DumpArt {
         /// Path to the folder to output the extracted files
         output_folder: PathBuf,
         /// Glob pattern to filter the list of files
         #[clap(default_value = "*.dds")]
-        glob: Pattern,
+        #[arg(num_args = 1..)]
+        globs: Vec<Pattern>,
     },
 }
 
@@ -66,7 +71,7 @@ enum Command {
 #[clap(version)]
 struct Cli {
     /// Specify the patch version (1, 2, or specific_patch)
-    #[arg(long, required = true)]
+    #[arg(short, long, required = true)]
     patch: Patch,
 
     /// Specify the Steam folder path (optional)
@@ -76,6 +81,10 @@ struct Cli {
     /// Specify the cache directory (optional)
     #[arg(long)]
     cache_dir: Option<PathBuf>,
+
+    /// Verbose printing of non-fatal error messages
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
 
     #[command(subcommand)]
     command: Command,
@@ -93,6 +102,7 @@ struct Args {
     source: Source,
     command: Command,
     cache_dir: PathBuf,
+    verbose: bool,
 }
 
 /// Validates user input and constructs a valid input state
@@ -124,11 +134,13 @@ fn parse_args() -> Result<Args> {
         source,
         command: cli.command,
         cache_dir,
+        verbose: cli.verbose,
     })
 }
 
 fn main() -> Result<()> {
     let args = parse_args()?;
+    VERBOSE.set(args.verbose).unwrap();
 
     let mut fs = match args.source {
         Source::Cdn { cache_dir } => {
@@ -144,21 +156,27 @@ fn main() -> Result<()> {
     .context("Failed to initialise file system")?;
 
     match args.command {
-        Command::List { glob } => list_files(&fs, &glob).context("List command failed")?,
+        Command::List { globs } => list_files(&fs, &globs).context("List command failed")?,
         Command::Cat { path } => cat_file(&mut fs, &path).context("Cat command failed")?,
         Command::Extract {
-            glob,
+            globs,
             output_folder,
-        } => extract_files(&mut fs, &glob, &output_folder).context("Extract command filed")?,
+        } => extract_files(&mut fs, &globs, &output_folder).context("Extract command filed")?,
         Command::DumpTables {
             output_folder,
-            glob,
-        } => dump_tables(&mut fs, &glob, &args.cache_dir, &output_folder, &args.patch)
-            .context("Dump Tables command failed")?,
+            globs,
+        } => dump_tables(
+            &mut fs,
+            &globs,
+            &args.cache_dir,
+            &output_folder,
+            &args.patch,
+        )
+        .context("Dump Tables command failed")?,
         Command::DumpArt {
             output_folder,
-            glob,
-        } => extract_art(&mut fs, &glob, &output_folder).context("Dump Art command failed")?,
+            globs,
+        } => extract_art(&mut fs, &globs, &output_folder).context("Dump Art command failed")?,
     }
 
     Ok(())
