@@ -14,13 +14,13 @@
 From source (requires Rust to be installed)
 
 ```bash
-cargo run --release --bin poe_files -- --help
+cargo run --release --bin poe_data_tools -- --help
 ```
 
 Using executable file
 
 ```bash
-poe_files --help
+poe_data_tools --help
 ```
 
 ## Globs
@@ -29,13 +29,13 @@ Note that commands that take globs use the form that requires `**` to match acro
 
 ```bash
 # all files in all directories (the default)
-cargo run --release --bin poe_files -- --patch 2 list '**'
+cargo run --release --bin poe_data_tools -- --patch 2 list '**'
 # all .datc64 files in all subdirectories
-cargo run --release --bin poe_files -- --patch 2 list '**/*.datc64'
+cargo run --release --bin poe_data_tools -- --patch 2 list '**/*.datc64'
 # all files in the art/ directory
-cargo run --release --bin poe_files -- --patch 2 list 'art/*'
+cargo run --release --bin poe_data_tools -- --patch 2 list 'art/*'
 # all files in the art/ directory and its subdirectories
-cargo run --release --bin poe_files -- --patch 2 list 'art/**'
+cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ```
 
 # Bundle File format

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{ensure, Context, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 use glob::Pattern;
-use poe_tools::{
+use poe_data_tools::{
     bundle_fs::FS,
     bundle_loader::cdn_base_url,
     commands::{
@@ -60,7 +60,7 @@ enum Command {
 /// File paths are printed to stdout.
 #[derive(Parser, Debug)]
 #[command(
-    name = "poe_files",
+    name = "poe_data_tools",
     group(
         ArgGroup::new("source")
         .args(&["steam", "cache_dir"])

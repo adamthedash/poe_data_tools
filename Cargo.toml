@@ -1,15 +1,15 @@
 [package]
-name = "poe_tools"
+name = "poe_data_tools"
 version = "0.5.0"
 edition = "2021"
 
 [lib]
-name = "poe_tools"
+name = "poe_data_tools"
 path = "src/lib.rs"
 
 [[bin]]
-name = "poe_files"
-path = "src/bin/poe_files.rs"
+name = "poe_data_tools"
+path = "src/bin/poe_data_tools.rs"
 
 [dependencies]
 anyhow = "1.0.93"
