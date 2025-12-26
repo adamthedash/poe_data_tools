@@ -83,7 +83,10 @@ impl DatTable {
     pub fn view_col(&self, offset: usize, width: usize) -> Result<impl Iterator<Item = &[u8]>> {
         ensure!(
             offset + width <= self.width(),
-            "Requested column out of bounds"
+            "Requested column out of bounds: bytes {}-{}, row width: {}",
+            offset,
+            offset + width,
+            self.width(),
         );
         let iter = self
             .rows
