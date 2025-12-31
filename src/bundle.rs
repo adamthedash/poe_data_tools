@@ -1,3 +1,5 @@
+//! Parser for bundle files
+
 use std::{fs, path::Path};
 
 use anyhow::{anyhow, Context, Result};

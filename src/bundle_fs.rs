@@ -1,3 +1,5 @@
+//! File system for searching/loading bundle files from different data sources
+
 use std::{
     collections::HashMap,
     hash::{BuildHasher, Hasher},

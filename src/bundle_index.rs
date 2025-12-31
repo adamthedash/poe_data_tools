@@ -1,3 +1,5 @@
+//! Parser for bundle index file
+
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};

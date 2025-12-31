@@ -1,3 +1,5 @@
+//! Hasher for virtual file paths
+
 use std::hash::{BuildHasher, Hasher};
 
 use murmurhash64::murmur_hash64a;

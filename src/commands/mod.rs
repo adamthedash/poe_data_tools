@@ -1,3 +1,5 @@
+//! High level commands for working with virtual files
+
 pub mod cat;
 pub mod dump_art;
 pub mod dump_tables;

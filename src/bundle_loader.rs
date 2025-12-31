@@ -1,3 +1,5 @@
+//! Data loading from the PoE CDN
+
 use std::{
     fs,
     io::{Read, Write},

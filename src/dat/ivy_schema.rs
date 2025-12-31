@@ -1,3 +1,6 @@
+//! Dat file schema loading using [community curated](https://github.com/poe-tool-dev/dat-schema)
+//! source of truth
+
 use std::{fs, path::Path};
 
 use anyhow::Result;

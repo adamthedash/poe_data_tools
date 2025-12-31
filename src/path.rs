@@ -1,3 +1,5 @@
+//! Parser for compacted virtual file path chunks
+
 use crate::bundle_index::PathRep;
 
 // Pull out the path components from the bundle blob into a more usable structure
