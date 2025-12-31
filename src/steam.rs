@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+/// Search common locations from the steam install folder
 pub fn steam_folder_search(patch: &str) -> Option<PathBuf> {
     let home = dirs::home_dir().unwrap();
     let game = match patch {

@@ -12,6 +12,18 @@ use nom::{bytes::complete::take, multi::count, number::complete::le_u8, IResult}
 use reqwest::blocking::Client;
 use url::Url;
 
+/// Bundle file loader which pulls from the PoE CDN. Files are cached locally for re-use.  
+///
+/// # Examples
+///
+/// Load an art file from a specific version of PoE 2
+/// ```
+/// let base_url = Url::parse("https://patch-poe2.poecdn.com/4.4.0.3.9/").unwrap();
+/// let loader = CDNLoader::new(&base_url, ".cache");
+/// let contents = loader.load("minimap/metadata_terrain_desert_seashore.dds").unwrap();
+/// // Process the file...
+///
+/// ```
 pub struct CDNLoader {
     base_url: Url,
     cache_dir: String,
@@ -58,6 +70,17 @@ impl CDNLoader {
     }
 }
 
+/// Fetches the CDN URL for the given patch or game version of PoE
+///
+/// # Examples
+/// ```
+/// let cache_path = PathBuf::from(".cache");
+/// // Latest version of PoE 1
+/// let url = cdn_base_url(&cache_path, "1").unwrap();
+///
+/// // Specific patch of PoE 2
+/// let url = cdn_base_url(&cache_path, "4.4.0.3.9").unwrap();
+/// ```
 pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
     // Check cache for version URL
     let cache_dir = cache_dir.join("cdn_url");
@@ -116,7 +139,8 @@ fn parse_utf16_string(input: &[u8]) -> IResult<&[u8], String> {
 
 /// Fetch the current latest version of the game
 fn cur_url(host: String, send: &[u8]) -> anyhow::Result<Url> {
-    // Fetch data from the CDN - todo: looks like this returns a list of URLs. Might need to use a
+    // Fetch data from the CDN
+    // TODO: looks like this returns a list of URLs. Might need to use a
     // streaming-style parsing instead of just reading 1Kb down the line if there's a bunch of
     // strings
     let mut stream = TcpStream::connect(host)?;

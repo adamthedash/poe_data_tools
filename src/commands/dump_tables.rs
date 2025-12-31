@@ -30,7 +30,7 @@ use crate::{
 };
 
 fn parse_foreignrow(bytes: &[u8]) -> u64 {
-    // todo: polars doesn't support u128, so figure something out later. For now
+    // TODO: polars doesn't support u128, so figure something out later. For now
     // just downcast
     u128::from_le_bytes(bytes.try_into().unwrap()) as u64
 }
@@ -456,7 +456,8 @@ fn process_file(bytes: &Bytes, output_path: &Path, schema: &DatTableSchema) -> R
     // Apply it
     let df = parse_table(&table, schema).context("Failed to apply schema to table")?;
 
-    // Save table out as CSV todo: / JSON / SQLLite table
+    // Save table out as CSV
+    // TODO: / JSON / SQLLite table
     save_to_csv(&df, output_path).context("Failed to write CSV")?;
 
     Ok(())
@@ -469,7 +470,8 @@ pub fn load_parsed_table(
     filename: &str,
     version: u32,
 ) -> Result<RecordBatch> {
-    // Load table schema - todo: HashMap rather than vector
+    // Load table schema
+    // TODO: HashMap rather than vector
     let schema = schemas
         .tables
         .iter()
@@ -512,7 +514,7 @@ pub fn dump_tables(
         _ => bail!("Only patch versions 1/2 supported for table extraction."),
     };
 
-    // Load schema: todo: Get this from Ivy's CDN / cache it
+    // Load schema
     let schemas = fetch_schema(cache_dir).context("Failed to fetch schema file")?;
 
     let filenames = fs
@@ -542,7 +544,8 @@ pub fn dump_tables(
         })
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
-            // Load table schema - todo: HashMap rather than vector
+            // Load table schema
+            // TODO: HashMap rather than vector
             let schema = schemas
                 .tables
                 .iter()

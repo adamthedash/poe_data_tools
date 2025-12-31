@@ -16,6 +16,18 @@ use crate::{
     path::parse_paths,
 };
 
+/// Simple File System abstraction over Steam / CDN data source.  
+///
+/// # Examples
+///
+/// Read all files from a local steam install.
+/// ```
+/// let fs = FS::from_steam(PathBuf::from("<steam_path>/steamapps/common/Path of Exile")).unwrap();
+/// for path in fs.list() {
+///     let contents = fs.read(&path).unwrap();
+///     // Do things..
+/// }
+/// ```
 pub struct FS {
     index: BundleIndex,
     lut: HashMap<u64, usize>,
@@ -26,6 +38,11 @@ pub struct FS {
 
 impl FS {
     /// Initialise a file system over a steam folder
+    ///
+    /// # Examples
+    /// ```
+    /// FS::from_steam(PathBuf::from("<steam_path>/steamapps/common/Path of Exile")).unwrap();
+    /// ```
     pub fn from_steam(steam_folder: PathBuf) -> Result<FS> {
         let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
         let index = load_index_file(&index_path).context("Failed to load bundle index")?;
@@ -46,7 +63,13 @@ impl FS {
         })
     }
 
-    /// Initialise a file system using the CDN background
+    /// Initialise a file system using the CDN backend
+    ///
+    /// # Examples
+    /// ```
+    /// let base_url = Url::parse("https://patch-poe2.poecdn.com/4.4.0.3.9/").unwrap();
+    /// FS::from_cdn(&base_url, &PathBuf::from(".cache")).unwrap();
+    /// ```
     pub fn from_cdn(base_url: &Url, cache_dir: &Path) -> Result<FS> {
         let index = fetch_index_file(
             base_url,
@@ -71,7 +94,7 @@ impl FS {
         })
     }
 
-    /// Lists all paths in the index
+    /// Iterate over all virtual paths in the file system
     pub fn list(&self) -> impl Iterator<Item = String> + '_ {
         self.index
             .paths
@@ -80,6 +103,20 @@ impl FS {
     }
 
     /// Read many files at once, optimising batch loads. Does not preserve order of paths given.
+    ///
+    /// # Examples
+    /// ```
+    /// let files_to_read = [
+    ///     "minimap/metadata_terrain_desert_sinreveal.dds",
+    ///     "minimap/metadata_terrain_desert_seashore.dds",
+    /// ];
+    /// for result in fs.batch_read(&files_to_read) {
+    ///     match result {
+    ///         Ok((path, contents)) => { ... },
+    ///         Err((path, error)) = { ... },
+    ///     }
+    /// }
+    /// ```
     pub fn batch_read<'a>(
         &'a self,
         paths: &[&'a str],
@@ -140,7 +177,8 @@ impl FS {
                 .with_context(|| format!("Failed to fetch bundle file: {:?}", bundle_path))
             };
 
-            // Read the file contents - todo: see if we can do this lazily instead of
+            // Read the file contents
+            // TODO: see if we can do this lazily instead of
             // collecting all files within a bundle at once
             let contents: Vec<_> = match bundle {
                 Ok(b) => files
@@ -162,6 +200,12 @@ impl FS {
         errors.into_iter().map(Err).chain(file_contents)
     }
 
+    /// Read a single file from the file system
+    ///
+    /// # Examples
+    /// ```
+    /// let contents = fs.read("minimap/metadata_terrain_desert_sinreveal.dds").unwrap();
+    /// ```
     pub fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
         let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };

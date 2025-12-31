@@ -81,7 +81,7 @@ impl ParsedPathRep {
         self.leaves
             .iter()
             .map(|l| {
-                // todo: try avoiding so much cloning
+                // TODO: try avoiding so much cloning
                 let mut path_segments = vec![l.value.clone()];
                 let mut parent = l.parent_index;
                 while let Some(p) = parent {

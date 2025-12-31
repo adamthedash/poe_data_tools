@@ -14,6 +14,7 @@ use url::Url;
 
 use crate::bundle_loader::CDNLoader;
 
+/// Marker for which compression method to use
 /// Encoded as a u32
 #[derive(Debug)]
 pub enum FirstFileEncode {
@@ -35,6 +36,7 @@ impl FirstFileEncode {
     }
 }
 
+/// Bundle file headers
 #[derive(Debug)]
 pub struct HeadPayload {
     pub first_file_encode: FirstFileEncode,
@@ -43,6 +45,7 @@ pub struct HeadPayload {
     pub uncompressed_block_granularity: u32,
 }
 
+/// Structured representation of the bundle file format
 #[derive(Debug)]
 pub struct Bundle {
     pub head: HeadPayload,
@@ -51,12 +54,13 @@ pub struct Bundle {
 
 impl Bundle {
     /// Return the entire content of the bundle
-    /// todo: decode blocks in parallel
+    /// TODO: decode blocks in parallel
     ///     Also return a result instead of panicing
     pub fn read_all(&self) -> Bytes {
         self.read_range(0, self.head.uncompressed_size as usize)
     }
 
+    /// Read a range of uncompressed bytes from the bundle
     pub fn read_range(&self, offset: usize, len: usize) -> Bytes {
         let block_size = self.head.uncompressed_block_granularity as usize;
 
@@ -82,12 +86,12 @@ impl Bundle {
                     .unwrap();
             });
 
-        // Grab subset form block aligned buffer
+        // Grab subset from block aligned buffer
         Bytes::from(buf).slice(offset % block_size..offset % block_size + len)
     }
 }
 
-// Parser for FirstFileEncode
+/// Parser for FirstFileEncode
 fn parse_first_file_encode(input: &[u8]) -> IResult<&[u8], FirstFileEncode> {
     let (input, value) = le_u32(input)?;
     match FirstFileEncode::from_u32(value) {
@@ -99,7 +103,7 @@ fn parse_first_file_encode(input: &[u8]) -> IResult<&[u8], FirstFileEncode> {
     }
 }
 
-// Parser for HeadPayload
+/// Parser for HeadPayload
 fn parse_head_payload(input: &[u8]) -> IResult<&[u8], (HeadPayload, Vec<u32>)> {
     let (input, _) = take(12usize)(input)?; // Skip bytes 0-12
     let (input, first_file_encode) = parse_first_file_encode(input)?;
@@ -127,7 +131,7 @@ fn parse_head_payload(input: &[u8]) -> IResult<&[u8], (HeadPayload, Vec<u32>)> {
     ))
 }
 
-// Parser for blocks
+/// Parser for blocks
 fn parse_blocks<'a>(input: &'a [u8], block_sizes: &[u32]) -> IResult<&'a [u8], Vec<Vec<u8>>> {
     let mut remaining_input = input;
     let mut blocks = Vec::new();
@@ -141,16 +145,23 @@ fn parse_blocks<'a>(input: &'a [u8], block_sizes: &[u32]) -> IResult<&'a [u8], V
     Ok((remaining_input, blocks))
 }
 
-// Parser for Bundle
+/// Parse a bundle file from raw byte content
+///
+/// TODO: Make method of Bundle
 pub fn parse_bundle(input: &[u8]) -> IResult<&[u8], Bundle> {
     let (input, (head, block_sizes)) = parse_head_payload(input)?;
     let (input, blocks) = parse_blocks(input, &block_sizes)?;
     Ok((input, Bundle { head, blocks }))
 }
 
-/// Load a bundle file from disk
+/// Load and parse a bundle file from disk
+///
+/// # Examples
+/// ```
+/// let bundle_path = PathBuf::from("<steam_poe_folder>/Bundles2/Streaming/Folders/41/minimap.bundle.bin");
+/// let bundle = load_bundle_content(&bundle_path).unwrap();
+/// ```
 pub fn load_bundle_content(path: &Path) -> Result<Bundle> {
-    // todo: figure how to properly do error propogation with nom
     let bundle_content = fs::read(path).context("Failed to read bundle file")?;
 
     let (_, bundle) =
@@ -158,7 +169,15 @@ pub fn load_bundle_content(path: &Path) -> Result<Bundle> {
     Ok(bundle)
 }
 
-// Fetch a bundle file from the CDN (or cache)
+/// Fetch a bundle file from the CDN (or cache)
+///
+/// # Examples
+/// ```
+/// let base_url = Url::parse("https://patch-poe2.poecdn.com/4.4.0.3.9/").unwrap();
+/// let cache_path = PathBuf::from(".cache");
+/// let bundle_path = PathBuf::from("Bundles2/Streaming/Folders/41/minimap.bundle.bin");
+/// let bundle = fetch_bundle_content(&base_url, &cache_path, &bundle_path).unwrap();
+/// ```
 pub fn fetch_bundle_content(base_url: &Url, cache_dir: &Path, path: &Path) -> Result<Bundle> {
     let bundle_content = CDNLoader::new(base_url, cache_dir.to_str().unwrap())
         .load(path)

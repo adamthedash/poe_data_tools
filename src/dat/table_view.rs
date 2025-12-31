@@ -32,7 +32,7 @@ fn split_on_8_bb(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
     )(input)
 }
 
-// Take a null-terminated UTF-16 string
+/// Take a null-terminated UTF-16 string
 fn take_utf16_string(input: &[u8]) -> String {
     let u16_data = input
         .chunks_exact(2)
@@ -42,6 +42,8 @@ fn take_utf16_string(input: &[u8]) -> String {
 
     String::from_utf16(&u16_data).expect("Failed to parse UTF-16 string.")
 }
+
+/// Structured interface over a `.datc64` file
 pub struct DatTable {
     pub rows: Vec<Vec<u8>>,
     pub variable_data: Vec<u8>,
