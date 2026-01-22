@@ -10,8 +10,10 @@ use itertools::izip;
 
 use super::Patch;
 use crate::{
-    bundle_fs::FS, commands::dump_tables::load_parsed_table, dat::ivy_schema::fetch_schema,
-    tree::psg::parse_psg,
+    bundle_fs::FS,
+    commands::dump_tables::load_parsed_table,
+    dat::ivy_schema::fetch_schema,
+    tree::psg::{parse_psg_poe1, parse_psg_poe2},
 };
 
 #[derive(Debug)]
@@ -326,7 +328,14 @@ pub fn dump_tree(
 
     // Load PSG
     let passive_tree_bytes = fs.read("metadata/passiveskillgraph.psg")?;
-    let (_, passive_tree) = parse_psg(&passive_tree_bytes)
+    println!("bytes: {:?}", passive_tree_bytes.len());
+
+    let parser = match version {
+        1 => parse_psg_poe1,
+        2 => parse_psg_poe2,
+        _ => unreachable!(),
+    };
+    let (_, passive_tree) = parser(&passive_tree_bytes)
         .map_err(|e| anyhow!("Failed to parse passive skill tree: {:?}", e))?;
 
     // Load DAT schemas
