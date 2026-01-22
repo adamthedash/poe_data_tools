@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::Path};
 use anyhow::{anyhow, bail, Context, Result};
 use arrow_array::{
     cast::AsArray,
-    types::{GenericStringType, Int32Type, UInt16Type, UInt64Type},
+    types::{Int32Type, UInt16Type, UInt64Type},
     RecordBatch,
 };
 use itertools::izip;
@@ -97,7 +97,7 @@ struct Root<'a> {
 }
 
 /// data/ascendancy.datc64
-fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy>, Vec<usize>)> {
+fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy<'_>>, Vec<usize>)> {
     let ids = table
         .column_by_name("Id")
         .context("Column not found: Id")?
@@ -178,7 +178,7 @@ fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy>, Vec<u
 }
 
 /// data/characters.datc64
-fn parse_character_table(table: &RecordBatch) -> Result<Vec<Class>> {
+fn parse_character_table(table: &RecordBatch) -> Result<Vec<Class<'_>>> {
     let names = table
         .column_by_name("Name")
         .context("Column not found: Name")?

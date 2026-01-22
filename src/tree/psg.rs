@@ -88,7 +88,7 @@ pub struct PassiveSkillGraph<'a> {
 }
 
 /// https://gist.github.com/qcrist/3078c2bbc55401d911583819a65e8bf9
-pub fn parse_psg(input: &[u8]) -> IResult<&[u8], PassiveSkillGraph> {
+pub fn parse_psg(input: &[u8]) -> IResult<&[u8], PassiveSkillGraph<'_>> {
     let (input, version) = u8(input)?;
     assert_eq!(version, 3, "Only PSG version 3 supported.");
 
