@@ -7,7 +7,9 @@
 - `cat`: Dumps the binary contents of a file to stdout
 - `dump-art`: Extracts DirectDraw Surface (.dds) files and converts them to PNGs
 - `dump-tables`: Extracts data tables (.datc64), applies the [community-curated schemas](https://github.com/poe-tool-dev/dat-schema),
-  and saves them out as CSVs where the schema was successfully applied.
+  and saves them out as CSVs where the schema was successfully applied.  
+- `dump-tree`: Extracts the passive skill tree as JSON.  
+
 
 ## Usage
 
@@ -46,12 +48,15 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 
 ![bundle index file format](./images/bundle_index_spec.png)
 
+# PassiveSkillGraph (PSG) File Format
+![psg file format poe1](./images/psg_spec_poe1.png)  
+![psg file format poe2](./images/psg_spec_poe2.png)  
+
 **TODO List**
 
 - Proper documentation for the lib crate
 - Swap image.rs version once [DDS support is merged](https://github.com/image-rs/image/pull/2258)
 - Skill tree data export
-- Partially export dat tables when some schema columns fail to validate
 
 # Testing
 
