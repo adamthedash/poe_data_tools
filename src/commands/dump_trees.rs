@@ -4,17 +4,13 @@ use anyhow::{anyhow, bail, ensure, Context, Result};
 use glob::{MatchOptions, Pattern};
 
 use super::Patch;
-use crate::{
-    bundle_fs::FS,
-    tree::psg::{parse_psg_poe1, parse_psg_poe2},
-    VERBOSE,
-};
+use crate::{bundle_fs::FS, tree::psg::PassiveSkillGraph, VERBOSE};
 
 fn process_file(contents: &[u8], output_path: &Path, version: &Patch) -> Result<()> {
     // Parse the PSG file
     let (_, passive_tree) = match version {
-        Patch::One => parse_psg_poe1(contents),
-        Patch::Two => parse_psg_poe2(contents),
+        Patch::One => PassiveSkillGraph::parse_poe1(contents),
+        Patch::Two => PassiveSkillGraph::parse_poe2(contents),
         _ => bail!("Only patch versions 1/2 supported for table extraction."),
     }
     .map_err(|e| anyhow!("Failed to parse passive skill tree: {:?}", e))?;

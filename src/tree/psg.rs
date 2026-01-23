@@ -13,16 +13,29 @@ pub struct Connection {
     pub curvature: i32,
 }
 
-fn parse_connection(input: &[u8]) -> IResult<&[u8], Connection> {
-    let (input, id) = le_u32(input)?;
-    let (input, radius) = le_i32(input)?;
+impl Connection {
+    fn parse_poe1(input: &[u8]) -> IResult<&[u8], Self> {
+        let (input, id) = le_u32(input)?;
 
-    let connection = Connection {
-        passive_id: id,
-        curvature: radius,
-    };
+        let connection = Connection {
+            passive_id: id,
+            curvature: 0,
+        };
 
-    Ok((input, connection))
+        Ok((input, connection))
+    }
+
+    fn parse_poe2(input: &[u8]) -> IResult<&[u8], Self> {
+        let (input, id) = le_u32(input)?;
+        let (input, radius) = le_i32(input)?;
+
+        let connection = Connection {
+            passive_id: id,
+            curvature: radius,
+        };
+
+        Ok((input, connection))
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -34,49 +47,35 @@ pub struct Passive {
     pub connections: Vec<Connection>,
 }
 
-fn parse_passive_poe1(input: &[u8]) -> IResult<&[u8], Passive> {
-    let (input, id) = le_u32(input)?;
-    let (input, radius) = le_i32(input)?;
-    let (input, position) = le_u32(input)?;
+impl Passive {
+    fn parse_poe1(input: &[u8]) -> IResult<&[u8], Self> {
+        Self::parse(input, Connection::parse_poe1)
+    }
 
-    let (input, num_connections) = le_u32(input)?;
-    let (input, connections) = count(le_u32, num_connections as usize)(input)?;
+    fn parse_poe2(input: &[u8]) -> IResult<&[u8], Self> {
+        Self::parse(input, Connection::parse_poe2)
+    }
 
-    // Cast to common type
-    let connections = connections
-        .into_iter()
-        .map(|id| Connection {
-            passive_id: id,
-            curvature: 0,
-        })
-        .collect();
+    fn parse(
+        input: &[u8],
+        connection_parser: fn(&[u8]) -> IResult<&[u8], Connection>,
+    ) -> IResult<&[u8], Self> {
+        let (input, id) = le_u32(input)?;
+        let (input, radius) = le_i32(input)?;
+        let (input, position) = le_u32(input)?;
 
-    let passive = Passive {
-        id,
-        orbit: radius,
-        orbit_position: position,
-        connections,
-    };
+        let (input, num_connections) = le_u32(input)?;
+        let (input, connections) = count(connection_parser, num_connections as usize)(input)?;
 
-    Ok((input, passive))
-}
+        let passive = Passive {
+            id,
+            orbit: radius,
+            orbit_position: position,
+            connections,
+        };
 
-fn parse_passive_poe2(input: &[u8]) -> IResult<&[u8], Passive> {
-    let (input, id) = le_u32(input)?;
-    let (input, radius) = le_i32(input)?;
-    let (input, position) = le_u32(input)?;
-
-    let (input, num_connections) = le_u32(input)?;
-    let (input, connections) = count(parse_connection, num_connections as usize)(input)?;
-
-    let passive = Passive {
-        id,
-        orbit: radius,
-        orbit_position: position,
-        connections,
-    };
-
-    Ok((input, passive))
+        Ok((input, passive))
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -98,29 +97,31 @@ pub struct Group {
     pub passives: Vec<Passive>,
 }
 
-fn parse_group(
-    input: &[u8],
-    passive_parser: impl FnMut(&[u8]) -> IResult<&[u8], Passive>,
-) -> IResult<&[u8], Group> {
-    let (input, x) = le_f32(input)?;
-    let (input, y) = le_f32(input)?;
-    let (input, flags) = le_u32(input)?;
-    let (input, unk1) = le_u32(input)?;
-    let (input, unk2) = u8(input)?;
+impl Group {
+    fn parse(
+        input: &[u8],
+        passive_parser: fn(&[u8]) -> IResult<&[u8], Passive>,
+    ) -> IResult<&[u8], Self> {
+        let (input, x) = le_f32(input)?;
+        let (input, y) = le_f32(input)?;
+        let (input, flags) = le_u32(input)?;
+        let (input, unk1) = le_u32(input)?;
+        let (input, unk2) = u8(input)?;
 
-    let (input, num_passives) = le_u32(input)?;
-    let (input, passives) = count(passive_parser, num_passives as usize)(input)?;
+        let (input, num_passives) = le_u32(input)?;
+        let (input, passives) = count(passive_parser, num_passives as usize)(input)?;
 
-    let group = Group {
-        x,
-        y,
-        flags,
-        unk1,
-        unk2,
-        passives,
-    };
+        let group = Group {
+            x,
+            y,
+            flags,
+            unk1,
+            unk2,
+            passives,
+        };
 
-    Ok((input, group))
+        Ok((input, group))
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -134,63 +135,46 @@ pub struct PassiveSkillGraph {
     pub groups: Vec<Group>,
 }
 
-pub fn parse_psg_poe1(input: &[u8]) -> IResult<&[u8], PassiveSkillGraph> {
-    let (input, version) = u8(input)?;
-    assert_eq!(version, 3, "Only PSG version 3 supported.");
+impl PassiveSkillGraph {
+    pub fn parse_poe1(input: &[u8]) -> IResult<&[u8], Self> {
+        Self::parse(input, Passive::parse_poe1, |input| {
+            le_u32(input).map(|(input, id)| (input, id as u64))
+        })
+    }
 
-    let (input, graph_type) = u8(input)?;
+    pub fn parse_poe2(input: &[u8]) -> IResult<&[u8], Self> {
+        Self::parse(input, Passive::parse_poe2, |input| le_u64(input))
+    }
 
-    let (input, num_orbits) = u8(input)?;
-    let (input, skills_per_orbit) = count(u8, num_orbits as usize)(input)?;
+    fn parse(
+        input: &[u8],
+        passive_parser: fn(&[u8]) -> IResult<&[u8], Passive>,
+        passive_id_parser: fn(&[u8]) -> IResult<&[u8], u64>,
+    ) -> IResult<&[u8], Self> {
+        let (input, version) = u8(input)?;
+        assert_eq!(version, 3, "Only PSG version 3 supported.");
 
-    let (input, num_passives) = le_u32(input)?;
-    let (input, passives) = count(le_u32, num_passives as usize)(input)?;
+        let (input, graph_type) = u8(input)?;
 
-    // Cast to common type
-    let passives = passives.into_iter().map(|x| x as u64).collect();
+        let (input, num_orbits) = u8(input)?;
+        let (input, skills_per_orbit) = count(u8, num_orbits as usize)(input)?;
 
-    let (input, num_groups) = le_u32(input)?;
+        let (input, num_passives) = le_u32(input)?;
+        let (input, passives) = count(passive_id_parser, num_passives as usize)(input)?;
 
-    let (input, groups) =
-        count(|x| parse_group(x, parse_passive_poe1), num_groups as usize)(input)?;
+        let (input, num_groups) = le_u32(input)?;
 
-    let psg = PassiveSkillGraph {
-        version,
-        root_passives: passives,
-        groups,
-        graph_type,
-        passives_per_orbit: skills_per_orbit,
-    };
+        let (input, groups) =
+            count(|x| Group::parse(x, passive_parser), num_groups as usize)(input)?;
 
-    Ok((input, psg))
-}
+        let psg = PassiveSkillGraph {
+            version,
+            root_passives: passives,
+            groups,
+            graph_type,
+            passives_per_orbit: skills_per_orbit,
+        };
 
-/// https://gist.github.com/qcrist/3078c2bbc55401d911583819a65e8bf9
-/// Above seems only valid for PoE 2
-pub fn parse_psg_poe2(input: &[u8]) -> IResult<&[u8], PassiveSkillGraph> {
-    let (input, version) = u8(input)?;
-    assert_eq!(version, 3, "Only PSG version 3 supported.");
-
-    let (input, graph_type) = u8(input)?;
-
-    let (input, num_orbits) = u8(input)?;
-    let (input, skills_per_orbit) = count(u8, num_orbits as usize)(input)?;
-
-    let (input, num_passives) = le_u32(input)?;
-    let (input, passives) = count(le_u64, num_passives as usize)(input)?;
-
-    let (input, num_groups) = le_u32(input)?;
-
-    let (input, groups) =
-        count(|x| parse_group(x, parse_passive_poe2), num_groups as usize)(input)?;
-
-    let psg = PassiveSkillGraph {
-        version,
-        root_passives: passives,
-        groups,
-        graph_type,
-        passives_per_orbit: skills_per_orbit,
-    };
-
-    Ok((input, psg))
+        Ok((input, psg))
+    }
 }
