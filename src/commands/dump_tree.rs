@@ -328,6 +328,7 @@ pub fn dump_tree(
 
     // Load PSG
     let passive_tree_bytes = fs.read("metadata/passiveskillgraph.psg")?;
+    // let passive_tree_bytes = fs.read("metadata/atlasskillgraphs/atlasskillgraph.psg")?;
     println!("bytes: {:?}", passive_tree_bytes.len());
 
     let parser = match version {
@@ -337,6 +338,7 @@ pub fn dump_tree(
     };
     let (_, passive_tree) = parser(&passive_tree_bytes)
         .map_err(|e| anyhow!("Failed to parse passive skill tree: {:?}", e))?;
+    println!("{:#?}", passive_tree);
 
     // Load DAT schemas
     let schemas = fetch_schema(cache_dir)

@@ -7,14 +7,17 @@ use nom::{
 #[derive(Debug)]
 pub struct Connection {
     pub id: u32,
-    pub radius: i32,
+    pub curvature: i32,
 }
 
 fn parse_connection(input: &[u8]) -> IResult<&[u8], Connection> {
     let (input, id) = le_u32(input)?;
     let (input, radius) = le_i32(input)?;
 
-    let connection = Connection { id, radius };
+    let connection = Connection {
+        id,
+        curvature: radius,
+    };
 
     Ok((input, connection))
 }
@@ -38,7 +41,7 @@ fn parse_passive_poe1(input: &[u8]) -> IResult<&[u8], Passive> {
     // Cast to common type
     let connections = connections
         .into_iter()
-        .map(|id| Connection { id, radius: 0 })
+        .map(|id| Connection { id, curvature: 0 })
         .collect();
 
     let passive = Passive {
