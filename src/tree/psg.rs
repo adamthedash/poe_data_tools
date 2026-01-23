@@ -3,10 +3,13 @@ use nom::{
     number::complete::{le_f32, le_i32, le_u32, le_u64, u8},
     IResult,
 };
+use serde::Serialize;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Connection {
-    pub id: u32,
+    /// Destination node
+    pub passive_id: u32,
+    /// Curvature of the spline drawn between two nodes
     pub curvature: i32,
 }
 
@@ -15,18 +18,19 @@ fn parse_connection(input: &[u8]) -> IResult<&[u8], Connection> {
     let (input, radius) = le_i32(input)?;
 
     let connection = Connection {
-        id,
+        passive_id: id,
         curvature: radius,
     };
 
     Ok((input, connection))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Passive {
     pub id: u32,
-    pub radius: i32,
-    pub position: u32,
+    pub orbit: i32,
+    /// Clockwise
+    pub orbit_position: u32,
     pub connections: Vec<Connection>,
 }
 
@@ -41,13 +45,16 @@ fn parse_passive_poe1(input: &[u8]) -> IResult<&[u8], Passive> {
     // Cast to common type
     let connections = connections
         .into_iter()
-        .map(|id| Connection { id, curvature: 0 })
+        .map(|id| Connection {
+            passive_id: id,
+            curvature: 0,
+        })
         .collect();
 
     let passive = Passive {
         id,
-        radius,
-        position,
+        orbit: radius,
+        orbit_position: position,
         connections,
     };
 
@@ -64,20 +71,26 @@ fn parse_passive_poe2(input: &[u8]) -> IResult<&[u8], Passive> {
 
     let passive = Passive {
         id,
-        radius,
-        position,
+        orbit: radius,
+        orbit_position: position,
         connections,
     };
 
     Ok((input, passive))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Group {
     pub x: f32,
     pub y: f32,
     pub flags: u32,
+    /// 0 == ?
+    /// 1 == ?
+    /// 2 == ? PoE1
+    /// 3 == ? PoE2 Mastery group / ascendencies?
+    /// 4 == ? PoE2 Possibly non-wheel groups?
     pub unk1: u32,
+    /// 1 == Cluster jewel
     pub unk2: u8,
 
     pub passives: Vec<Passive>,
@@ -108,12 +121,14 @@ fn parse_group(
     Ok((input, group))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct PassiveSkillGraph {
     pub version: u8,
+    /// 1 == Passive skill tree
+    /// 2 == Atlas tree
     pub graph_type: u8,
-    pub skills_per_orbit: Vec<u8>,
-    pub passives: Vec<u64>,
+    pub passives_per_orbit: Vec<u8>,
+    pub root_passives: Vec<u64>,
     pub groups: Vec<Group>,
 }
 
@@ -139,10 +154,10 @@ pub fn parse_psg_poe1(input: &[u8]) -> IResult<&[u8], PassiveSkillGraph> {
 
     let psg = PassiveSkillGraph {
         version,
-        passives,
+        root_passives: passives,
         groups,
         graph_type,
-        skills_per_orbit,
+        passives_per_orbit: skills_per_orbit,
     };
 
     Ok((input, psg))
@@ -169,10 +184,10 @@ pub fn parse_psg_poe2(input: &[u8]) -> IResult<&[u8], PassiveSkillGraph> {
 
     let psg = PassiveSkillGraph {
         version,
-        passives,
+        root_passives: passives,
         groups,
         graph_type,
-        skills_per_orbit,
+        passives_per_orbit: skills_per_orbit,
     };
 
     Ok((input, psg))

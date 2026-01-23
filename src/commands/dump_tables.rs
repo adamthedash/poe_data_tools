@@ -533,16 +533,15 @@ pub fn dump_tables(
 
     fs.batch_read(&filenames)
         // Print and filter out errors
-        .filter_map(|f| match f {
-            Ok(x) => Some(x),
-            Err((path, e)) => {
+        .filter_map(|f| {
+            f.inspect_err(|(path, e)| {
                 eprintln!("Failed to extract file: {:?}: {:?}", path, e);
-                None
-            }
+            })
+            .ok()
         })
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
-            // Load table schema - todo: HashMap rather than vector
+            // Load table schema - TODO: HashMap rather than vector
             let schema = schemas
                 .tables
                 .iter()

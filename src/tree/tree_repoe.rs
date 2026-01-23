@@ -1,20 +1,14 @@
-use std::{any::type_name, collections::HashMap, path::Path};
+#![allow(dead_code, unused_variables)]
+/// Transforming raw PSG data into the format provided by RePoE
+use std::{any::type_name, collections::HashMap};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result};
 use arrow_array::{
     cast::AsArray,
-    types::{Int32Type, UInt16Type, UInt32Type, UInt64Type},
+    types::{Int32Type, UInt64Type},
     ArrowPrimitiveType, GenericListArray, GenericStringArray, PrimitiveArray, RecordBatch,
 };
 use itertools::izip;
-
-use super::Patch;
-use crate::{
-    bundle_fs::FS,
-    commands::dump_tables::load_parsed_table,
-    dat::ivy_schema::fetch_schema,
-    tree::psg::{parse_psg_poe1, parse_psg_poe2},
-};
 
 #[derive(Debug)]
 struct Ascendancy<'a> {
@@ -176,7 +170,7 @@ fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy<'_>>, V
     .collect::<Vec<_>>();
 
     let parent_classes = table
-        .get_column_as::<UInt32Type>("ClassNo")?
+        .get_column_as::<Int32Type>("ClassNo")?
         .into_iter()
         .map(|x| x.expect("No value for parent class ID") as usize)
         .collect::<Vec<_>>();
@@ -284,114 +278,4 @@ fn parse_passive_table(table: &RecordBatch) -> Result<()> {
     // TODO: Look up stat formatting functions, insert values and return as strings
 
     unimplemented!()
-}
-
-pub fn dump_tree(
-    fs: &mut FS,
-    cache_dir: &Path,
-    _output_folder: &Path,
-    version: &Patch,
-) -> Result<()> {
-    let version = match version {
-        Patch::One => 1,
-        Patch::Two => 2,
-        _ => bail!("Only patch versions 1/2 supported for table extraction."),
-    };
-
-    // Load PSG
-    let passive_tree_bytes = fs.read("metadata/passiveskillgraph.psg")?;
-    // let passive_tree_bytes = fs.read("metadata/atlasskillgraphs/atlasskillgraph.psg")?;
-    println!("bytes: {:?}", passive_tree_bytes.len());
-
-    let parser = match version {
-        1 => parse_psg_poe1,
-        2 => parse_psg_poe2,
-        _ => unreachable!(),
-    };
-    let (_, passive_tree) = parser(&passive_tree_bytes)
-        .map_err(|e| anyhow!("Failed to parse passive skill tree: {:?}", e))?;
-    println!("{:#?}", passive_tree);
-
-    // Load DAT schemas
-    let schemas = fetch_schema(cache_dir)
-        .context("Failed to fetch schema file")
-        .unwrap();
-
-    // Load DAT tables
-    // ==================== Passive skills ==================
-    let passive_table =
-        load_parsed_table(fs, &schemas, "data/balance/passiveskills.datc64", version)?;
-    println!("{:?}", passive_table);
-
-    // Create LUT between passive skill ID and passive row
-    let _passive_lut = passive_table
-        .get_column_as::<UInt16Type>("PassiveSkillGraphId")?
-        .into_iter()
-        .enumerate()
-        .fold(HashMap::new(), |mut hm, (row, passive_id)| {
-            if let Some(passive_id) = passive_id {
-                hm.entry(passive_id).insert_entry(row);
-            };
-
-            hm
-        });
-
-    //println!("{:#?}", passive_lut);
-
-    // ==================== Characters (Base class) ==================
-    let character_table =
-        load_parsed_table(fs, &schemas, "data/balance/characters.datc64", version)?;
-    println!("{:?}", character_table);
-    let mut characters = parse_character_table(&character_table)
-        .context("Failed to collect required information from the characters table")?;
-
-    // ==================== Ascendancy ==================
-    let ascendancy_table =
-        load_parsed_table(fs, &schemas, "data/balance/ascendancy.datc64", version)?;
-    println!("{:?}", ascendancy_table);
-    let (ascendancies, parent_class_ids) = parse_ascendancy_table(&ascendancy_table)
-        .context("Failed to collect required information from the ascendancies table")?;
-    //println!("{:#?}", ascendancies);
-
-    // Assign ascendancies to their parent class
-    parent_class_ids
-        .into_iter()
-        .zip(ascendancies)
-        .for_each(|(i, a)| {
-            characters[i].ascendancies.push(a);
-        });
-
-    //println!("{:#?}", characters);
-
-    // ==================== Groups ==================
-    // TODO: Where do we infer group number from? Natural ordering of PSG file?
-    let groups = passive_tree
-        .groups
-        .iter()
-        .map(|g| {
-            let nodes = g.passives.iter().map(|p| p.id).collect::<Vec<_>>();
-
-            Group {
-                x: g.x,
-                y: g.y,
-                // TODO
-                orbits: vec![],
-                // TODO
-                background: Background {
-                    image: "TODO",
-                    is_half_image: false,
-                },
-                nodes,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    //println!("{:#?}", groups);
-    //println!("num groups: {:?}", groups.len());
-
-    // ==================== Stats ==================
-    let stats_table = load_parsed_table(fs, &schemas, "data/stats.datc64", version)?;
-    println!("{:?}", stats_table);
-
-    Ok(())
 }
