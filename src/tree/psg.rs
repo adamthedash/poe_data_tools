@@ -89,6 +89,8 @@ pub struct Group {
     /// 2 == ? PoE1
     /// 3 == ? PoE2 Mastery group / ascendencies?
     /// 4 == ? PoE2 Possibly non-wheel groups?
+    /// 5 == ? PoE1 Atlas skill tree
+    /// 6 == ? PoE1 Atlas skill tree
     pub unk1: u32,
     /// 1 == Cluster jewel
     pub unk2: u8,
