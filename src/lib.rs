@@ -1,3 +1,4 @@
+#![feature(trait_alias)]
 use std::sync::OnceLock;
 
 pub mod bundle;
