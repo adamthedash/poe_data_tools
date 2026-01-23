@@ -1,10 +1,10 @@
-use std::{collections::HashMap, path::Path};
+use std::{any::type_name, collections::HashMap, path::Path};
 
 use anyhow::{anyhow, bail, Context, Result};
 use arrow_array::{
     cast::AsArray,
-    types::{Int32Type, UInt16Type, UInt64Type},
-    RecordBatch,
+    types::{Int32Type, UInt16Type, UInt32Type, UInt64Type},
+    ArrowPrimitiveType, GenericStringArray, PrimitiveArray, RecordBatch,
 };
 use itertools::izip;
 
@@ -98,6 +98,28 @@ struct Root<'a> {
     points: HashMap<&'a str, usize>,
 }
 
+trait ColumnHelper {
+    fn get_column_as<T: ArrowPrimitiveType>(&self, column: &str) -> Result<&PrimitiveArray<T>>;
+
+    fn get_column_as_string(&self, column: &str) -> Result<&GenericStringArray<i32>>;
+}
+
+impl ColumnHelper for RecordBatch {
+    fn get_column_as<T: ArrowPrimitiveType>(&self, column: &str) -> Result<&PrimitiveArray<T>> {
+        self.column_by_name(column)
+            .with_context(|| format!("Column not found: {column}"))?
+            .as_primitive_opt::<T>()
+            .with_context(|| format!("Couldn't parse column {column:?} as {:?}", type_name::<T>()))
+    }
+
+    fn get_column_as_string(&self, column: &str) -> Result<&GenericStringArray<i32>> {
+        self.column_by_name(column)
+            .with_context(|| format!("Column not found: {column}"))?
+            .as_string_opt()
+            .with_context(|| format!("Couldn't parse column {column:?} as string"))
+    }
+}
+
 /// data/ascendancy.datc64
 fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy<'_>>, Vec<usize>)> {
     let ids = table
@@ -157,24 +179,13 @@ fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy<'_>>, V
     .collect::<Vec<_>>();
 
     let parent_classes = table
-        .column_by_name("Characters")
-        .context("Column not found: Characters")?
-        .as_list_opt::<i32>()
-        .context("Couldn't cast column to list")?
-        .iter()
-        .map(|s| -> Result<_> {
-            let parent_class_id = s
-                .context("No value for parent class")?
-                .as_primitive_opt::<UInt64Type>()
-                .context("Couldn't cast parent class list to u64")?
-                .into_iter()
-                .next()
-                .context("Parent class list is empty")?
-                .expect("Null value for parent class");
-
-            Ok(parent_class_id as usize)
-        })
-        .collect::<Result<Vec<_>>>()?;
+        .column_by_name("ClassNo")
+        .context("Column not found: ClassNo")?
+        .as_primitive_opt::<UInt32Type>()
+        .context("Couldn't cast column as u32")?
+        .into_iter()
+        .map(|x| x.expect("No value for parent class ID") as usize)
+        .collect::<Vec<_>>();
 
     Ok((ascendancies, parent_classes))
 }
@@ -347,7 +358,8 @@ pub fn dump_tree(
 
     // Load DAT tables
     // ==================== Passive skills ==================
-    let passive_table = load_parsed_table(fs, &schemas, "data/passiveskills.datc64", version)?;
+    let passive_table =
+        load_parsed_table(fs, &schemas, "data/balance/passiveskills.datc64", version)?;
     println!("{:?}", passive_table);
 
     // Create LUT between passive skill ID and passive row
@@ -370,13 +382,15 @@ pub fn dump_tree(
     //println!("{:#?}", passive_lut);
 
     // ==================== Characters (Base class) ==================
-    let character_table = load_parsed_table(fs, &schemas, "data/characters.datc64", version)?;
+    let character_table =
+        load_parsed_table(fs, &schemas, "data/balance/characters.datc64", version)?;
     println!("{:?}", character_table);
     let mut characters = parse_character_table(&character_table)
         .context("Failed to collect required information from the characters table")?;
 
     // ==================== Ascendancy ==================
-    let ascendancy_table = load_parsed_table(fs, &schemas, "data/ascendancy.datc64", version)?;
+    let ascendancy_table =
+        load_parsed_table(fs, &schemas, "data/balance/ascendancy.datc64", version)?;
     println!("{:?}", ascendancy_table);
     let (ascendancies, parent_class_ids) = parse_ascendancy_table(&ascendancy_table)
         .context("Failed to collect required information from the ascendancies table")?;
