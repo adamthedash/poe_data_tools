@@ -4,7 +4,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use arrow_array::{
     cast::AsArray,
     types::{Int32Type, UInt16Type, UInt32Type, UInt64Type},
-    ArrowPrimitiveType, GenericStringArray, PrimitiveArray, RecordBatch,
+    ArrowPrimitiveType, GenericListArray, GenericStringArray, PrimitiveArray, RecordBatch,
 };
 use itertools::izip;
 
@@ -102,6 +102,8 @@ trait ColumnHelper {
     fn get_column_as<T: ArrowPrimitiveType>(&self, column: &str) -> Result<&PrimitiveArray<T>>;
 
     fn get_column_as_string(&self, column: &str) -> Result<&GenericStringArray<i32>>;
+
+    fn get_column_as_list(&self, column: &str) -> Result<&GenericListArray<i32>>;
 }
 
 impl ColumnHelper for RecordBatch {
@@ -117,6 +119,13 @@ impl ColumnHelper for RecordBatch {
             .with_context(|| format!("Column not found: {column}"))?
             .as_string_opt()
             .with_context(|| format!("Couldn't parse column {column:?} as string"))
+    }
+
+    fn get_column_as_list(&self, column: &str) -> Result<&GenericListArray<i32>> {
+        self.column_by_name(column)
+            .with_context(|| format!("Column not found: {column}"))?
+            .as_list_opt()
+            .with_context(|| format!("Couldn't parse column {column:?} as list"))
     }
 }
 
@@ -244,10 +253,7 @@ fn parse_passive_table(table: &RecordBatch) -> Result<()> {
         .collect::<Vec<_>>();
 
     let stats = table
-        .column_by_name("Stats")
-        .context("Column not found: Stats")?
-        .as_list_opt::<i32>()
-        .context("Couldn't cast column to list")?
+        .get_column_as_list("Stats")?
         .iter()
         .map(|s| {
             let stat_ids = s
