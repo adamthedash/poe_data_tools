@@ -123,37 +123,25 @@ impl ColumnHelper for RecordBatch {
 /// data/ascendancy.datc64
 fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy<'_>>, Vec<usize>)> {
     let ids = table
-        .column_by_name("Id")
-        .context("Column not found: Id")?
-        .as_string_opt::<i32>()
-        .context("Couldn't cast column to string")?
+        .get_column_as_string("Id")?
         .into_iter()
         .map(|id| id.expect("No value for ascendancy ID"))
         .collect::<Vec<_>>();
 
     let names = table
-        .column_by_name("Name")
-        .context("Column not found: Name")?
-        .as_string_opt::<i32>()
-        .context("Couldn't cast column to string")?
+        .get_column_as_string("Name")?
         .into_iter()
         .map(|id| id.expect("No value for ascendancy ID"))
         .collect::<Vec<_>>();
 
     let flavour_text = table
-        .column_by_name("FlavourText")
-        .context("Column not found: FlavourText")?
-        .as_string_opt::<i32>()
-        .context("Couldn't cast column to string")?
+        .get_column_as_string("FlavourText")?
         .into_iter()
         .collect::<Vec<_>>();
 
     // TODO: RGB to hex
     let flavour_text_colour = table
-        .column_by_name("RGBFlavourTextColour")
-        .context("Column not found: RGBFlavourTextColour")?
-        .as_string_opt::<i32>()
-        .context("Couldn't cast column to string")?
+        .get_column_as_string("RGBFlavourTextColour")?
         .into_iter()
         .collect::<Vec<_>>();
 
@@ -179,10 +167,7 @@ fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy<'_>>, V
     .collect::<Vec<_>>();
 
     let parent_classes = table
-        .column_by_name("ClassNo")
-        .context("Column not found: ClassNo")?
-        .as_primitive_opt::<UInt32Type>()
-        .context("Couldn't cast column as u32")?
+        .get_column_as::<UInt32Type>("ClassNo")?
         .into_iter()
         .map(|x| x.expect("No value for parent class ID") as usize)
         .collect::<Vec<_>>();
@@ -193,37 +178,25 @@ fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy<'_>>, V
 /// data/characters.datc64
 fn parse_character_table(table: &RecordBatch) -> Result<Vec<Class<'_>>> {
     let names = table
-        .column_by_name("Name")
-        .context("Column not found: Name")?
-        .as_string_opt::<i32>()
-        .context("Couldn't cast column to string")?
+        .get_column_as_string("Name")?
         .into_iter()
         .map(|x| x.expect("No value for character name"))
         .collect::<Vec<_>>();
 
     let base_dexs = table
-        .column_by_name("BaseDexterity")
-        .context("Column not found: BaseDexterity")?
-        .as_primitive_opt::<Int32Type>()
-        .context("Couldn't cast column to i32")?
+        .get_column_as::<Int32Type>("BaseDexterity")?
         .into_iter()
         .map(|x| x.expect("No value for base dexterity"))
         .collect::<Vec<_>>();
 
     let base_strs = table
-        .column_by_name("BaseStrength")
-        .context("Column not found: BaseStrength")?
-        .as_primitive_opt::<Int32Type>()
-        .context("Couldn't cast column to i32")?
+        .get_column_as::<Int32Type>("BaseStrength")?
         .into_iter()
         .map(|x| x.expect("No value for base strength"))
         .collect::<Vec<_>>();
 
     let base_ints = table
-        .column_by_name("BaseIntelligence")
-        .context("Column not found: BaseIntelligence")?
-        .as_primitive_opt::<Int32Type>()
-        .context("Couldn't cast column to i32")?
+        .get_column_as::<Int32Type>("BaseIntelligence")?
         .into_iter()
         .map(|x| x.expect("No value for base intelligence"))
         .collect::<Vec<_>>();
@@ -244,44 +217,29 @@ fn parse_character_table(table: &RecordBatch) -> Result<Vec<Class<'_>>> {
 /// data/passiveskills.datc64
 fn parse_passive_table(table: &RecordBatch) -> Result<()> {
     let skill_graph_node_ids = table
-        .column_by_name("PassiveSkillGraphId")
-        .context("Column not found: PassiveSkillGraphId")?
-        .as_primitive_opt::<UInt64Type>()
-        .context("Couldn't cast column to u64")?
+        .get_column_as::<UInt64Type>("PassiveSkillGraphId")?
         .into_iter()
         .map(|x| x.expect("Unexpected null value"))
         .collect::<Vec<_>>();
 
     let names = table
-        .column_by_name("Name")
-        .context("Column not found: Name")?
-        .as_string_opt::<i32>()
-        .context("Couldn't cast column to string")?
+        .get_column_as_string("Name")?
         .into_iter()
         .collect::<Vec<_>>();
 
     let ascendancy_id = table
-        .column_by_name("Ascendancy")
-        .context("Column not found: Ascendancy")?
-        .as_primitive_opt::<UInt64Type>()
-        .context("Couldn't cast column to u64")?
+        .get_column_as::<UInt64Type>("Ascendancy")?
         .into_iter()
         .collect::<Vec<_>>();
 
     let mastery_group = table
-        .column_by_name("MasteryGroup")
-        .context("Column not found: MasteryGroup")?
-        .as_primitive_opt::<UInt64Type>()
-        .context("Couldn't cast column to u64")?
+        .get_column_as::<UInt64Type>("MasteryGroup")?
         .into_iter()
         .collect::<Vec<_>>();
 
     // TODO: The only one that's null is the starting root node
     let icon_dds_file = table
-        .column_by_name("Icon_DDSFile")
-        .context("Column not found: Icon_DDSFile")?
-        .as_string_opt::<i32>()
-        .context("Couldn't cast column to string")?
+        .get_column_as_string("Icon_DDSFile")?
         .into_iter()
         .collect::<Vec<_>>();
 
@@ -308,10 +266,7 @@ fn parse_passive_table(table: &RecordBatch) -> Result<()> {
         .map(|i| {
             let col_name = format!("Stat{}Value", i + 1);
             let stat_value = table
-                .column_by_name(&col_name)
-                .with_context(|| format!("Column not found: {}", col_name))?
-                .as_primitive_opt::<Int32Type>()
-                .context("Couldn't cast column to i32")?
+                .get_column_as::<Int32Type>(&col_name)?
                 .into_iter()
                 .map(|x| x.expect("Stat value is null"))
                 .collect::<Vec<_>>();
@@ -363,12 +318,8 @@ pub fn dump_tree(
     println!("{:?}", passive_table);
 
     // Create LUT between passive skill ID and passive row
-    let col_name = "PassiveSkillGraphId";
-    let column = passive_table
-        .column_by_name(col_name)
-        .context(format!("Column not found in dat table: {:?}", col_name))?;
-    let _passive_lut = column
-        .as_primitive::<UInt16Type>()
+    let _passive_lut = passive_table
+        .get_column_as::<UInt16Type>("PassiveSkillGraphId")?
         .into_iter()
         .enumerate()
         .fold(HashMap::new(), |mut hm, (row, passive_id)| {
