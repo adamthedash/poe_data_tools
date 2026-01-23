@@ -1,97 +1,20 @@
-#![allow(dead_code, unused_variables)]
-/// Transforming raw PSG data into the format provided by RePoE
-/// TODO: This whole thing
-use std::{any::type_name, collections::HashMap};
+use std::{any::type_name, collections::HashMap, path::Path};
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use arrow_array::{
     cast::AsArray,
-    types::{Int32Type, UInt64Type},
-    ArrowPrimitiveType, GenericListArray, GenericStringArray, PrimitiveArray, RecordBatch,
+    types::{Int32Type, UInt16Type, UInt64Type},
+    ArrowPrimitiveType, BooleanArray, GenericListArray, GenericStringArray, PrimitiveArray,
+    RecordBatch,
 };
 use itertools::izip;
+use serde::Serialize;
 
-#[derive(Debug)]
-struct Ascendancy<'a> {
-    id: &'a str,
-    name: &'a str,
-    flavour_text: Option<&'a str>,
-    flavour_text_colour: Option<&'a str>,
-    flavour_text_rect: HashMap<&'a str, i32>,
-}
-
-#[derive(Debug)]
-struct Class<'a> {
-    name: &'a str,
-    base_str: i32,
-    base_int: i32,
-    base_dex: i32,
-    ascendancies: Vec<Ascendancy<'a>>,
-}
-
-#[derive(Debug)]
-struct Background<'a> {
-    image: &'a str,
-    is_half_image: bool,
-}
-
-#[derive(Debug)]
-struct Group<'a> {
-    x: f32,
-    y: f32,
-    orbits: Vec<usize>,
-    background: Background<'a>,
-    nodes: Vec<u32>,
-}
-
-#[derive(Debug)]
-struct Node<'a> {
-    skill: u32,
-    name: &'a str,
-    icon: &'a str,
-    ascendancy_name: &'a str,
-    stats: Vec<&'a str>,
-    group: usize,
-    orbit: usize,
-    orbit_index: usize,
-    nodes_out: Vec<&'a str>,
-    nodes_in: Vec<&'a str>,
-}
-
-#[derive(Debug)]
-struct ExtraImage<'a> {
-    x: f32,
-    y: f32,
-    image: &'a str,
-}
-
-#[derive(Debug)]
-struct Sprite<'a> {
-    filename: &'a str,
-    w: usize,
-    v: usize,
-    coords: HashMap<&'a str, HashMap<&'a str, usize>>,
-}
-
-#[derive(Debug)]
-struct Root<'a> {
-    tree: &'a str,
-    classes: Vec<Class<'a>>,
-    groups: HashMap<&'a str, Group<'a>>,
-    nodes: HashMap<&'a str, Node<'a>>,
-    extra_images: HashMap<&'a str, ExtraImage<'a>>,
-    jewel_slots: Vec<u32>,
-
-    min_x: f32,
-    min_y: f32,
-    max_x: f32,
-    max_y: f32,
-
-    constants: HashMap<&'a str, HashMap<&'a str, usize>>,
-    sprites: HashMap<&'a str, HashMap<f32, Sprite<'a>>>,
-    image_zoom_levels: Vec<f32>,
-    points: HashMap<&'a str, usize>,
-}
+use crate::{
+    bundle_fs::FS,
+    commands::{dump_tables::load_parsed_table, Patch},
+    dat::ivy_schema::fetch_schema,
+};
 
 trait ColumnHelper {
     fn get_column_as<T: ArrowPrimitiveType>(&self, column: &str) -> Result<&PrimitiveArray<T>>;
@@ -99,184 +22,314 @@ trait ColumnHelper {
     fn get_column_as_string(&self, column: &str) -> Result<&GenericStringArray<i32>>;
 
     fn get_column_as_list(&self, column: &str) -> Result<&GenericListArray<i32>>;
+
+    fn get_column_as_bool(&self, column: &str) -> Result<&BooleanArray>;
 }
 
 impl ColumnHelper for RecordBatch {
     fn get_column_as<T: ArrowPrimitiveType>(&self, column: &str) -> Result<&PrimitiveArray<T>> {
-        self.column_by_name(column)
-            .with_context(|| format!("Column not found: {column}"))?
-            .as_primitive_opt::<T>()
-            .with_context(|| format!("Couldn't parse column {column:?} as {:?}", type_name::<T>()))
+        let col = self
+            .column_by_name(column)
+            .with_context(|| format!("Column not found: {column}"))?;
+
+        col.as_primitive_opt::<T>().with_context(|| {
+            format!(
+                "Couldn't parse column {column:?} as {:?}, actual type: {:?}",
+                type_name::<T>(),
+                col.data_type()
+            )
+        })
     }
 
     fn get_column_as_string(&self, column: &str) -> Result<&GenericStringArray<i32>> {
-        self.column_by_name(column)
-            .with_context(|| format!("Column not found: {column}"))?
-            .as_string_opt()
-            .with_context(|| format!("Couldn't parse column {column:?} as string"))
+        let col = self
+            .column_by_name(column)
+            .with_context(|| format!("Column not found: {column}"))?;
+
+        col.as_string_opt().with_context(|| {
+            format!(
+                "Couldn't parse column {column:?} as string, actual type: {:?}",
+                col.data_type()
+            )
+        })
     }
 
     fn get_column_as_list(&self, column: &str) -> Result<&GenericListArray<i32>> {
-        self.column_by_name(column)
-            .with_context(|| format!("Column not found: {column}"))?
-            .as_list_opt()
-            .with_context(|| format!("Couldn't parse column {column:?} as list"))
+        let col = self
+            .column_by_name(column)
+            .with_context(|| format!("Column not found: {column}"))?;
+
+        col.as_list_opt().with_context(|| {
+            format!(
+                "Couldn't parse column {column:?} as list, actual type: {:?}",
+                col.data_type()
+            )
+        })
+    }
+
+    fn get_column_as_bool(&self, column: &str) -> Result<&BooleanArray> {
+        let col = self
+            .column_by_name(column)
+            .with_context(|| format!("Column not found: {column}"))?;
+
+        col.as_boolean_opt().with_context(|| {
+            format!(
+                "Couldn't parse column {column:?} as bool, actual type: {:?}",
+                col.data_type()
+            )
+        })
     }
 }
 
-/// data/ascendancy.datc64
-fn parse_ascendancy_table(table: &RecordBatch) -> Result<(Vec<Ascendancy<'_>>, Vec<usize>)> {
-    let ids = table
-        .get_column_as_string("Id")?
-        .into_iter()
-        .map(|id| id.expect("No value for ascendancy ID"))
-        .collect::<Vec<_>>();
+#[derive(Debug, Clone, Serialize)]
+pub struct PassiveSkillInfo {
+    pub flavour_text: Option<String>,
+    pub graph_passive_id: u16,
+    pub icon: Option<String>,
+    pub passive_id: String,
+    pub name: Option<String>,
+    pub is_ascendancy_starting_node: bool,
+    pub is_icon_only: bool,
+    pub is_jewel_socket: bool,
+    pub is_keystone: bool,
+    pub is_multiple_choice: bool,
+    pub is_multiple_choice_option: bool,
+    pub is_notable: bool,
+    pub skill_points: u32,
+    pub reminder_text: Vec<String>,
+    pub stats: HashMap<String, i32>,
+}
 
-    let names = table
-        .get_column_as_string("Name")?
-        .into_iter()
-        .map(|id| id.expect("No value for ascendancy ID"))
-        .collect::<Vec<_>>();
+/// Load passive skill info as in the "passives" section of RePoE
+pub fn load_passive_info(
+    fs: &mut FS,
+    version: &Patch,
+    cache_dir: &Path,
+) -> Result<Vec<PassiveSkillInfo>> {
+    let schemas = fetch_schema(cache_dir).context("Failed to load schema")?;
 
-    let flavour_text = table
+    let version_number = match version {
+        Patch::One => 1,
+        Patch::Two => 2,
+        Patch::Specific(v) if v.starts_with("3") => 1,
+        Patch::Specific(v) if v.starts_with("4") => 2,
+        _ => bail!("Unsupported version: {:?}", version),
+    };
+
+    let get_filename = |f| match version_number {
+        1 => format!("data/{f}.datc64"),
+        2 => format!("data/balance/{f}.datc64"),
+        _ => unreachable!(),
+    };
+
+    let passive_table =
+        load_parsed_table(fs, &schemas, &get_filename("passiveskills"), version_number)?;
+
+    let flavour_text = passive_table
         .get_column_as_string("FlavourText")?
         .into_iter()
-        .collect::<Vec<_>>();
-
-    // TODO: RGB to hex
-    let flavour_text_colour = table
-        .get_column_as_string("RGBFlavourTextColour")?
+        .map(|x| x.map(|x| x.to_string()));
+    let graph_passive_id = passive_table
+        .get_column_as::<UInt16Type>("PassiveSkillGraphId")?
         .into_iter()
-        .collect::<Vec<_>>();
-
-    // TODO
-    let flavour_text_rect = (0..ids.len()).map(|_| HashMap::new()).collect::<Vec<_>>();
-
-    let ascendancies = izip!(
-        ids,
-        names,
-        flavour_text,
-        flavour_text_colour,
-        flavour_text_rect
-    )
-    .map(
-        |(id, name, flavour_text, flavour_text_colour, flavour_text_rect)| Ascendancy {
-            id,
-            name,
-            flavour_text,
-            flavour_text_colour,
-            flavour_text_rect,
-        },
-    )
-    .collect::<Vec<_>>();
-
-    let parent_classes = table
-        .get_column_as::<Int32Type>("ClassNo")?
-        .into_iter()
-        .map(|x| x.expect("No value for parent class ID") as usize)
-        .collect::<Vec<_>>();
-
-    Ok((ascendancies, parent_classes))
-}
-
-/// data/characters.datc64
-fn parse_character_table(table: &RecordBatch) -> Result<Vec<Class<'_>>> {
-    let names = table
-        .get_column_as_string("Name")?
-        .into_iter()
-        .map(|x| x.expect("No value for character name"))
-        .collect::<Vec<_>>();
-
-    let base_dexs = table
-        .get_column_as::<Int32Type>("BaseDexterity")?
-        .into_iter()
-        .map(|x| x.expect("No value for base dexterity"))
-        .collect::<Vec<_>>();
-
-    let base_strs = table
-        .get_column_as::<Int32Type>("BaseStrength")?
-        .into_iter()
-        .map(|x| x.expect("No value for base strength"))
-        .collect::<Vec<_>>();
-
-    let base_ints = table
-        .get_column_as::<Int32Type>("BaseIntelligence")?
-        .into_iter()
-        .map(|x| x.expect("No value for base intelligence"))
-        .collect::<Vec<_>>();
-
-    let classes = izip!(names, base_dexs, base_ints, base_strs)
-        .map(|(name, base_dex, base_int, base_str)| Class {
-            name,
-            base_str,
-            base_int,
-            base_dex,
-            ascendancies: vec![],
-        })
-        .collect::<Vec<_>>();
-
-    Ok(classes)
-}
-
-/// data/passiveskills.datc64
-fn parse_passive_table(table: &RecordBatch) -> Result<()> {
-    let skill_graph_node_ids = table
-        .get_column_as::<UInt64Type>("PassiveSkillGraphId")?
-        .into_iter()
-        .map(|x| x.expect("Unexpected null value"))
-        .collect::<Vec<_>>();
-
-    let names = table
-        .get_column_as_string("Name")?
-        .into_iter()
-        .collect::<Vec<_>>();
-
-    let ascendancy_id = table
-        .get_column_as::<UInt64Type>("Ascendancy")?
-        .into_iter()
-        .collect::<Vec<_>>();
-
-    let mastery_group = table
-        .get_column_as::<UInt64Type>("MasteryGroup")?
-        .into_iter()
-        .collect::<Vec<_>>();
-
-    // TODO: The only one that's null is the starting root node
-    let icon_dds_file = table
+        .map(Option::unwrap);
+    let icon = passive_table
         .get_column_as_string("Icon_DDSFile")?
         .into_iter()
+        .map(|x| x.map(|x| x.to_string()));
+    let id = passive_table
+        .get_column_as_string("Id")?
+        .into_iter()
+        .map(|s| s.unwrap().to_string());
+    let is_ascendancy_starting_node = passive_table
+        .get_column_as_bool("IsAscendancyStartingNode")?
+        .into_iter()
+        .map(Option::unwrap);
+    let is_icon_only = passive_table
+        .get_column_as_bool("IsJustIcon")?
+        .into_iter()
+        .map(Option::unwrap);
+    let is_jewel_socket = passive_table
+        .get_column_as_bool("IsJewelSocket")?
+        .into_iter()
+        .map(Option::unwrap);
+    let is_keystone = passive_table
+        .get_column_as_bool("IsKeystone")?
+        .into_iter()
+        .map(Option::unwrap);
+    let is_multiple_choice = passive_table
+        .get_column_as_bool("IsMultipleChoice")?
+        .into_iter()
+        .map(Option::unwrap);
+    let is_multiple_choice_option = passive_table
+        .get_column_as_bool("IsMultipleChoiceOption")?
+        .into_iter()
+        .map(Option::unwrap);
+    let is_notable = passive_table
+        .get_column_as_bool("IsNotable")?
+        .into_iter()
+        .map(Option::unwrap);
+    let name = passive_table
+        .get_column_as_string("Name")?
+        .into_iter()
+        .map(|x| x.map(|x| x.to_string()));
+    let skill_points = passive_table
+        .get_column_as::<Int32Type>("SkillPointsGranted")?
+        .into_iter()
+        .map(Option::unwrap);
+
+    // Stats
+
+    let stat_ids = passive_table.get_column_as_list("Stats")?.iter().map(|s| {
+        let stat_ids = s
+            .expect("Stats list is null")
+            .as_primitive_opt::<UInt64Type>()
+            .expect("Couldn't cast stats list to u64")
+            .into_iter()
+            .map(|x| x.expect("Stat ID value is null"))
+            .collect::<Vec<_>>();
+
+        stat_ids
+    });
+
+    let stat_values = (1..=5)
+        .map(|i| -> Result<_> {
+            let values = passive_table
+                .get_column_as::<Int32Type>(&format!("Stat{i}Value"))?
+                .into_iter()
+                .map(Option::unwrap);
+
+            Ok(values)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let stat_values = Zip { iters: stat_values };
+
+    let stat_table = load_parsed_table(fs, &schemas, &get_filename("stats"), version_number)?;
+
+    let stats = stat_table
+        .get_column_as_string("Id")?
+        .into_iter()
+        .map(Option::unwrap)
         .collect::<Vec<_>>();
 
-    let stats = table
-        .get_column_as_list("Stats")?
+    let stat_maps = stat_ids.zip(stat_values).map(|(ids, values)| {
+        ids.into_iter()
+            .zip(values)
+            .map(|(id, value)| {
+                (
+                    stats
+                        .get(id as usize)
+                        .with_context(|| format!("Stat index out of bounds: {id}"))
+                        .unwrap()
+                        .to_string(),
+                    value,
+                )
+            })
+            .collect::<HashMap<_, _>>()
+    });
+
+    // Reminder texts
+
+    let reminder_text_table =
+        load_parsed_table(fs, &schemas, &get_filename("remindertext"), version_number)?;
+    let reminder_texts = reminder_text_table
+        .get_column_as_string("Text")?
+        .into_iter()
+        .map(Option::unwrap)
+        .collect::<Vec<_>>();
+
+    let reminder_text = passive_table
+        .get_column_as_list("ReminderStrings")?
         .iter()
         .map(|s| {
-            let stat_ids = s
-                .expect("Stats list is null")
+            let text_ids = s
+                .expect("Reminder text list is null")
                 .as_primitive_opt::<UInt64Type>()
-                .context("Couldn't cast stats list to u64")?
+                .expect("Couldn't cast stats list to u64")
                 .into_iter()
-                .map(|x| x.expect("Stat ID value is null"))
+                .map(|x| x.expect("Reminder text value is null"))
+                .map(|i| {
+                    reminder_texts
+                        .get(i as usize)
+                        .with_context(|| format!("Reminder index out of bounds: {i}"))
+                        .unwrap()
+                        .to_string()
+                })
                 .collect::<Vec<_>>();
 
-            Ok(stat_ids)
-        })
-        .collect::<Result<Vec<_>>>()?;
+            text_ids
+        });
 
-    let stat_values = (0..4)
-        .map(|i| {
-            let col_name = format!("Stat{}Value", i + 1);
-            let stat_value = table
-                .get_column_as::<Int32Type>(&col_name)?
-                .into_iter()
-                .map(|x| x.expect("Stat value is null"))
-                .collect::<Vec<_>>();
+    let passive_skills = izip!(
+        flavour_text,
+        graph_passive_id,
+        icon,
+        id,
+        is_ascendancy_starting_node,
+        is_icon_only,
+        is_jewel_socket,
+        is_keystone,
+        is_multiple_choice,
+        is_multiple_choice_option,
+        is_notable,
+        name,
+        skill_points,
+        stat_maps,
+        reminder_text,
+    )
+    .map(
+        |(
+            flavour_text,
+            graph_passive_id,
+            icon,
+            id,
+            is_ascendancy_starting_node,
+            is_icon_only,
+            is_jewel_socket,
+            is_keystone,
+            is_multiple_choice,
+            is_multiple_choice_option,
+            is_notable,
+            name,
+            skill_points,
+            stat_maps,
+            reminder_text,
+        )| {
+            PassiveSkillInfo {
+                flavour_text,
+                graph_passive_id,
+                icon,
+                passive_id: id,
+                is_ascendancy_starting_node,
+                is_icon_only,
+                is_jewel_socket,
+                is_keystone,
+                is_multiple_choice,
+                is_multiple_choice_option,
+                is_notable,
+                skill_points: skill_points as u32,
+                reminder_text,
+                stats: stat_maps,
+                name,
+            }
+        },
+    )
+    .collect();
 
-            Ok(stat_value)
-        })
-        .collect::<Result<Vec<_>>>()?;
+    Ok(passive_skills)
+}
 
-    // TODO: Look up stat formatting functions, insert values and return as strings
+struct Zip<I> {
+    iters: Vec<I>,
+}
 
-    unimplemented!()
+impl<I: Iterator> Iterator for Zip<I> {
+    type Item = Vec<I::Item>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iters
+            .iter_mut()
+            .map(|iter| iter.next())
+            .collect::<Option<_>>()
+    }
 }

@@ -1,9 +1,13 @@
+use std::collections::HashMap;
+
 use nom::{
     multi::count,
     number::complete::{le_f32, le_i32, le_u32, le_u64, u8},
     IResult,
 };
 use serde::Serialize;
+
+use crate::tree::tree_repoe::PassiveSkillInfo;
 
 #[derive(Debug, Serialize)]
 pub struct Connection {
@@ -133,6 +137,7 @@ pub struct PassiveSkillGraph {
     pub passives_per_orbit: Vec<u8>,
     pub root_passives: Vec<u64>,
     pub groups: Vec<Group>,
+    pub passive_info: Option<HashMap<u16, PassiveSkillInfo>>,
 }
 
 impl PassiveSkillGraph {
@@ -173,6 +178,7 @@ impl PassiveSkillGraph {
             groups,
             graph_type,
             passives_per_orbit: skills_per_orbit,
+            passive_info: None,
         };
 
         Ok((input, psg))

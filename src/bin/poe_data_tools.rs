@@ -189,8 +189,16 @@ fn main() -> Result<()> {
         Command::DumpTrees {
             output_folder,
             globs,
-        } => dump_trees(&mut fs, &globs, &output_folder, &args.patch)
-            .context("Dump Tree command failed")?,
+        } => {
+            dump_trees(
+                &mut fs,
+                &globs,
+                &output_folder,
+                &args.patch,
+                &args.cache_dir,
+            )
+            .context("Dump Tree command failed")?;
+        }
     }
 
     Ok(())

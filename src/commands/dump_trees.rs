@@ -1,19 +1,41 @@
-use std::{fs::create_dir_all, path::Path};
+use std::{collections::HashMap, fs::create_dir_all, path::Path};
 
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use glob::{MatchOptions, Pattern};
 
 use super::Patch;
-use crate::{bundle_fs::FS, tree::psg::PassiveSkillGraph, VERBOSE};
+use crate::{
+    bundle_fs::FS,
+    tree::{
+        psg::PassiveSkillGraph,
+        tree_repoe::{load_passive_info, PassiveSkillInfo},
+    },
+    VERBOSE,
+};
 
-fn process_file(contents: &[u8], output_path: &Path, version: &Patch) -> Result<()> {
+fn process_file(
+    contents: &[u8],
+    output_path: &Path,
+    version: &Patch,
+    passive_info: &HashMap<u16, PassiveSkillInfo>,
+) -> Result<()> {
     // Parse the PSG file
-    let (_, passive_tree) = match version {
+    let (_, mut passive_tree) = match version {
         Patch::One => PassiveSkillGraph::parse_poe1(contents),
         Patch::Two => PassiveSkillGraph::parse_poe2(contents),
         _ => bail!("Only patch versions 1/2 supported for table extraction."),
     }
     .map_err(|e| anyhow!("Failed to parse passive skill tree: {:?}", e))?;
+
+    // Add passive info - only nodes that are in the graph
+    let passive_info = {
+        let ids = passive_tree
+            .groups
+            .iter()
+            .flat_map(|g| g.passives.iter().map(|p| p.id as u16));
+        ids.map(|id| (id, passive_info[&id].clone())).collect()
+    };
+    passive_tree.passive_info = Some(passive_info);
 
     // Write to file
     create_dir_all(output_path.parent().context("No parent directory")?)
@@ -28,6 +50,7 @@ pub fn dump_trees(
     patterns: &[Pattern],
     output_folder: &Path,
     version: &Patch,
+    cache_dir: &Path,
 ) -> Result<()> {
     for pattern in patterns {
         ensure!(
@@ -52,6 +75,11 @@ pub fn dump_trees(
         .collect::<Vec<_>>();
     let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
 
+    let passive_info = load_passive_info(fs, version, cache_dir)?
+        .into_iter()
+        .map(|p| (p.graph_passive_id, p))
+        .collect::<HashMap<_, _>>();
+
     fs.batch_read(&filenames)
         // Print and filter out errors
         .filter_map(|f| {
@@ -64,7 +92,7 @@ pub fn dump_trees(
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
             // Convert the data table
             let output_path = output_folder.join(filename).with_extension("json");
-            process_file(&contents, &output_path, version)
+            process_file(&contents, &output_path, version, &passive_info)
                 .with_context(|| format!("Failed to process file: {:?}", filename))?;
 
             Ok(filename)
