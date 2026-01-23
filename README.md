@@ -8,7 +8,7 @@
 - `dump-art`: Extracts DirectDraw Surface (.dds) files and converts them to PNGs
 - `dump-tables`: Extracts data tables (.datc64), applies the [community-curated schemas](https://github.com/poe-tool-dev/dat-schema),
   and saves them out as CSVs where the schema was successfully applied.  
-- `dump-tree`: Extracts the passive skill tree as JSON.  
+- `dump-tree`: Extracts passive skill trees (player, atlas, ruthless, etc.) to JSON
 
 
 ## Usage
@@ -56,7 +56,6 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 
 - Proper documentation for the lib crate
 - Swap image.rs version once [DDS support is merged](https://github.com/image-rs/image/pull/2258)
-- Skill tree data export
 
 # Testing
 
