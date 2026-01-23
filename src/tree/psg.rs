@@ -7,7 +7,7 @@ use nom::{
 };
 use serde::Serialize;
 
-use crate::tree::tree_repoe::PassiveSkillInfo;
+use crate::tree::passive_info::PassiveSkillInfo;
 
 #[derive(Debug, Serialize)]
 pub struct Connection {

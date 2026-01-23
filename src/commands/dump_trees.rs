@@ -7,8 +7,8 @@ use super::Patch;
 use crate::{
     bundle_fs::FS,
     tree::{
+        passive_info::{load_passive_info, PassiveSkillInfo},
         psg::PassiveSkillGraph,
-        tree_repoe::{load_passive_info, PassiveSkillInfo},
     },
     VERBOSE,
 };
