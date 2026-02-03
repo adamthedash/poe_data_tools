@@ -1,7 +1,9 @@
 #![feature(trait_alias)]
 #![feature(str_from_utf16_endian)]
+#![feature(assert_matches)]
 use std::sync::OnceLock;
 
+pub mod arm;
 pub mod bundle;
 pub mod bundle_fs;
 pub mod bundle_index;
