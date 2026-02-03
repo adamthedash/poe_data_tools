@@ -52,6 +52,9 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ![psg file format poe1](./images/psg_spec_poe1.png)  
 ![psg file format poe2](./images/psg_spec_poe2.png)  
 
+# World Areas (ARM) File Format
+![arm format](./images/arm_spec.png)  
+
 **TODO List**
 
 - Proper documentation for the lib crate
