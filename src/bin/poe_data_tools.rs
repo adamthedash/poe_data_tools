@@ -7,8 +7,8 @@ use poe_data_tools::{
     bundle_fs::FS,
     bundle_loader::cdn_base_url,
     commands::{
-        cat::cat_file, dump_art::extract_art, dump_tables::dump_tables, dump_trees::dump_trees,
-        extract::extract_files, list::list_files, Patch,
+        cat::cat_file, dump_art::extract_art, dump_maps::dump_maps, dump_tables::dump_tables,
+        dump_trees::dump_trees, extract::extract_files, list::list_files, Patch,
     },
     VERBOSE,
 };
@@ -60,6 +60,15 @@ enum Command {
 
         /// Glob patterns to filter the list of files
         #[clap(default_value = "**/*.psg")]
+        #[arg(num_args = 1..)]
+        globs: Vec<Pattern>,
+    },
+    /// Extracts map files as JSON
+    DumpMaps {
+        output_folder: PathBuf,
+
+        /// Glob patterns to filter the list of files
+        #[clap(default_value = "**/*.arm")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
     },
@@ -198,6 +207,12 @@ fn main() -> Result<()> {
                 &args.cache_dir,
             )
             .context("Dump Tree command failed")?;
+        }
+        Command::DumpMaps {
+            output_folder,
+            globs,
+        } => {
+            dump_maps(&mut fs, &globs, &output_folder).context("Dump Maps command failed")?;
         }
     }
 

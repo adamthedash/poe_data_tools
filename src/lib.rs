@@ -1,4 +1,5 @@
 #![feature(trait_alias)]
+#![feature(str_from_utf16_endian)]
 use std::sync::OnceLock;
 
 pub mod bundle;
