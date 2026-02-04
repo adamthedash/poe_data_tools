@@ -3,10 +3,16 @@ use std::collections::HashMap;
 use itertools::{izip, Itertools};
 use nom::{
     branch::alt,
-    bytes::complete::{is_not, tag, take_until},
-    character::complete::{self, space1},
+    bytes::{
+        complete::{is_not, tag, take_till, take_till1, take_until, take_while},
+        streaming::take_while1,
+    },
+    character::{
+        complete::{self, space1},
+        is_space,
+    },
     combinator,
-    multi::{count, separated_list1},
+    multi::{count, length_count, many1, many1_count, separated_list0, separated_list1},
     sequence::{delimited, preceded, separated_pair},
     IResult, Parser,
 };
@@ -27,6 +33,12 @@ fn version_line<'a>() -> impl MultilineParser<'a, u32> {
 /// Quoted string ending in newline
 fn quoted_str(input: &str) -> IResult<&str, String> {
     delimited(complete::char('"'), take_until("\""), complete::char('"'))
+        .map(String::from)
+        .parse(input)
+}
+
+fn unquoted_str(input: &str) -> IResult<&str, String> {
+    take_till1(|c: char| c.is_whitespace())
         .map(String::from)
         .parse(input)
 }
@@ -316,12 +328,7 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
 fn doodads<'a>(version: u32) -> impl MultilineParser<'a, Vec<Doodad>> {
     let doodad = doodad(version);
 
-    let group_parser: Box<dyn MultilineParser<'_, Vec<Doodad>>> = match version {
-        ..32 => Box::new(length_prefixed(doodad)) as _,
-        32.. => Box::new(terminated(doodad, "-1")) as _,
-    };
-
-    group_parser
+    group(version, doodad)
 }
 
 /// Stores the entire line without interpreting
@@ -333,20 +340,23 @@ fn noop<'a>() -> impl MultilineParser<'a, String> {
 fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<String>> {
     let doodad_connection = noop();
 
-    let group_parser: Box<dyn MultilineParser<'_, Vec<String>>> = match version {
-        ..32 => Box::new(length_prefixed(doodad_connection)) as _,
-        32.. => Box::new(terminated(doodad_connection, "-1")) as _,
-    };
-
-    group_parser
+    group(version, doodad_connection)
 }
 
 fn decals<'a>(version: u32) -> impl MultilineParser<'a, Vec<String>> {
     let decal = noop();
 
-    let group_parser: Box<dyn MultilineParser<'_, Vec<String>>> = match version {
-        ..32 => Box::new(length_prefixed(decal)) as _,
-        32.. => Box::new(terminated(decal, "-1")) as _,
+    group(version, decal)
+}
+
+/// Either length-prefixed or "-1"-terminated depending on version
+fn group<'a, T: 'a>(
+    version: u32,
+    item_parser: impl MultilineParser<'a, T> + 'a,
+) -> impl MultilineParser<'a, Vec<T>> {
+    let group_parser: Box<dyn MultilineParser<'_, Vec<T>>> = match version {
+        ..32 => Box::new(length_prefixed(item_parser)) as _,
+        32.. => Box::new(terminated(item_parser, "-1")) as _,
     };
 
     group_parser
@@ -356,6 +366,7 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
 
     let (lines, version) = version_line()(&lines)?;
+    println!("version: {version}");
 
     let (lines, strings) = string_section()(lines)?;
 
@@ -388,7 +399,6 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
     };
     let (lines, grid) = grid(grid_height, grid_width, &strings)(lines)?;
 
-    // println!("{:#?}", lines);
     let (lines, doodads) = doodads(version)(lines)?;
 
     let (lines, doodad_connections) = match version {
@@ -396,8 +406,68 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
         15.. => doodad_connections(version)(lines)?,
     };
 
-    // TODO: Might be optional in some versions
     let (lines, decals) = decals(version)(lines)?;
+
+    let (lines, boss_lines) = match version {
+        ..23 => (lines, None),
+        23.. => {
+            let line_parser = separated_pair(
+                separated_list1(space1, quoted_str),
+                space1,
+                nom::sequence::terminated(
+                    separated_list0(space1, complete::i32),
+                    combinator::opt(space1),
+                ),
+            );
+            let line_parser = single_line(nom_adapter(line_parser));
+
+            let (lines, boss_lines) = length_prefixed(line_parser)(lines)?;
+
+            (lines, Some(boss_lines))
+        }
+    };
+
+    let (lines, zones) = match version {
+        ..28 | 37.. => (lines, None),
+        28..37 => {
+            let line_parser = noop();
+            let (lines, item_lines) = {
+                // NOTE: Different group style
+                let group_parser: Box<dyn MultilineParser<'_, Vec<String>>> = match version {
+                    ..33 => Box::new(length_prefixed(line_parser)) as _,
+                    33.. => Box::new(terminated(line_parser, "-1")) as _,
+                };
+
+                group_parser
+            }(lines)?;
+
+            (lines, Some(item_lines))
+        }
+    };
+
+    println!("remaining lines: {:#?}", lines);
+
+    let (lines, tags) = match version {
+        ..28 => (lines, None),
+        28.. => {
+            let line_parser = length_count(complete::u32, preceded(space1, unquoted_str));
+
+            let (lines, tags) = single_line(nom_adapter(line_parser))(lines)?;
+
+            (lines, Some(tags))
+        }
+    };
+
+    // TODO: This can only run after all other data is taken
+    // let (lines, nums) = if lines.len() == 1 {
+    //     let line_parser = many1(nom::sequence::terminated(complete::u32, space1));
+    //     let mut line_parser = single_line(nom_adapter(line_parser));
+    //     let (lines, nums) = line_parser(lines)?;
+    //
+    //     (lines, Some(nums))
+    // } else {
+    //     (lines, None)
+    // };
 
     let map = Map {
         version,
@@ -414,10 +484,14 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
         string1,
         doodad_connections,
         decals,
+        boss_lines,
+        zones,
     };
 
     // TODO: Return &str once we figure out lifetimes
-    let lines = lines.iter().map(|s| s.to_string()).collect();
+    let lines = lines.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+
+    // assert!(lines.is_empty());
 
     Ok((lines, map))
 }

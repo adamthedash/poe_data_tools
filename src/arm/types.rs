@@ -55,7 +55,6 @@ pub struct SlotK {
 pub enum Slot {
     K(SlotK),
     N,
-    // TODO: Though, but doesn't look like it
     F { fill: Option<String> },
     S,
     O,
@@ -115,4 +114,8 @@ pub struct Map {
     pub doodad_connections: Vec<String>,
     //TODO: interpret
     pub decals: Vec<String>,
+    //TODO: interpret
+    pub boss_lines: Option<Vec<(Vec<String>, Vec<i32>)>>,
+    //TODO: interpret
+    pub zones: Option<Vec<String>>,
 }
