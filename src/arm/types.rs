@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -27,7 +29,7 @@ impl Direction {
 #[derive(Debug, Serialize)]
 pub struct Edge {
     pub direction: Direction,
-    pub edge: String,
+    pub edge: Option<String>,
     pub exit: u32,
     pub virtual_exit: u32,
 }
@@ -35,8 +37,8 @@ pub struct Edge {
 #[derive(Debug, Serialize)]
 pub struct Corner {
     pub direction: Direction,
-    pub ground: String,
-    pub height: u32,
+    pub ground: Option<String>,
+    pub height: i32,
 }
 
 #[derive(Debug, Serialize)]
@@ -45,7 +47,7 @@ pub struct SlotK {
     pub width: u32,
     pub edges: [Edge; 4],
     pub corners: [Corner; 4],
-    pub slot_tag: String,
+    pub slot_tag: Option<String>,
     pub origin: Direction,
 }
 
@@ -53,35 +55,45 @@ pub struct SlotK {
 pub enum Slot {
     K(SlotK),
     N,
-    // TODO: Thought this was a string index, but doesn't look like it
-    F { fill: u32 },
+    // TODO: Though, but doesn't look like it
+    F { fill: Option<String> },
     S,
+    O,
 }
 
 #[derive(Debug, Serialize)]
 pub struct PoI {
     pub num1: u32,
     pub num2: u32,
-    pub num3: u32,
+    pub num3: f32,
     pub tag: String,
 }
 
 #[derive(Debug, Serialize)]
 pub struct Doodad {
-    pub num1: u32,
-    pub num2: u32,
-    pub float1: f32,
-    pub rotation: f32,
-    pub float2: f32,
-    pub num3: u32,
-    pub float3: f32,
-    pub float4: f32,
-    pub num4: u32,
-    pub num5: u32,
-    pub num6: u32,
-    pub num7: u32,
+    pub x: u32,
+    pub y: u32,
+
+    pub float_pairs: Vec<(f32, f32)>,
+
+    // Likely yaw/pitch/roll
+    // Quaternion? https://gitlab.com/zao/poe-rs/-/blob/master/src/formats/arm/types.rs?ref_type=heads#L82
+    pub radians1: f32,
+    pub radians2: Option<f32>,
+    pub radians3: Option<f32>,
+
+    pub radians4: Option<f32>,
+    pub radians5: Option<f32>,
+    // pub float1: Option<f32>,
+    pub uint3: u32,
+    pub uint4: Option<u32>,
+    pub floats: Vec<f32>,
+
+    pub scale: f32,
     pub ao_file: String,
     pub stub: String,
+
+    pub key_values: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -94,7 +106,7 @@ pub struct Map {
     pub tag: String,
     pub numbers2: Vec<u32>,
     pub root_slot: Slot,
-    pub numbers3: Vec<Vec<u32>>,
+    pub numbers3: Vec<Vec<i32>>,
     pub points_of_interest: Vec<Vec<PoI>>,
     pub string1: Option<String>,
     pub grid: Vec<Vec<Slot>>,

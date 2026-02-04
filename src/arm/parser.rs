@@ -1,10 +1,13 @@
+use std::collections::HashMap;
+
 use itertools::{izip, Itertools};
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_until},
-    character::complete::{self},
+    bytes::complete::{is_not, tag, take_until},
+    character::complete::{self, space1},
+    combinator,
     multi::{count, separated_list1},
-    sequence::{delimited, preceded},
+    sequence::{delimited, preceded, separated_pair},
     IResult, Parser,
 };
 
@@ -40,13 +43,78 @@ fn uints<'a>() -> impl MultilineParser<'a, Vec<u32>> {
     )))
 }
 
-/// "k" followed by 24 numbers
-fn slot_k(input: &str) -> IResult<&str, (char, Vec<u32>)> {
-    let (input, letter) =
-        nom::sequence::terminated(complete::char('k'), complete::char(' '))(input)?;
-    let (input, numbers) = separated_list1(complete::char(' '), complete::u32)(input)?;
+/// Space-separated signed ints
+fn ints<'a>() -> impl MultilineParser<'a, Vec<i32>> {
+    single_line(nom_adapter(separated_list1(
+        complete::char(' '),
+        complete::i32,
+    )))
+}
 
-    Ok((input, (letter, numbers)))
+/// "k" followed by 24 numbers
+fn slot_k<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, SlotK> {
+    use nom::{
+        character::complete::{char as C, i32 as I, u32 as U},
+        sequence::{preceded as P, terminated as T},
+    };
+
+    let (input, _letter) = T(C('k'), C(' '))(input)?;
+
+    let (input, grid_dims) = count(T(U, C(' ')), 2)(input)?;
+
+    let (input, edges) = count(T(U, C(' ')), 4)(input)?;
+
+    let (input, exits) = count(T(U, C(' ')), 8)(input)?;
+
+    let (input, corner_grounds) = count(T(U, C(' ')), 4)(input)?;
+
+    let (input, corner_heights) = count(T(I, C(' ')), 4)(input)?;
+
+    let (input, slot_tag) = U(input)?;
+
+    let (input, origin_dir) = combinator::opt(P(C(' '), U))(input)?;
+
+    let edges = izip!(
+        Direction::cardinal().into_iter(),
+        edges,
+        exits.into_iter().tuples(),
+    )
+    .map(|(direction, edge, (exit, virtual_exit))| Edge {
+        direction,
+        // 0 -> None,
+        // i -> Some(i - 1)
+        edge: (edge > 0).then(|| strings[(edge - 1) as usize].clone()),
+        exit,
+        virtual_exit,
+    })
+    .collect::<Vec<_>>()
+    .try_into()
+    .expect("Parser should take care of counts");
+
+    let corners = izip!(
+        Direction::diagonals().into_iter(),
+        corner_grounds,
+        corner_heights,
+    )
+    .map(|(direction, ground, height)| Corner {
+        direction,
+        ground: (ground > 0).then(|| strings[ground as usize - 1].clone()),
+        height,
+    })
+    .collect::<Vec<_>>()
+    .try_into()
+    .expect("Parser should take care of counts");
+
+    let slot = SlotK {
+        width: grid_dims[0],
+        height: grid_dims[1],
+        edges,
+        corners,
+        slot_tag: (slot_tag > 0).then(|| strings[slot_tag as usize - 1].clone()),
+        origin: Direction::diagonals()[origin_dir.unwrap_or(0) as usize],
+    };
+
+    Ok((input, slot))
 }
 
 /// k, f, s, n slots
@@ -54,48 +122,11 @@ fn parse_slot<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, Slot> 
     alt((
         complete::char('n').map(|_| Slot::N),
         complete::char('s').map(|_| Slot::S),
-        preceded(tag("f "), complete::u32).map(|i| Slot::F { fill: i }),
-        slot_k.map(|(_, nums)| {
-            // width, height, edge_[n, w, s, e](index), [exit_n, virtual_exit_n, exit_w, ...], corner_ground_[sw, se, ne,
-            // nw](index), corner_height_[sw, se, ne, nw], slot_tag(index)
-            let edges = izip!(
-                Direction::cardinal().into_iter(),
-                &nums[2..6],
-                nums[6..14].iter().tuples(),
-            )
-            .map(|(direction, edge, (exit, virtual_exit))| Edge {
-                direction,
-                edge: strings[*edge as usize].clone(),
-                exit: *exit,
-                virtual_exit: *virtual_exit,
-            })
-            .collect::<Vec<_>>()
-            .try_into()
-            .expect("Failed to parse edges");
-
-            let corners = izip!(
-                Direction::diagonals().into_iter(),
-                &nums[14..18],
-                &nums[18..22],
-            )
-            .map(|(direction, ground, height)| Corner {
-                direction,
-                ground: strings[*ground as usize].clone(),
-                height: *height,
-            })
-            .collect::<Vec<_>>()
-            .try_into()
-            .expect("Failed to parse corners");
-
-            Slot::K(SlotK {
-                width: nums[0],
-                height: nums[1],
-                edges,
-                corners,
-                slot_tag: strings[nums[22] as usize].clone(),
-                origin: Direction::diagonals()[*nums.get(23).unwrap_or(&0) as usize],
-            })
+        complete::char('o').map(|_| Slot::O),
+        preceded(tag("f "), complete::u32).map(|i| Slot::F {
+            fill: (i > 0).then(|| strings[i as usize - 1].clone()),
         }),
+        (|input| slot_k(input, strings)).map(Slot::K),
     ))(input)
 }
 
@@ -120,13 +151,17 @@ fn grid<'a>(
 fn poi<'a>() -> impl MultilineParser<'a, PoI> {
     let line_parser = count(
         nom::sequence::terminated(complete::u32, complete::char(' ')),
-        3,
+        2,
     )
+    .and(nom::sequence::terminated(
+        nom::number::complete::float,
+        complete::char(' '),
+    ))
     .and(quoted_str)
-    .map(|(nums, string)| PoI {
-        num1: nums[0],
-        num2: nums[1],
-        num3: nums[2],
+    .map(|((nums12, num3), string)| PoI {
+        num1: nums12[0],
+        num2: nums12[1],
+        num3,
         tag: string,
     });
 
@@ -136,91 +171,154 @@ fn poi<'a>() -> impl MultilineParser<'a, PoI> {
 fn poi_groups<'a>(version: u32) -> impl MultilineParser<'a, Vec<Vec<PoI>>> {
     // Counts determined by version, manually curated
     let count = match version {
-        ..22 => 9,
-        22..26 => 10,
+        ..20 => 9,
+        20..26 => 10,
         26..29 => 5,
         29.. => 6,
     };
 
     let group_parser: Box<dyn MultilineParser<'_, Vec<PoI>>> = match version {
-        ..23 => Box::new(length_prefixed(poi())) as _,
-        23.. => Box::new(terminated(poi(), "-1")) as _,
+        ..32 => Box::new(length_prefixed(poi())) as _,
+        32.. => Box::new(terminated(poi(), "-1")) as _,
     };
 
     repeated(group_parser, count)
 }
 
 /// Single doodad string
-fn doodad(line: &str) -> IResult<&str, Doodad> {
-    let (line, num1) = complete::u32(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, num2) = complete::u32(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, float1) = nom::number::complete::float(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, rotation) = nom::number::complete::float(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, float2) = nom::number::complete::float(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, num3) = complete::u32(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, float3) = nom::number::complete::float(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, float4) = nom::number::complete::float(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, num4) = complete::u32(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, num5) = complete::u32(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, num6) = complete::u32(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, num7) = complete::u32(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, ao_file) = quoted_str(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let (line, stub) = quoted_str(line)?;
-    let (line, _) = complete::char(' ')(line)?;
-
-    let doodad = Doodad {
-        num1,
-        num2,
-        float1,
-        rotation,
-        float2,
-        num3,
-        float3,
-        float4,
-        num4,
-        num5,
-        num6,
-        num7,
-        ao_file,
-        stub,
+fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
+    use nom::{
+        character::complete::{char as C, u32 as U},
+        number::complete::float as F,
+        sequence::{preceded as P, terminated as T},
     };
 
-    Ok((line, doodad))
+    let parser = for<'b> move |line: &'b str| -> IResult<&'b str, Doodad> {
+        // println!("Line: {:?}", line);
+        let (line, x) = U(line)?;
+        let (line, _) = space1(line)?;
+
+        let (line, y) = U(line)?;
+        let (line, _) = space1(line)?;
+
+        let (line, float_pairs) = match version {
+            ..34 => (line, vec![]),
+            34.. => {
+                let (line, count1) = U(line)?;
+                let (line, _) = space1(line)?;
+
+                count(T(separated_pair(F, space1, F), space1), count1 as usize)(line)?
+            }
+        };
+
+        let (line, radians1) = F(line)?;
+        let (line, _) = space1(line)?;
+
+        let (line, (radians2, radians3, radians4, radians5)) = match version {
+            ..18 => (line, (None, None, None, None)),
+            18.. => {
+                let (line, radians2) = F(line)?;
+                let (line, _) = space1(line)?;
+
+                let (line, radians3) = F(line)?;
+                let (line, _) = space1(line)?;
+
+                let (line, radians4) = F(line)?;
+                let (line, _) = space1(line)?;
+
+                let (line, radians5) = F(line)?;
+                let (line, _) = space1(line)?;
+
+                (
+                    line,
+                    (
+                        Some(radians2),
+                        Some(radians3),
+                        Some(radians4),
+                        Some(radians5),
+                    ),
+                )
+            }
+        };
+
+        let (line, uint3) = U(line)?;
+        let (line, _) = space1(line)?;
+
+        // TODO: Unclear whether it is uint3 or 4 that's missing.
+        let (line, uint4) = match version {
+            ..25 => (line, None),
+            25.. => {
+                let (line, uint4) = U(line)?;
+                let (line, _) = space1(line)?;
+
+                (line, Some(uint4))
+            }
+        };
+
+        let (line, count1) = U(line)?;
+        let (line, _) = space1(line)?;
+
+        let (line, floats) = count(T(F, space1), count1 as usize)(line)?;
+
+        let (line, scale) = F(line)?;
+        let (line, _) = space1(line)?;
+
+        let (line, ao_file) = quoted_str(line)?;
+        let (line, _) = space1(line)?;
+
+        let (line, stub) = quoted_str(line)?;
+
+        let (line, key_values) = match version {
+            ..36 => (line, HashMap::new()),
+            36.. => {
+                let (line, _) = space1(line)?;
+                let (line, count1) = U(line)?;
+
+                let (line, key_values) = count(
+                    P(space1, separated_pair(is_not("="), C('='), is_not(" "))),
+                    count1 as usize,
+                )(line)?;
+
+                let key_values = key_values
+                    .into_iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect();
+
+                (line, key_values)
+            }
+        };
+
+        let doodad = Doodad {
+            x,
+            y,
+            float_pairs,
+            radians1,
+            radians2,
+            radians3,
+            radians4,
+            radians5,
+            uint3,
+            uint4,
+            floats,
+            scale,
+            ao_file,
+            stub,
+            key_values,
+        };
+
+        Ok((line, doodad))
+    };
+
+    single_line(nom_adapter(parser))
 }
 
 /// Group of doodads
 fn doodads<'a>(version: u32) -> impl MultilineParser<'a, Vec<Doodad>> {
-    let doodad = single_line(nom_adapter(doodad));
+    let doodad = doodad(version);
 
     let group_parser: Box<dyn MultilineParser<'_, Vec<Doodad>>> = match version {
-        ..23 => Box::new(length_prefixed(doodad)) as _,
-        23.. => Box::new(terminated(doodad, "-1")) as _,
+        ..32 => Box::new(length_prefixed(doodad)) as _,
+        32.. => Box::new(terminated(doodad, "-1")) as _,
     };
 
     group_parser
@@ -236,8 +334,8 @@ fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<String>>
     let doodad_connection = noop();
 
     let group_parser: Box<dyn MultilineParser<'_, Vec<String>>> = match version {
-        ..23 => Box::new(length_prefixed(doodad_connection)) as _,
-        23.. => Box::new(terminated(doodad_connection, "-1")) as _,
+        ..32 => Box::new(length_prefixed(doodad_connection)) as _,
+        32.. => Box::new(terminated(doodad_connection, "-1")) as _,
     };
 
     group_parser
@@ -247,8 +345,8 @@ fn decals<'a>(version: u32) -> impl MultilineParser<'a, Vec<String>> {
     let decal = noop();
 
     let group_parser: Box<dyn MultilineParser<'_, Vec<String>>> = match version {
-        ..23 => Box::new(length_prefixed(decal)) as _,
-        23.. => Box::new(terminated(decal, "-1")) as _,
+        ..32 => Box::new(length_prefixed(decal)) as _,
+        32.. => Box::new(terminated(decal, "-1")) as _,
     };
 
     group_parser
@@ -271,7 +369,7 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
 
     let (lines, root_slot) = root_slot(&strings)(lines)?;
 
-    let (lines, numbers3) = repeated(uints(), numbers1.iter().sum::<u32>() as usize)(lines)?;
+    let (lines, numbers3) = repeated(ints(), numbers1.iter().sum::<u32>() as usize * 2)(lines)?;
 
     let (lines, poi_groups) = poi_groups(version)(lines)?;
 
@@ -283,12 +381,20 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
         }
     };
 
-    let (lines, grid) = grid(dimensions[0] as usize, dimensions[1] as usize, &strings)(lines)?;
+    let (grid_height, grid_width) = if let Slot::K(slot) = &root_slot {
+        (slot.height as usize, slot.width as usize)
+    } else {
+        (1, 1)
+    };
+    let (lines, grid) = grid(grid_height, grid_width, &strings)(lines)?;
 
+    // println!("{:#?}", lines);
     let (lines, doodads) = doodads(version)(lines)?;
 
-    // TODO: Might be optional in some versions
-    let (lines, doodad_connections) = doodad_connections(version)(lines)?;
+    let (lines, doodad_connections) = match version {
+        ..15 => (lines, vec![]),
+        15.. => doodad_connections(version)(lines)?,
+    };
 
     // TODO: Might be optional in some versions
     let (lines, decals) = decals(version)(lines)?;

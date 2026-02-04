@@ -1,6 +1,7 @@
 #![feature(trait_alias)]
 #![feature(str_from_utf16_endian)]
 #![feature(assert_matches)]
+#![feature(closure_lifetime_binder)]
 use std::sync::OnceLock;
 
 pub mod arm;
