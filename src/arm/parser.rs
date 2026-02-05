@@ -430,11 +430,50 @@ fn boss_lines<'a>(
     Ok((lines, boss_lines))
 }
 
-fn zones<'a>(version: u32) -> impl MultilineParser<'a, Vec<String>> {
-    let line_parser = noop();
+fn zone<'a>(version: u32) -> impl MultilineParser<'a, Zone> {
+    use nom::sequence::preceded as P;
+
+    let parser = move |line| -> IResult<&str, Zone> {
+        let (line, name) = match version {
+            ..35 => unquoted_str(line)?,
+            35.. => quoted_str(line)?,
+        };
+
+        let (line, bbox) = count(P(space1, complete::i32), 4)(line)?;
+
+        let (line, string1, env_file, uint1) = match version {
+            ..35 => (line, None, None, None),
+            35.. => {
+                let (line, string1) = P(space1, quoted_str)(line)?;
+                let (line, env_file) = P(space1, quoted_str)(line)?;
+                let (line, uint1) = P(space1, complete::u32)(line)?;
+
+                (line, Some(string1), Some(env_file), Some(uint1))
+            }
+        };
+
+        let zone = Zone {
+            name,
+            x_min: bbox[0],
+            y_min: bbox[1],
+            x_max: bbox[2],
+            y_max: bbox[3],
+            string1,
+            env_file,
+            uint1,
+        };
+
+        Ok((line, zone))
+    };
+
+    single_line(nom_adapter(parser))
+}
+
+fn zones<'a>(version: u32) -> impl MultilineParser<'a, Vec<Zone>> {
+    let line_parser = zone(version);
 
     // NOTE: Appears to be LP until v33, then v36 appears another LP?
-    let group_parser: Box<dyn MultilineParser<'_, Vec<String>>> = match version {
+    let group_parser: Box<dyn MultilineParser<'_, Vec<Zone>>> = match version {
         ..33 => Box::new(length_prefixed(line_parser)) as _,
         33.. => Box::new(terminated(line_parser, "-1")) as _,
     };

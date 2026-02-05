@@ -116,6 +116,18 @@ pub struct Decal {
     pub tag: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct Zone {
+    pub name: String,
+    pub x_min: i32,
+    pub y_min: i32,
+    pub x_max: i32,
+    pub y_max: i32,
+    pub string1: Option<String>,
+    pub env_file: Option<String>,
+    pub uint1: Option<u32>,
+}
+
 #[derive(Debug, Serialize, Default)]
 pub struct Map {
     pub version: u32,
@@ -133,10 +145,9 @@ pub struct Map {
     pub doodads: Vec<Doodad>,
     pub doodad_connections: Vec<DoodadConnection>,
     pub decals: Vec<Decal>,
-    //TODO: interpret
     pub boss_lines: Option<Vec<Vec<String>>>,
     //TODO: interpret
-    pub zones: Option<Vec<String>>,
+    pub zones: Option<Vec<Zone>>,
     pub tags: Option<Vec<String>>,
     //TODO: interpret
     pub trailing: Option<Vec<u32>>,
