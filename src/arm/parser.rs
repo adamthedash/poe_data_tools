@@ -1,24 +1,18 @@
 use std::collections::HashMap;
 
-use itertools::{izip, Itertools};
+use itertools::{Itertools, izip};
 use nom::{
-    branch::alt,
-    bytes::{
-        complete::{is_not, tag, take_till, take_till1, take_until, take_while},
-        streaming::take_while1,
-    },
-    character::{
-        complete::{self, space1},
-        is_space,
-    },
-    combinator,
-    multi::{count, length_count, many1, many1_count, separated_list0, separated_list1},
-    sequence::{delimited, preceded, separated_pair},
     IResult, Parser,
+    branch::alt,
+    bytes::complete::{is_not, tag, take_till1, take_until},
+    character::complete::{self, space0, space1},
+    combinator::{self, all_consuming, rest},
+    multi::{count, length_count, separated_list1},
+    sequence::{delimited, preceded, separated_pair},
 };
 
 use super::{
-    line_parser::{length_prefixed, nom_adapter, single_line, MultilineParser},
+    line_parser::{MultilineParser, length_prefixed, nom_adapter, single_line},
     types::*,
 };
 use crate::arm::line_parser::{repeated, terminated};
@@ -206,7 +200,6 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
     };
 
     let parser = for<'b> move |line: &'b str| -> IResult<&'b str, Doodad> {
-        // println!("Line: {:?}", line);
         let (line, x) = U(line)?;
         let (line, _) = space1(line)?;
 
@@ -336,17 +329,59 @@ fn noop<'a>() -> impl MultilineParser<'a, String> {
     single_line(|line| Ok(("", line.to_string())))
 }
 
-/// TODO: Interpret lines
-fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<String>> {
-    let doodad_connection = noop();
+fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<DoodadConnection>> {
+    let doodad_connection = single_line(nom_adapter(
+        count(nom::sequence::terminated(complete::u32, space1), 2)
+            .and(quoted_str)
+            .map(|(nums, tag)| DoodadConnection {
+                from: nums[0],
+                to: nums[1],
+                tag,
+            }),
+    ));
 
     group(version, doodad_connection)
 }
 
-fn decals<'a>(version: u32) -> impl MultilineParser<'a, Vec<String>> {
-    let decal = noop();
+/// Decale on a line
+fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
+    use nom::{number::complete::float as F, sequence::terminated as T};
 
-    group(version, decal)
+    let parser = move |line| -> IResult<&str, Decal> {
+        let (line, floats) = count(T(F, space1), 3)(line)?;
+
+        let (line, uint1) = match version {
+            ..15 => (line, None),
+            15.. => {
+                let (line, uint1) = T(complete::u32, space1)(line)?;
+                (line, Some(uint1))
+            }
+        };
+
+        let (line, float4) = T(F, space1)(line)?;
+
+        let (line, atlas_file) = T(quoted_str, space1)(line)?;
+
+        let (line, tag) = quoted_str(line)?;
+
+        let decal = Decal {
+            float1: floats[0],
+            float2: floats[1],
+            float3: floats[2],
+            uint1,
+            float4,
+            atlas_file,
+            tag,
+        };
+
+        Ok((line, decal))
+    };
+
+    single_line(nom_adapter(parser))
+}
+
+fn decals<'a>(version: u32) -> impl MultilineParser<'a, Vec<Decal>> {
+    group(version, decal(version))
 }
 
 /// Either length-prefixed or "-1"-terminated depending on version
@@ -362,11 +397,100 @@ fn group<'a, T: 'a>(
     group_parser
 }
 
+fn boss_lines<'a>(
+    lines: &'a [&'a str],
+) -> super::line_parser::Result<(Vec<&'a str>, Vec<Vec<String>>)> {
+    // NOTE: Boss string line is often not properly ended with a newline, causing the next
+    // line to be appended on the end instead. We're accounting for this by cropping off
+    // the end and prepending it to our list of lines
+    let line_parser = separated_pair(separated_list1(space1, quoted_str), space1, rest);
+    let line_parser = single_line(nom_adapter(line_parser));
+
+    let (lines, boss_lines) = length_prefixed(line_parser)(lines)?;
+    let mut lines = lines.to_vec();
+
+    let (boss_lines, mut trailing) =
+        boss_lines
+            .into_iter()
+            .fold((vec![], vec![]), |(mut blines, mut tlines), (b, t)| {
+                blines.push(b);
+                tlines.push(t);
+
+                (blines, tlines)
+            });
+
+    if let Some(t) = trailing.pop()
+        && !t.is_empty()
+    {
+        lines.insert(0, t);
+    }
+
+    assert!(trailing.iter().all(|s| s.is_empty()));
+
+    Ok((lines, boss_lines))
+}
+
+fn zones<'a>(version: u32) -> impl MultilineParser<'a, Vec<String>> {
+    let line_parser = noop();
+
+    // NOTE: Appears to be LP until v33, then v36 appears another LP?
+    let group_parser: Box<dyn MultilineParser<'_, Vec<String>>> = match version {
+        ..33 => Box::new(length_prefixed(line_parser)) as _,
+        33.. => Box::new(terminated(line_parser, "-1")) as _,
+    };
+
+    group_parser
+}
+
+fn tags<'a>() -> impl MultilineParser<'a, Option<Vec<String>>> {
+    |lines| {
+        if let Some(&first) = lines.first() {
+            let mut line_parser = combinator::opt(all_consuming(length_count(
+                complete::u32,
+                preceded(space1, unquoted_str),
+            )));
+            let (_, tags) = line_parser(first)?;
+
+            // Crop off last line if successful
+            let lines = if tags.is_some() { &lines[1..] } else { lines };
+
+            Ok((lines, tags))
+        } else {
+            Ok((lines, None))
+        }
+    }
+}
+
+/// Line of space separated uints, sometimes with a space a the end
+fn trailing<'a>() -> impl MultilineParser<'a, Option<Vec<u32>>> {
+    |lines| {
+        let (lines, trailing) = if let Some(&last) = lines.first() {
+            let mut line_parser = combinator::opt(all_consuming(nom::sequence::terminated(
+                separated_list1(space1::<_, nom::error::Error<_>>, complete::u32),
+                space0,
+            )));
+            let (_, trailing_nums) = line_parser(last)?;
+
+            // Crop off last line if successful
+            let lines = if trailing_nums.is_some() {
+                &lines[1..]
+            } else {
+                lines
+            };
+
+            (lines, trailing_nums)
+        } else {
+            (lines, None)
+        };
+
+        Ok((lines, trailing))
+    }
+}
+
 pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Map)> {
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
 
     let (lines, version) = version_line()(&lines)?;
-    println!("version: {version}");
 
     let (lines, strings) = string_section()(lines)?;
 
@@ -402,72 +526,41 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
     let (lines, doodads) = doodads(version)(lines)?;
 
     let (lines, doodad_connections) = match version {
-        ..15 => (lines, vec![]),
-        15.. => doodad_connections(version)(lines)?,
+        ..23 => (lines, vec![]),
+        23.. => doodad_connections(version)(lines)?,
     };
 
     let (lines, decals) = decals(version)(lines)?;
 
     let (lines, boss_lines) = match version {
-        ..23 => (lines, None),
-        23.. => {
-            let line_parser = separated_pair(
-                separated_list1(space1, quoted_str),
-                space1,
-                nom::sequence::terminated(
-                    separated_list0(space1, complete::i32),
-                    combinator::opt(space1),
-                ),
-            );
-            let line_parser = single_line(nom_adapter(line_parser));
-
-            let (lines, boss_lines) = length_prefixed(line_parser)(lines)?;
+        ..22 => (lines.to_vec(), None),
+        22.. => {
+            let (lines, boss_lines) = boss_lines(lines)?;
 
             (lines, Some(boss_lines))
         }
     };
+    let lines = lines.as_slice();
 
     let (lines, zones) = match version {
-        ..28 | 37.. => (lines, None),
-        28..37 => {
-            let line_parser = noop();
-            let (lines, item_lines) = {
-                // NOTE: Different group style
-                let group_parser: Box<dyn MultilineParser<'_, Vec<String>>> = match version {
-                    ..33 => Box::new(length_prefixed(line_parser)) as _,
-                    33.. => Box::new(terminated(line_parser, "-1")) as _,
-                };
-
-                group_parser
-            }(lines)?;
+        ..27 => (lines, None),
+        27.. => {
+            let (lines, item_lines) = zones(version)(lines)?;
 
             (lines, Some(item_lines))
         }
     };
 
-    println!("remaining lines: {:#?}", lines);
-
+    // Optional line with tags
     let (lines, tags) = match version {
         ..28 => (lines, None),
-        28.. => {
-            let line_parser = length_count(complete::u32, preceded(space1, unquoted_str));
-
-            let (lines, tags) = single_line(nom_adapter(line_parser))(lines)?;
-
-            (lines, Some(tags))
-        }
+        28.. => tags()(lines)?,
     };
 
-    // TODO: This can only run after all other data is taken
-    // let (lines, nums) = if lines.len() == 1 {
-    //     let line_parser = many1(nom::sequence::terminated(complete::u32, space1));
-    //     let mut line_parser = single_line(nom_adapter(line_parser));
-    //     let (lines, nums) = line_parser(lines)?;
-    //
-    //     (lines, Some(nums))
-    // } else {
-    //     (lines, None)
-    // };
+    // Optional trailing line with a bunch of numbers
+    let (lines, trailing) = trailing()(lines)?;
+
+    assert!(lines.is_empty(), "Extra lines: {:#?}", lines);
 
     let map = Map {
         version,
@@ -486,12 +579,12 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
         decals,
         boss_lines,
         zones,
+        tags,
+        trailing,
     };
 
     // TODO: Return &str once we figure out lifetimes
     let lines = lines.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-
-    // assert!(lines.is_empty());
 
     Ok((lines, map))
 }

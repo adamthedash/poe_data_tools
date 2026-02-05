@@ -51,11 +51,14 @@ pub struct SlotK {
     pub origin: Direction,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 pub enum Slot {
     K(SlotK),
+    #[default]
     N,
-    F { fill: Option<String> },
+    F {
+        fill: Option<String>,
+    },
     S,
     O,
 }
@@ -96,6 +99,24 @@ pub struct Doodad {
 }
 
 #[derive(Debug, Serialize)]
+pub struct DoodadConnection {
+    pub from: u32,
+    pub to: u32,
+    pub tag: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Decal {
+    pub float1: f32,
+    pub float2: f32,
+    pub float3: f32,
+    pub uint1: Option<u32>,
+    pub float4: f32,
+    pub atlas_file: String,
+    pub tag: String,
+}
+
+#[derive(Debug, Serialize, Default)]
 pub struct Map {
     pub version: u32,
     pub strings: Vec<String>,
@@ -110,12 +131,13 @@ pub struct Map {
     pub string1: Option<String>,
     pub grid: Vec<Vec<Slot>>,
     pub doodads: Vec<Doodad>,
+    pub doodad_connections: Vec<DoodadConnection>,
+    pub decals: Vec<Decal>,
     //TODO: interpret
-    pub doodad_connections: Vec<String>,
-    //TODO: interpret
-    pub decals: Vec<String>,
-    //TODO: interpret
-    pub boss_lines: Option<Vec<(Vec<String>, Vec<i32>)>>,
+    pub boss_lines: Option<Vec<Vec<String>>>,
     //TODO: interpret
     pub zones: Option<Vec<String>>,
+    pub tags: Option<Vec<String>>,
+    //TODO: interpret
+    pub trailing: Option<Vec<u32>>,
 }

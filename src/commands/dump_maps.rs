@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use anyhow::{anyhow, ensure, Context, Result};
+use anyhow::{Context, Result, anyhow, ensure};
 use glob::{MatchOptions, Pattern};
 
 use crate::{
@@ -62,12 +62,12 @@ pub fn dump_maps(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Res
                 .with_context(|| format!("Failed to parse file: {:?}", filename))
                 .unwrap();
 
-            // let out_path = output_folder.join(filename).with_extension("json");
-            // fs::create_dir_all(out_path.parent().unwrap()).context("Failed to create folder")?;
-            //
-            // let f = std::fs::File::create(&out_path)
-            //     .with_context(|| format!("Failed to create file {:?}", out_path))?;
-            // serde_json::to_writer_pretty(f, &map).context("Failed to serialise map")?;
+            let out_path = output_folder.join(filename).with_extension("json");
+            fs::create_dir_all(out_path.parent().unwrap()).context("Failed to create folder")?;
+
+            let f = std::fs::File::create(&out_path)
+                .with_context(|| format!("Failed to create file {:?}", out_path))?;
+            serde_json::to_writer_pretty(f, &map).context("Failed to serialise map")?;
 
             Ok(filename)
         })
