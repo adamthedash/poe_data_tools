@@ -53,6 +53,7 @@ pub struct SlotK {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Serialize, Default)]
+#[serde(tag = "kind", content = "data")]
 pub enum Slot {
     K(SlotK),
     #[default]

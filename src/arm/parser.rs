@@ -336,8 +336,8 @@ fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
         let (line, floats) = count(T(F, space1), 3)(line)?;
 
         let (line, uint1) = match version {
-            ..15 => (line, None),
-            15.. => {
+            ..17 => (line, None),
+            17.. => {
                 let (line, uint1) = T(complete::u32, space1)(line)?;
                 (line, Some(uint1))
             }
@@ -363,10 +363,6 @@ fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
     };
 
     single_line(nom_adapter(parser))
-}
-
-fn decals<'a>(version: u32) -> impl MultilineParser<'a, Vec<Decal>> {
-    group(version, decal(version))
 }
 
 /// Either length-prefixed or "-1"-terminated depending on version
@@ -554,7 +550,7 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
         23.. => doodad_connections(version)(lines)?,
     };
 
-    let (lines, decals) = decals(version)(lines)?;
+    let (lines, decals) = group(version, decal(version))(lines)?;
 
     let (lines, boss_lines) = match version {
         ..22 => (lines.to_vec(), None),
@@ -577,8 +573,8 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
 
     // Optional line with tags
     let (lines, tags) = match version {
-        ..28 => (lines, None),
-        28.. => tags()(lines)?,
+        ..10 => (lines, None),
+        10.. => tags()(lines)?,
     };
 
     // Optional trailing line with a bunch of numbers
