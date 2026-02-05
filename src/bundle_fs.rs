@@ -4,14 +4,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
 use url::Url;
 
 use crate::{
     bundle::{fetch_bundle_content, load_bundle_content},
-    bundle_index::{fetch_index_file, load_index_file, BundleIndex},
+    bundle_index::{BundleIndex, fetch_index_file, load_index_file},
     hasher::BuildMurmurHash64A,
     path::parse_paths,
 };
@@ -95,15 +95,12 @@ impl FS {
                 let hash = hasher.finish();
 
                 // Look up the file info for this file
-                let fileinfo = self
-                    .lut
+                self.lut
                     .get(&hash)
                     .map(|i| &self.index.files[*i])
                     .with_context(|| format!("Path not found in index: {}", path))
                     .map(|f| (path, f))
-                    .map_err(|e| (path, e));
-
-                fileinfo
+                    .map_err(|e| (path, e))
             })
             .bucket_result();
 

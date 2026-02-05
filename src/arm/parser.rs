@@ -57,7 +57,7 @@ fn ints<'a>() -> impl MultilineParser<'a, Vec<i32>> {
     )))
 }
 
-/// "k" followed by 24 numbers
+/// "k" followed by 23-24 numbers
 fn slot_k<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, SlotK> {
     use nom::{
         character::complete::{char as C, i32 as I, u32 as U},
@@ -123,7 +123,7 @@ fn slot_k<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, SlotK> {
     Ok((input, slot))
 }
 
-/// k, f, s, n slots
+/// k, f, s, o, n slots
 fn parse_slot<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, Slot> {
     alt((
         complete::char('n').map(|_| Slot::N),
@@ -183,10 +183,7 @@ fn poi_groups<'a>(version: u32) -> impl MultilineParser<'a, Vec<Vec<PoI>>> {
         29.. => 6,
     };
 
-    let group_parser: Box<dyn MultilineParser<'_, Vec<PoI>>> = match version {
-        ..32 => Box::new(length_prefixed(poi())) as _,
-        32.. => Box::new(terminated(poi(), "-1")) as _,
-    };
+    let group_parser = group(version, poi());
 
     repeated(group_parser, count)
 }
@@ -315,18 +312,6 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
     };
 
     single_line(nom_adapter(parser))
-}
-
-/// Group of doodads
-fn doodads<'a>(version: u32) -> impl MultilineParser<'a, Vec<Doodad>> {
-    let doodad = doodad(version);
-
-    group(version, doodad)
-}
-
-/// Stores the entire line without interpreting
-fn noop<'a>() -> impl MultilineParser<'a, String> {
-    single_line(|line| Ok(("", line.to_string())))
 }
 
 fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<DoodadConnection>> {
@@ -562,7 +547,7 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
     };
     let (lines, grid) = grid(grid_height, grid_width, &strings)(lines)?;
 
-    let (lines, doodads) = doodads(version)(lines)?;
+    let (lines, doodads) = group(version, doodad(version))(lines)?;
 
     let (lines, doodad_connections) = match version {
         ..23 => (lines, vec![]),

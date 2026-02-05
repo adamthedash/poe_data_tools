@@ -51,6 +51,7 @@ pub struct SlotK {
     pub origin: Direction,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Serialize, Default)]
 pub enum Slot {
     K(SlotK),
@@ -146,9 +147,7 @@ pub struct Map {
     pub doodad_connections: Vec<DoodadConnection>,
     pub decals: Vec<Decal>,
     pub boss_lines: Option<Vec<Vec<String>>>,
-    //TODO: interpret
     pub zones: Option<Vec<Zone>>,
     pub tags: Option<Vec<String>>,
-    //TODO: interpret
     pub trailing: Option<Vec<u32>>,
 }

@@ -14,9 +14,8 @@ fn parse_map(contents: &[u8]) -> Result<Map> {
     let input =
         String::from_utf16le(contents).context("Failed to parse contents as UTF16LE string")?;
 
-    let (remaining, map) =
+    let (_, map) =
         parse_map_str(&input).map_err(|e| anyhow!("Failed to parse map file: {:?}", e))?;
-    // println!("{:#?}", map);
 
     Ok(map)
 }
