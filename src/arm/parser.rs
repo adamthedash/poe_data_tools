@@ -3,11 +3,11 @@ use nom::{
     IResult, Parser,
     branch::alt,
     bytes::complete::{is_not, tag, take_till1, take_until},
-    character::complete::{self, char as C, i32 as I, space0, space1, u32 as U},
+    character::complete::{char as C, i32 as I, space0, space1, u32 as U},
     combinator::{self, all_consuming, rest},
     multi::{count, length_count, separated_list1},
     number::complete::float as F,
-    sequence::{Tuple, delimited, preceded, separated_pair, preceded as P, terminated as T},
+    sequence::{Tuple, delimited, separated_pair, preceded as P, terminated as T},
 };
 
 use super::{
@@ -18,7 +18,7 @@ use crate::arm::line_parser::{repeated, terminated};
 
 /// Parses a 0/1 as a bool
 fn parse_bool(line: &str) -> IResult<&str, bool> {
-    let (rest, item) = complete::u32(line)?;
+    let (rest, item) = U(line)?;
 
     let item = match item {
         0 => false,
@@ -36,15 +36,15 @@ fn parse_bool(line: &str) -> IResult<&str, bool> {
 }
 
 fn version_line<'a>() -> impl MultilineParser<'a, u32> {
-    single_line(nom_adapter(preceded(
+    single_line(nom_adapter(P(
         tag("\u{feff}version "),
-        complete::u32,
+        U,
     )))
 }
 
 /// Quoted string ending in newline
 fn quoted_str(input: &str) -> IResult<&str, String> {
-    delimited(complete::char('"'), take_until("\""), complete::char('"'))
+    delimited(C('"'), take_until("\""), C('"'))
         .map(String::from)
         .parse(input)
 }
@@ -75,11 +75,11 @@ fn string_section<'a>() -> impl MultilineParser<'a, Vec<String>> {
 fn dimensions<'a>(version: u32) -> impl MultilineParser<'a, Dimension> {
 
     let parser = move |line| -> IResult<&str, Dimension> {
-        let (line, side_length) = complete::u32(line)?;
+        let (line, side_length) = U(line)?;
 
         let line = match version {
             ..31 => {
-                let (line, _) = P(space1, complete::u32)(line)?;
+                let (line, _) = P(space1, U)(line)?;
                 line
             }
             31.. => line,
@@ -88,7 +88,7 @@ fn dimensions<'a>(version: u32) -> impl MultilineParser<'a, Dimension> {
         let (line, uint1) = match version {
             ..22 => (line, None),
             22.. => {
-                let (line, bool1) = P(space1, complete::u32)(line)?;
+                let (line, bool1) = P(space1, U)(line)?;
 
                 (line, Some(bool1))
             }
@@ -105,8 +105,8 @@ fn dimensions<'a>(version: u32) -> impl MultilineParser<'a, Dimension> {
 /// Space-separated uinsigned ints
 fn uints<'a>() -> impl MultilineParser<'a, Vec<u32>> {
     single_line(nom_adapter(separated_list1(
-        complete::char(' '),
-        complete::u32,
+        C(' '),
+        U,
     )))
 }
 
@@ -175,10 +175,10 @@ fn slot_k<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, SlotK> {
 /// k, f, s, o, n slots
 fn parse_slot<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, Slot> {
     alt((
-        complete::char('n').map(|_| Slot::N),
-        complete::char('s').map(|_| Slot::S),
-        complete::char('o').map(|_| Slot::O),
-        preceded(tag("f "), complete::u32).map(|i| Slot::F {
+        C('n').map(|_| Slot::N),
+        C('s').map(|_| Slot::S),
+        C('o').map(|_| Slot::O),
+        P(tag("f "), U).map(|i| Slot::F {
             fill: (i > 0).then(|| strings[i as usize - 1].clone()),
         }),
         (|input| slot_k(input, strings)).map(Slot::K),
@@ -195,7 +195,7 @@ fn grid<'a>(
     _width: usize,
     strings: &'a [String],
 ) -> impl MultilineParser<'a, Vec<Vec<Slot>>> {
-    let row_parser = single_line(nom_adapter(separated_list1(complete::char(' '), |l| {
+    let row_parser = single_line(nom_adapter(separated_list1(C(' '), |l| {
         parse_slot(l, strings)
     })));
 
@@ -207,9 +207,9 @@ fn poi<'a>() -> impl MultilineParser<'a, PoI> {
 
     let line_parser = |line| -> IResult<&str, PoI> {
         let (line, (x, y, float1, tag)) = (
-            complete::u32,
-            P(space1, complete::u32),
-            P(space1, nom::number::complete::float),
+            U,
+            P(space1, U),
+            P(space1, F),
             P(space1, quoted_str),
         )
             .parse(line)?;
@@ -361,7 +361,7 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
 
 fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<DoodadConnection>> {
     let doodad_connection = single_line(nom_adapter(
-        count(nom::sequence::terminated(complete::u32, space1), 2)
+        count(T(U, space1), 2)
             .and(quoted_str)
             .map(|(nums, tag)| DoodadConnection {
                 from: nums[0],
@@ -382,7 +382,7 @@ fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
         let (line, uint1) = match version {
             ..17 => (line, None),
             17.. => {
-                let (line, uint1) = T(complete::u32, space1)(line)?;
+                let (line, uint1) = T(U, space1)(line)?;
                 (line, Some(uint1))
             }
         };
@@ -450,14 +450,14 @@ fn zone<'a>(version: u32) -> impl MultilineParser<'a, Zone> {
             35.. => quoted_str(line)?,
         };
 
-        let (line, bbox) = count(P(space1, complete::i32), 4)(line)?;
+        let (line, bbox) = count(P(space1, I), 4)(line)?;
 
         let (line, string1, env_file, uint1) = match version {
             ..35 => (line, None, None, None),
             35.. => {
                 let (line, string1) = P(space1, quoted_str)(line)?;
                 let (line, env_file) = P(space1, quoted_str)(line)?;
-                let (line, uint1) = P(space1, complete::u32)(line)?;
+                let (line, uint1) = P(space1, U)(line)?;
 
                 (line, Some(string1), Some(env_file), Some(uint1))
             }
@@ -496,8 +496,8 @@ fn tags<'a>() -> impl MultilineParser<'a, Option<Vec<String>>> {
     |lines| {
         if let Some(&first) = lines.first() {
             let mut line_parser = combinator::opt(all_consuming(length_count(
-                complete::u32,
-                preceded(space1, unquoted_str),
+                U,
+                P(space1, unquoted_str),
             )));
             let (_, tags) = line_parser(first)?;
 
@@ -515,8 +515,8 @@ fn tags<'a>() -> impl MultilineParser<'a, Option<Vec<String>>> {
 fn trailing<'a>() -> impl MultilineParser<'a, Option<Vec<u32>>> {
     |lines| {
         let (lines, trailing) = if let Some(&last) = lines.first() {
-            let mut line_parser = combinator::opt(all_consuming(nom::sequence::terminated(
-                separated_list1(space1::<_, nom::error::Error<_>>, complete::u32),
+            let mut line_parser = combinator::opt(all_consuming(T(
+                separated_list1(space1::<_, nom::error::Error<_>>, U),
                 space0,
             )));
             let (_, trailing_nums) = line_parser(last)?;
@@ -540,11 +540,11 @@ fn trailing<'a>() -> impl MultilineParser<'a, Option<Vec<u32>>> {
 pub fn thingy<'a>(strings: &[String]) -> impl MultilineParser<'a, Thingy> {
 
     let parser = |line| -> IResult<&str, Thingy> {
-        let (line, index) = complete::u32(line)?;
+        let (line, index) = U(line)?;
 
         let et_file = (index > 0).then(|| strings[index as usize - 1].clone());
 
-        let (line, int) = P(space1, complete::i32)(line)?;
+        let (line, int) = P(space1, I)(line)?;
 
         let (line, bools) = count(combinator::opt(P(space1, parse_bool)), 3)(line)?;
 
