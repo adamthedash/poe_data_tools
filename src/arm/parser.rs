@@ -56,6 +56,19 @@ fn unquoted_str(input: &str) -> IResult<&str, String> {
         .parse(input)
 }
 
+/// Either length-prefixed or "-1"-terminated depending on version
+fn group<'a, T: 'a>(
+    version: u32,
+    item_parser: impl MultilineParser<'a, T> + 'a,
+) -> impl MultilineParser<'a, Vec<T>> {
+    let group_parser: Box<dyn MultilineParser<'_, Vec<T>>> = match version {
+        ..32 => Box::new(length_prefixed(item_parser)) as _,
+        32.. => Box::new(terminated(item_parser, "-1")) as _,
+    };
+
+    group_parser
+}
+
 fn string_section<'a>() -> impl MultilineParser<'a, Vec<String>> {
     length_prefixed(single_line(nom_adapter(quoted_str)))
 }
@@ -405,19 +418,6 @@ fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
     };
 
     single_line(nom_adapter(parser))
-}
-
-/// Either length-prefixed or "-1"-terminated depending on version
-fn group<'a, T: 'a>(
-    version: u32,
-    item_parser: impl MultilineParser<'a, T> + 'a,
-) -> impl MultilineParser<'a, Vec<T>> {
-    let group_parser: Box<dyn MultilineParser<'_, Vec<T>>> = match version {
-        ..32 => Box::new(length_prefixed(item_parser)) as _,
-        32.. => Box::new(terminated(item_parser, "-1")) as _,
-    };
-
-    group_parser
 }
 
 fn boss_lines<'a>(
