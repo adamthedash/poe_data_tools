@@ -17,6 +17,25 @@ use super::{
 };
 use crate::arm::line_parser::{repeated, terminated};
 
+/// Parses a 0/1 as a bool
+fn parse_bool(line: &str) -> IResult<&str, bool> {
+    let (rest, item) = complete::u32(line)?;
+
+    let item = match item {
+        0 => false,
+        1 => true,
+        _ => {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                line,
+                // No better option here
+                nom::error::ErrorKind::Digit,
+            )));
+        }
+    };
+
+    Ok((rest, item))
+}
+
 fn version_line<'a>() -> impl MultilineParser<'a, u32> {
     single_line(nom_adapter(preceded(
         tag("\u{feff}version "),
@@ -41,19 +60,42 @@ fn string_section<'a>() -> impl MultilineParser<'a, Vec<String>> {
     length_prefixed(single_line(nom_adapter(quoted_str)))
 }
 
+fn dimensions<'a>(version: u32) -> impl MultilineParser<'a, Dimension> {
+    use nom::sequence::preceded as P;
+
+    let parser = move |line| -> IResult<&str, Dimension> {
+        let (line, side_length) = complete::u32(line)?;
+
+        let line = match version {
+            ..31 => {
+                let (line, _) = P(space1, complete::u32)(line)?;
+                line
+            }
+            31.. => line,
+        };
+
+        let (line, uint1) = match version {
+            ..22 => (line, None),
+            22.. => {
+                let (line, bool1) = P(space1, complete::u32)(line)?;
+
+                (line, Some(bool1))
+            }
+        };
+
+        let dimension = Dimension { side_length, uint1 };
+
+        Ok((line, dimension))
+    };
+
+    single_line(nom_adapter(parser))
+}
+
 /// Space-separated uinsigned ints
 fn uints<'a>() -> impl MultilineParser<'a, Vec<u32>> {
     single_line(nom_adapter(separated_list1(
         complete::char(' '),
         complete::u32,
-    )))
-}
-
-/// Space-separated signed ints
-fn ints<'a>() -> impl MultilineParser<'a, Vec<i32>> {
-    single_line(nom_adapter(separated_list1(
-        complete::char(' '),
-        complete::i32,
     )))
 }
 
@@ -507,6 +549,32 @@ fn trailing<'a>() -> impl MultilineParser<'a, Option<Vec<u32>>> {
     }
 }
 
+pub fn thingy<'a>(strings: &[String]) -> impl MultilineParser<'a, Thingy> {
+    use nom::sequence::preceded as P;
+
+    let parser = |line| -> IResult<&str, Thingy> {
+        let (line, index) = complete::u32(line)?;
+
+        let et_file = (index > 0).then(|| strings[index as usize - 1].clone());
+
+        let (line, int) = P(space1, complete::i32)(line)?;
+
+        let (line, bools) = count(combinator::opt(P(space1, parse_bool)), 3)(line)?;
+
+        let thingy = Thingy {
+            et_file,
+            int,
+            bool1: bools[0],
+            bool2: bools[1],
+            bool3: bools[2],
+        };
+
+        Ok((line, thingy))
+    };
+
+    single_line(nom_adapter(parser))
+}
+
 pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Map)> {
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
 
@@ -514,7 +582,7 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
 
     let (lines, strings) = string_section()(lines)?;
 
-    let (lines, dimensions) = uints()(lines)?;
+    let (lines, dimensions) = dimensions(version)(lines)?;
 
     let (lines, numbers1) = uints()(lines)?;
 
@@ -524,7 +592,8 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
 
     let (lines, root_slot) = root_slot(&strings)(lines)?;
 
-    let (lines, numbers3) = repeated(ints(), numbers1.iter().sum::<u32>() as usize * 2)(lines)?;
+    let (lines, numbers3) =
+        repeated(thingy(&strings), numbers1.iter().sum::<u32>() as usize * 2)(lines)?;
 
     let (lines, poi_groups) = poi_groups(version)(lines)?;
 

@@ -130,17 +130,31 @@ pub struct Zone {
     pub uint1: Option<u32>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct Thingy {
+    pub et_file: Option<String>,
+    pub int: i32,
+    pub bool1: Option<bool>,
+    pub bool2: Option<bool>,
+    pub bool3: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Default)]
+pub struct Dimension {
+    pub side_length: u32,
+    pub uint1: Option<u32>,
+}
+
 #[derive(Debug, Serialize, Default)]
 pub struct Map {
     pub version: u32,
     pub strings: Vec<String>,
-    /// Have seen either 2 or 3 elements here
-    pub dimensions: Vec<u32>,
+    pub dimensions: Dimension,
     pub numbers1: Vec<u32>,
     pub tag: String,
     pub numbers2: Vec<u32>,
     pub root_slot: Slot,
-    pub numbers3: Vec<Vec<i32>>,
+    pub numbers3: Vec<Thingy>,
     pub points_of_interest: Vec<Vec<PoI>>,
     pub string1: Option<String>,
     pub grid: Vec<Vec<Slot>>,
