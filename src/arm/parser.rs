@@ -588,11 +588,11 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
 
     let (lines, tag1) = single_line(nom_adapter(quoted_str))(lines)?;
 
-    let (lines, numbers2) = uints()(lines)?;
+    let (lines, bools) = single_line(nom_adapter(separated_list1(space1, parse_bool)))(lines)?;
 
     let (lines, root_slot) = root_slot(&strings)(lines)?;
 
-    let (lines, numbers3) =
+    let (lines, thingies) =
         repeated(thingy(&strings), numbers1.iter().sum::<u32>() as usize * 2)(lines)?;
 
     let (lines, poi_groups) = poi_groups(version)(lines)?;
@@ -657,9 +657,9 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
         dimensions,
         numbers1,
         tag: tag1,
-        numbers2,
+        bools,
         root_slot,
-        numbers3,
+        thingies,
         points_of_interest: poi_groups,
         grid,
         doodads,
