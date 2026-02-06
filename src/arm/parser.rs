@@ -6,7 +6,7 @@ use nom::{
     character::complete::{self, space0, space1},
     combinator::{self, all_consuming, rest},
     multi::{count, length_count, separated_list1},
-    sequence::{delimited, preceded, separated_pair},
+    sequence::{Tuple, delimited, preceded, separated_pair},
 };
 
 use super::{
@@ -208,21 +208,21 @@ fn grid<'a>(
 
 /// Single PoI line - 3 uints & a string
 fn poi<'a>() -> impl MultilineParser<'a, PoI> {
-    let line_parser = count(
-        nom::sequence::terminated(complete::u32, complete::char(' ')),
-        2,
-    )
-    .and(nom::sequence::terminated(
-        nom::number::complete::float,
-        complete::char(' '),
-    ))
-    .and(quoted_str)
-    .map(|((nums12, num3), string)| PoI {
-        num1: nums12[0],
-        num2: nums12[1],
-        num3,
-        tag: string,
-    });
+    use nom::sequence::preceded as P;
+
+    let line_parser = |line| -> IResult<&str, PoI> {
+        let (line, (x, y, float1, tag)) = (
+            complete::u32,
+            P(space1, complete::u32),
+            P(space1, nom::number::complete::float),
+            P(space1, quoted_str),
+        )
+            .parse(line)?;
+
+        let poi = PoI { x, y, float1, tag };
+
+        Ok((line, poi))
+    };
 
     single_line(nom_adapter(line_parser))
 }

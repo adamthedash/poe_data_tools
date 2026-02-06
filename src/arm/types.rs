@@ -67,9 +67,9 @@ pub enum Slot {
 
 #[derive(Debug, Serialize)]
 pub struct PoI {
-    pub num1: u32,
-    pub num2: u32,
-    pub num3: f32,
+    pub x: u32,
+    pub y: u32,
+    pub float1: f32,
     pub tag: String,
 }
 
