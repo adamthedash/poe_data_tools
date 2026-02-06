@@ -69,7 +69,7 @@ pub enum Slot {
 pub struct PoI {
     pub x: u32,
     pub y: u32,
-    pub float1: f32,
+    pub rotation: f32,
     pub tag: String,
 }
 
@@ -108,11 +108,11 @@ pub struct DoodadConnection {
 
 #[derive(Debug, Serialize)]
 pub struct Decal {
-    pub float1: f32,
-    pub float2: f32,
-    pub float3: f32,
-    pub uint1: Option<u32>,
-    pub float4: f32,
+    pub x: f32,
+    pub y: f32,
+    pub rotation: f32,
+    pub bool1: Option<bool>,
+    pub scale: f32,
     pub atlas_file: String,
     pub tag: String,
 }
@@ -124,7 +124,7 @@ pub struct Zone {
     pub y_min: i32,
     pub x_max: i32,
     pub y_max: i32,
-    pub string1: Option<String>,
+    pub disable_teleports: Option<String>,
     pub env_file: Option<String>,
     pub uint1: Option<u32>,
 }

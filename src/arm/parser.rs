@@ -7,7 +7,7 @@ use nom::{
     combinator::{self, all_consuming, rest},
     multi::{count, length_count, separated_list1},
     number::complete::float as F,
-    sequence::{Tuple, delimited, separated_pair, preceded as P, terminated as T},
+    sequence::{Tuple, delimited, preceded as P, separated_pair, terminated as T},
 };
 
 use super::{
@@ -36,10 +36,7 @@ fn parse_bool(line: &str) -> IResult<&str, bool> {
 }
 
 fn version_line<'a>() -> impl MultilineParser<'a, u32> {
-    single_line(nom_adapter(P(
-        tag("\u{feff}version "),
-        U,
-    )))
+    single_line(nom_adapter(P(tag("\u{feff}version "), U)))
 }
 
 /// Quoted string ending in newline
@@ -73,7 +70,6 @@ fn string_section<'a>() -> impl MultilineParser<'a, Vec<String>> {
 }
 
 fn dimensions<'a>(version: u32) -> impl MultilineParser<'a, Dimension> {
-
     let parser = move |line| -> IResult<&str, Dimension> {
         let (line, side_length) = U(line)?;
 
@@ -104,15 +100,11 @@ fn dimensions<'a>(version: u32) -> impl MultilineParser<'a, Dimension> {
 
 /// Space-separated uinsigned ints
 fn uints<'a>() -> impl MultilineParser<'a, Vec<u32>> {
-    single_line(nom_adapter(separated_list1(
-        C(' '),
-        U,
-    )))
+    single_line(nom_adapter(separated_list1(C(' '), U)))
 }
 
 /// "k" followed by 23-24 numbers
 fn slot_k<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, SlotK> {
-
     let (input, _letter) = T(C('k'), C(' '))(input)?;
 
     let (input, grid_dims) = count(T(U, C(' ')), 2)(input)?;
@@ -204,17 +196,22 @@ fn grid<'a>(
 
 /// Single PoI line - 3 uints & a string
 fn poi<'a>() -> impl MultilineParser<'a, PoI> {
-
     let line_parser = |line| -> IResult<&str, PoI> {
-        let (line, (x, y, float1, tag)) = (
+        let (line, (x, y, rotation, tag)) = (
             U,
             P(space1, U),
             P(space1, F),
+            // TODO: Remove \u0000 chars from this
             P(space1, quoted_str),
         )
             .parse(line)?;
 
-        let poi = PoI { x, y, float1, tag };
+        let poi = PoI {
+            x,
+            y,
+            rotation,
+            tag,
+        };
 
         Ok((line, poi))
     };
@@ -238,7 +235,6 @@ fn poi_groups<'a>(version: u32) -> impl MultilineParser<'a, Vec<Vec<PoI>>> {
 
 /// Single doodad string
 fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
-
     let parser = for<'b> move |line: &'b str| -> IResult<&'b str, Doodad> {
         let (line, x) = U(line)?;
         let (line, _) = space1(line)?;
@@ -360,45 +356,42 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
 }
 
 fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<DoodadConnection>> {
-    let doodad_connection = single_line(nom_adapter(
-        count(T(U, space1), 2)
-            .and(quoted_str)
-            .map(|(nums, tag)| DoodadConnection {
-                from: nums[0],
-                to: nums[1],
-                tag,
-            }),
-    ));
+    let doodad_connection = single_line(nom_adapter(count(T(U, space1), 2).and(quoted_str).map(
+        |(nums, tag)| DoodadConnection {
+            from: nums[0],
+            to: nums[1],
+            tag,
+        },
+    )));
 
     group(version, doodad_connection)
 }
 
 /// Decale on a line
 fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
-
     let parser = move |line| -> IResult<&str, Decal> {
         let (line, floats) = count(T(F, space1), 3)(line)?;
 
-        let (line, uint1) = match version {
+        let (line, bool1) = match version {
             ..17 => (line, None),
             17.. => {
-                let (line, uint1) = T(U, space1)(line)?;
+                let (line, uint1) = T(parse_bool, space1)(line)?;
                 (line, Some(uint1))
             }
         };
 
-        let (line, float4) = T(F, space1)(line)?;
+        let (line, scale) = T(F, space1)(line)?;
 
         let (line, atlas_file) = T(quoted_str, space1)(line)?;
 
         let (line, tag) = quoted_str(line)?;
 
         let decal = Decal {
-            float1: floats[0],
-            float2: floats[1],
-            float3: floats[2],
-            uint1,
-            float4,
+            x: floats[0],
+            y: floats[1],
+            rotation: floats[2],
+            bool1,
+            scale,
             atlas_file,
             tag,
         };
@@ -443,7 +436,6 @@ fn boss_lines<'a>(
 }
 
 fn zone<'a>(version: u32) -> impl MultilineParser<'a, Zone> {
-
     let parser = move |line| -> IResult<&str, Zone> {
         let (line, name) = match version {
             ..35 => unquoted_str(line)?,
@@ -469,7 +461,7 @@ fn zone<'a>(version: u32) -> impl MultilineParser<'a, Zone> {
             y_min: bbox[1],
             x_max: bbox[2],
             y_max: bbox[3],
-            string1,
+            disable_teleports: string1,
             env_file,
             uint1,
         };
@@ -495,10 +487,8 @@ fn zones<'a>(version: u32) -> impl MultilineParser<'a, Vec<Zone>> {
 fn tags<'a>() -> impl MultilineParser<'a, Option<Vec<String>>> {
     |lines| {
         if let Some(&first) = lines.first() {
-            let mut line_parser = combinator::opt(all_consuming(length_count(
-                U,
-                P(space1, unquoted_str),
-            )));
+            let mut line_parser =
+                combinator::opt(all_consuming(length_count(U, P(space1, unquoted_str))));
             let (_, tags) = line_parser(first)?;
 
             // Crop off last line if successful
@@ -538,7 +528,6 @@ fn trailing<'a>() -> impl MultilineParser<'a, Option<Vec<u32>>> {
 }
 
 pub fn thingy<'a>(strings: &[String]) -> impl MultilineParser<'a, Thingy> {
-
     let parser = |line| -> IResult<&str, Thingy> {
         let (line, index) = U(line)?;
 
