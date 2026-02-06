@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use itertools::{Itertools, izip};
 use nom::{
     IResult, Parser,
@@ -259,19 +257,22 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
         let (line, _) = space1(line)?;
 
         let (line, float_pairs) = match version {
-            ..34 => (line, vec![]),
+            ..34 => (line, None),
             34.. => {
                 let (line, count1) = U(line)?;
                 let (line, _) = space1(line)?;
 
-                count(T(separated_pair(F, space1, F), space1), count1 as usize)(line)?
+                let (line, pairs) =
+                    count(T(separated_pair(F, space1, F), space1), count1 as usize)(line)?;
+
+                (line, Some(pairs))
             }
         };
 
         let (line, radians1) = F(line)?;
         let (line, _) = space1(line)?;
 
-        let (line, (radians2, radians3, radians4, radians5)) = match version {
+        let (line, (trig1, trig2, trig3, trig4)) = match version {
             ..18 => (line, (None, None, None, None)),
             18.. => {
                 let (line, radians2) = F(line)?;
@@ -298,17 +299,16 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
             }
         };
 
-        let (line, uint3) = U(line)?;
+        let (line, bool1) = parse_bool(line)?;
         let (line, _) = space1(line)?;
 
-        // TODO: Unclear whether it is uint3 or 4 that's missing.
-        let (line, uint4) = match version {
+        let (line, bool2) = match version {
             ..25 => (line, None),
             25.. => {
-                let (line, uint4) = U(line)?;
+                let (line, bool2) = parse_bool(line)?;
                 let (line, _) = space1(line)?;
 
-                (line, Some(uint4))
+                (line, Some(bool2))
             }
         };
 
@@ -326,7 +326,7 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
         let (line, stub) = quoted_str(line)?;
 
         let (line, key_values) = match version {
-            ..36 => (line, HashMap::new()),
+            ..36 => (line, None),
             36.. => {
                 let (line, _) = space1(line)?;
                 let (line, count1) = U(line)?;
@@ -341,7 +341,7 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
                     .map(|(k, v)| (k.to_string(), v.to_string()))
                     .collect();
 
-                (line, key_values)
+                (line, Some(key_values))
             }
         };
 
@@ -350,12 +350,12 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
             y,
             float_pairs,
             radians1,
-            radians2,
-            radians3,
-            radians4,
-            radians5,
-            uint3,
-            uint4,
+            trig1,
+            trig2,
+            trig3,
+            trig4,
+            bool1,
+            bool2,
             floats,
             scale,
             ao_file,

@@ -78,26 +78,25 @@ pub struct Doodad {
     pub x: u32,
     pub y: u32,
 
-    pub float_pairs: Vec<(f32, f32)>,
+    pub float_pairs: Option<Vec<(f32, f32)>>,
 
-    // Likely yaw/pitch/roll
-    // Quaternion? https://gitlab.com/zao/poe-rs/-/blob/master/src/formats/arm/types.rs?ref_type=heads#L82
     pub radians1: f32,
-    pub radians2: Option<f32>,
-    pub radians3: Option<f32>,
 
-    pub radians4: Option<f32>,
-    pub radians5: Option<f32>,
-    // pub float1: Option<f32>,
-    pub uint3: u32,
-    pub uint4: Option<u32>,
+    pub trig1: Option<f32>,
+    pub trig2: Option<f32>,
+    pub trig3: Option<f32>,
+    pub trig4: Option<f32>,
+
+    pub bool1: bool,
+    pub bool2: Option<bool>,
+
     pub floats: Vec<f32>,
 
     pub scale: f32,
     pub ao_file: String,
     pub stub: String,
 
-    pub key_values: HashMap<String, String>,
+    pub key_values: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Serialize)]
