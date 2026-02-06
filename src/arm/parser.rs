@@ -3,10 +3,11 @@ use nom::{
     IResult, Parser,
     branch::alt,
     bytes::complete::{is_not, tag, take_till1, take_until},
-    character::complete::{self, space0, space1},
+    character::complete::{self, char as C, i32 as I, space0, space1, u32 as U},
     combinator::{self, all_consuming, rest},
     multi::{count, length_count, separated_list1},
-    sequence::{Tuple, delimited, preceded, separated_pair},
+    number::complete::float as F,
+    sequence::{Tuple, delimited, preceded, separated_pair, preceded as P, terminated as T},
 };
 
 use super::{
@@ -72,7 +73,6 @@ fn string_section<'a>() -> impl MultilineParser<'a, Vec<String>> {
 }
 
 fn dimensions<'a>(version: u32) -> impl MultilineParser<'a, Dimension> {
-    use nom::sequence::preceded as P;
 
     let parser = move |line| -> IResult<&str, Dimension> {
         let (line, side_length) = complete::u32(line)?;
@@ -112,10 +112,6 @@ fn uints<'a>() -> impl MultilineParser<'a, Vec<u32>> {
 
 /// "k" followed by 23-24 numbers
 fn slot_k<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, SlotK> {
-    use nom::{
-        character::complete::{char as C, i32 as I, u32 as U},
-        sequence::{preceded as P, terminated as T},
-    };
 
     let (input, _letter) = T(C('k'), C(' '))(input)?;
 
@@ -208,7 +204,6 @@ fn grid<'a>(
 
 /// Single PoI line - 3 uints & a string
 fn poi<'a>() -> impl MultilineParser<'a, PoI> {
-    use nom::sequence::preceded as P;
 
     let line_parser = |line| -> IResult<&str, PoI> {
         let (line, (x, y, float1, tag)) = (
@@ -243,11 +238,6 @@ fn poi_groups<'a>(version: u32) -> impl MultilineParser<'a, Vec<Vec<PoI>>> {
 
 /// Single doodad string
 fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
-    use nom::{
-        character::complete::{char as C, u32 as U},
-        number::complete::float as F,
-        sequence::{preceded as P, terminated as T},
-    };
 
     let parser = for<'b> move |line: &'b str| -> IResult<&'b str, Doodad> {
         let (line, x) = U(line)?;
@@ -385,7 +375,6 @@ fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<DoodadCo
 
 /// Decale on a line
 fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
-    use nom::{number::complete::float as F, sequence::terminated as T};
 
     let parser = move |line| -> IResult<&str, Decal> {
         let (line, floats) = count(T(F, space1), 3)(line)?;
@@ -454,7 +443,6 @@ fn boss_lines<'a>(
 }
 
 fn zone<'a>(version: u32) -> impl MultilineParser<'a, Zone> {
-    use nom::sequence::preceded as P;
 
     let parser = move |line| -> IResult<&str, Zone> {
         let (line, name) = match version {
@@ -550,7 +538,6 @@ fn trailing<'a>() -> impl MultilineParser<'a, Option<Vec<u32>>> {
 }
 
 pub fn thingy<'a>(strings: &[String]) -> impl MultilineParser<'a, Thingy> {
-    use nom::sequence::preceded as P;
 
     let parser = |line| -> IResult<&str, Thingy> {
         let (line, index) = complete::u32(line)?;
