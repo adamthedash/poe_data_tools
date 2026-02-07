@@ -66,6 +66,7 @@ Tested on linux (WSL) and Windows with the Steam version of PoE 1, and rolling l
 
 # Resources
 https://gitlab.com/zao/poe-rs
+https://gitlab.com/zao/poe-rs/blob/master/spec/arm.md
 
 ```
 .act = Actor, UCS-2 plain

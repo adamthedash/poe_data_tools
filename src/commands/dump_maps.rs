@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fs, io::BufWriter, path::Path};
 
 use anyhow::{Context, Result, anyhow, ensure};
 use glob::{MatchOptions, Pattern};
@@ -66,7 +66,8 @@ pub fn dump_maps(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Res
 
             let f = std::fs::File::create(&out_path)
                 .with_context(|| format!("Failed to create file {:?}", out_path))?;
-            serde_json::to_writer_pretty(f, &map).context("Failed to serialise map")?;
+            let f = BufWriter::new(f);
+            serde_json::to_writer(f, &map).context("Failed to serialise map")?;
 
             Ok(filename)
         })

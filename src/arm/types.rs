@@ -163,5 +163,5 @@ pub struct Map {
     pub boss_lines: Option<Vec<Vec<String>>>,
     pub zones: Option<Vec<Zone>>,
     pub tags: Option<Vec<String>>,
-    pub trailing: Option<Vec<u32>>,
+    pub ground_overrides: Option<Vec<Vec<Option<String>>>>,
 }

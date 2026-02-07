@@ -502,11 +502,26 @@ fn tags<'a>() -> impl MultilineParser<'a, Option<Vec<String>>> {
 }
 
 /// Line of space separated uints, sometimes with a space a the end
-fn trailing<'a>() -> impl MultilineParser<'a, Option<Vec<u32>>> {
-    |lines| {
+fn ground_overrides<'a>(
+    strings: &[String],
+    _grid_height: usize,
+    grid_width: usize,
+) -> impl MultilineParser<'a, Option<Vec<Vec<Option<String>>>>> {
+    move |lines| {
         let (lines, trailing) = if let Some(&last) = lines.first() {
             let mut line_parser = combinator::opt(all_consuming(T(
-                separated_list1(space1::<_, nom::error::Error<_>>, U),
+                separated_list1(
+                    space1::<_, nom::error::Error<_>>,
+                    U.map(|i| (i > 0).then(|| strings[i as usize - 1].clone())),
+                )
+                .map(|list| {
+                    // Chunk into 2D grid
+                    list.into_iter()
+                        .chunks(grid_width - 1)
+                        .into_iter()
+                        .map(|c| c.collect::<Vec<_>>())
+                        .collect::<Vec<_>>()
+                }),
                 space0,
             )));
             let (_, trailing_nums) = line_parser(last)?;
@@ -623,7 +638,7 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
     };
 
     // Optional trailing line with a bunch of numbers
-    let (lines, trailing) = trailing()(lines)?;
+    let (lines, ground_overrides) = ground_overrides(&strings, grid_height, grid_width)(lines)?;
 
     assert!(lines.is_empty(), "Extra lines: {:#?}", lines);
 
@@ -645,7 +660,7 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
         boss_lines,
         zones,
         tags,
-        trailing,
+        ground_overrides,
     };
 
     // TODO: Return &str once we figure out lifetimes
