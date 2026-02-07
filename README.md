@@ -52,8 +52,15 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ![psg file format poe1](./images/psg_spec_poe1.png)  
 ![psg file format poe2](./images/psg_spec_poe2.png)  
 
+# World Area related files
+![world areas](./images/world_areas.png)  
+
+# TSI File Format
+![tsi format](./images/tsi_spec.png)  
+
 # World Areas (ARM) File Format
 ![arm format](./images/arm_spec.png)  
+
 
 **TODO List**
 
