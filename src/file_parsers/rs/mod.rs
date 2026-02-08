@@ -2,16 +2,16 @@ pub mod types;
 
 use anyhow::{Result, anyhow};
 use nom::{
-    Parser,
     character::complete::{space1, u32 as U},
-    combinator::opt,
-    sequence::{pair, terminated},
+    combinator::{all_consuming, opt},
+    multi::many0,
+    sequence::{preceded, terminated},
 };
 use types::*;
 
 use crate::file_parsers::{
     line_parser::{Result as LResult, nom_adapter, single_line, take_forever},
-    shared::{quoted_str, utf16_bom_to_string},
+    shared::{quoted_str, unquoted_str, utf16_bom_to_string, version_line},
 };
 
 pub fn parse_rs(contents: &[u8]) -> Result<RSFile> {
@@ -25,15 +25,33 @@ pub fn parse_rs(contents: &[u8]) -> Result<RSFile> {
 fn parse_rs_str(contents: &str) -> LResult<RSFile> {
     let lines = contents
         .lines()
+        .map(|l| l.trim())
         // Skip empty/commented lines
-        .filter(|l| !l.is_empty() || l.starts_with(r"\\!"))
+        .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
 
-    let line_parser = pair(opt(terminated(U, space1)), quoted_str)
-        .map(|(weight, arm_file)| Room { weight, arm_file });
+    let (lines, version) = version_line()(&lines)?;
 
-    let (lines, rooms) = take_forever(single_line(nom_adapter(line_parser)))(&lines)?;
+    let line_parser = |line| {
+        let (line, weight) = opt(terminated(U, space1))(line)?;
+
+        let (line, arm_file) = quoted_str(line)?;
+
+        let (line, rotations) = all_consuming(many0(preceded(space1, unquoted_str)))(line)?;
+
+        let room = Room {
+            weight,
+            arm_file,
+            rotations,
+        };
+
+        Ok((line, room))
+    };
+
+    let (lines, rooms) = take_forever(single_line(nom_adapter(line_parser)))(lines)?;
     assert!(lines.is_empty(), "File not fully consumed");
 
-    Ok(rooms)
+    let room_file = RSFile { version, rooms };
+
+    Ok(room_file)
 }

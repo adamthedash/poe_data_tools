@@ -8,8 +8,9 @@ use poe_data_tools::{
     bundle_fs::FS,
     bundle_loader::cdn_base_url,
     commands::{
-        Patch, cat::cat_file, dump_arm::dump_arm, dump_art::extract_art, dump_tables::dump_tables,
-        dump_trees::dump_trees, dump_tsi::dump_tsi, extract::extract_files, list::list_files,
+        Patch, cat::cat_file, dump_arm::dump_arm, dump_art::extract_art, dump_rs::dump_rs,
+        dump_tables::dump_tables, dump_trees::dump_trees, dump_tsi::dump_tsi,
+        extract::extract_files, list::list_files,
     },
 };
 
@@ -78,6 +79,15 @@ enum Command {
 
         /// Glob patterns to filter the list of files
         #[clap(default_value = "**/*.tsi")]
+        #[arg(num_args = 1..)]
+        globs: Vec<Pattern>,
+    },
+    /// Extracts .rs (Room Set) files as JSON
+    DumpRS {
+        output_folder: PathBuf,
+
+        /// Glob patterns to filter the list of files
+        #[clap(default_value = "**/*.rs")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
     },
@@ -228,6 +238,13 @@ fn main() -> Result<()> {
             globs,
         } => {
             dump_tsi(&mut fs, &globs, &output_folder).context("Dump TSI command failed")?;
+        }
+
+        Command::DumpRS {
+            output_folder,
+            globs,
+        } => {
+            dump_rs(&mut fs, &globs, &output_folder).context("Dump TSI command failed")?;
         }
     }
 
