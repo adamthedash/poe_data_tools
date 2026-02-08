@@ -3,6 +3,8 @@ use nom::{
     IResult, Parser,
     bytes::complete::{tag, take_till1, take_until},
     character::complete::{char as C, u32 as U},
+    combinator::verify,
+    multi::separated_list0,
     sequence::{delimited, preceded as P},
 };
 
@@ -53,4 +55,29 @@ pub fn utf16_bom_to_string(contents: &[u8]) -> anyhow::Result<String> {
     };
 
     parse_ut16(&contents[2..]).context("Failed to parse contents as UTF-16 string")
+}
+
+/// nom::sequence::separated_list but exact sized
+pub fn separated_array<const N: usize, I, S, F, OS, OF, E>(
+    sep: S,
+    item: F,
+) -> impl FnMut(I) -> IResult<I, [OF; N], E>
+where
+    I: Clone + nom::InputLength,
+    S: Parser<I, OS, E>,
+    F: Parser<I, OF, E>,
+    E: nom::error::ParseError<I>,
+{
+    let mut parser = verify(separated_list0(sep, item), |items: &Vec<OF>| {
+        items.len() == N
+    });
+
+    move |input| {
+        let (input, items) = parser(input)?;
+
+        let Ok(items) = items.try_into() else {
+            unreachable!("Verify should take care of length")
+        };
+        Ok((input, items))
+    }
 }

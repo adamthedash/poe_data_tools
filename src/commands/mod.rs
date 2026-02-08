@@ -1,6 +1,7 @@
 pub mod cat;
 pub mod dump_arm;
 pub mod dump_art;
+pub mod dump_ecf;
 pub mod dump_rs;
 pub mod dump_tables;
 pub mod dump_trees;

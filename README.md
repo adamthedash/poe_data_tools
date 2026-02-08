@@ -61,6 +61,9 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ## RS File Format
 ![rs format](./images/rs_spec.png)  
 
+## ECF File Format
+![ecf format](./images/ecf_spec.png)  
+
 ## ARM File Format
 ![arm format](./images/arm_spec.png)  
 
@@ -69,6 +72,7 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 
 - Proper documentation for the lib crate
 - Swap image.rs version once [DDS support is merged](https://github.com/image-rs/image/pull/2258)
+- Consolidate all of the `dump-xxx` commands into a single one.  
 
 # Testing
 
