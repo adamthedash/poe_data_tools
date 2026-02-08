@@ -1,8 +1,9 @@
 pub mod cat;
+pub mod dump_arm;
 pub mod dump_art;
-pub mod dump_maps;
 pub mod dump_tables;
 pub mod dump_trees;
+pub mod dump_tsi;
 pub mod extract;
 pub mod list;
 

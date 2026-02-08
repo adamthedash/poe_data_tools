@@ -6,7 +6,7 @@ use glob::{MatchOptions, Pattern};
 use crate::{bundle_fs::FS, file_parsers::arm::parser::parse_arm};
 
 /// Extract files to disk matching a glob pattern
-pub fn dump_maps(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Result<()> {
+pub fn dump_arm(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Result<()> {
     for pattern in patterns {
         ensure!(
             pattern.as_str().ends_with(".arm"),
