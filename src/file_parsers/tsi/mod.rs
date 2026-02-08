@@ -2,7 +2,11 @@ use std::collections::HashMap;
 
 use anyhow::{Context, Result, anyhow, bail};
 use nom::{
-    Parser, branch::alt, character::complete::space1, combinator::rest, sequence::separated_pair,
+    Parser,
+    branch::alt,
+    character::complete::space1,
+    combinator::{all_consuming, rest},
+    sequence::separated_pair,
 };
 
 use crate::file_parsers::{
@@ -20,7 +24,7 @@ pub fn parse_tsi(contents: &[u8]) -> Result<HashMap<String, String>> {
     let contents =
         parse_ut16(&contents[2..]).context("Failed to parse contents as UTF-16 string")?;
 
-    let lut = parse_tsi_str(&contents).map_err(|_| anyhow!("Failed to parse TSI"))?;
+    let lut = parse_tsi_str(&contents).map_err(|e| anyhow!("Failed to parse TSI: {e:?}"))?;
 
     Ok(lut)
 }
@@ -34,8 +38,8 @@ fn parse_tsi_str(contents: &str) -> LResult<HashMap<String, String>> {
     let line_parser = separated_pair(
         unquoted_str,
         space1,
-        // Un-quote strings if they're there
-        alt((quoted_str, rest.map(String::from))),
+        // Attempt to un-quote single quoted strings, otherwise just take the rest as-is
+        rest.and_then(alt((all_consuming(quoted_str), rest.map(String::from)))),
     );
 
     let (lines, pairs) = take_forever(single_line(nom_adapter(line_parser)))(&lines)?;
