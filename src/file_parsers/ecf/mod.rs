@@ -2,6 +2,7 @@ use anyhow::{Result, anyhow};
 use nom::{character::complete::space1, combinator::opt, sequence::preceded};
 
 use crate::file_parsers::{
+    FileParser,
     ecf::types::{EcfCombination, EcfFile},
     line_parser::{Result as LResult, nom_adapter, single_line, take_forever},
     shared::{parse_bool, quoted_str, separated_array, utf16_bom_to_string, version_line},
@@ -9,12 +10,18 @@ use crate::file_parsers::{
 
 pub mod types;
 
-pub fn parse_ecf(contents: &[u8]) -> Result<EcfFile> {
-    let contents = utf16_bom_to_string(contents)?;
+pub struct ECFParser;
 
-    let lut = parse_ecf_str(&contents).map_err(|e| anyhow!("Failed to parse ECF: {e:?}"))?;
+impl FileParser for ECFParser {
+    type Output = EcfFile;
 
-    Ok(lut)
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        let contents = utf16_bom_to_string(bytes)?;
+
+        let parsed = parse_ecf_str(&contents).map_err(|e| anyhow!("Failed to parse ECF: {e:?}"))?;
+
+        Ok(parsed)
+    }
 }
 
 fn parse_ecf_str(contents: &str) -> LResult<EcfFile> {

@@ -10,16 +10,23 @@ use nom::{
 use types::*;
 
 use crate::file_parsers::{
+    FileParser,
     line_parser::{Result as LResult, nom_adapter, single_line, take_forever},
     shared::{quoted_str, unquoted_str, utf16_bom_to_string, version_line},
 };
 
-pub fn parse_rs(contents: &[u8]) -> Result<RSFile> {
-    let contents = utf16_bom_to_string(contents)?;
+pub struct RSParser;
 
-    let lut = parse_rs_str(&contents).map_err(|e| anyhow!("Failed to parse RS: {e:?}"))?;
+impl FileParser for RSParser {
+    type Output = RSFile;
 
-    Ok(lut)
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        let contents = utf16_bom_to_string(bytes)?;
+
+        let lut = parse_rs_str(&contents).map_err(|e| anyhow!("Failed to parse RS: {e:?}"))?;
+
+        Ok(lut)
+    }
 }
 
 fn parse_rs_str(contents: &str) -> LResult<RSFile> {

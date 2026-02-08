@@ -16,8 +16,9 @@ use super::{
     },
     types::*,
 };
-use crate::file_parsers::shared::{
-    parse_bool, quoted_str, unquoted_str, utf16_bom_to_string, version_line,
+use crate::file_parsers::{
+    FileParser,
+    shared::{parse_bool, quoted_str, unquoted_str, utf16_bom_to_string, version_line},
 };
 
 /// Either length-prefixed or "-1"-terminated depending on version
@@ -637,11 +638,17 @@ fn parse_arm_str(input: &str) -> super::super::line_parser::Result<(Vec<String>,
     Ok((lines, map))
 }
 
-pub fn parse_arm(contents: &[u8]) -> anyhow::Result<Arm> {
-    let contents = utf16_bom_to_string(contents)?;
+pub struct ARMParser;
 
-    let (_, map) = parse_arm_str(&contents)
-        .map_err(|e| anyhow::anyhow!("Failed to parse map file: {:?}", e))?;
+impl FileParser for ARMParser {
+    type Output = Arm;
 
-    Ok(map)
+    fn parse(&self, bytes: &[u8]) -> anyhow::Result<Self::Output> {
+        let contents = utf16_bom_to_string(bytes)?;
+
+        let (_, arm) = parse_arm_str(&contents)
+            .map_err(|e| anyhow::anyhow!("Failed to parse map file: {:?}", e))?;
+
+        Ok(arm)
+    }
 }

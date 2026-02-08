@@ -1,3 +1,5 @@
+pub mod types;
+
 use std::collections::HashMap;
 
 use anyhow::{Result, anyhow};
@@ -8,21 +10,29 @@ use nom::{
     combinator::{all_consuming, rest},
     sequence::separated_pair,
 };
+use types::*;
 
-use crate::file_parsers::{
+use super::{
+    FileParser,
     line_parser::{Result as LResult, nom_adapter, single_line, take_forever},
     shared::{quoted_str, unquoted_str, utf16_bom_to_string},
 };
 
-pub fn parse_tsi(contents: &[u8]) -> Result<HashMap<String, String>> {
-    let contents = utf16_bom_to_string(contents)?;
+pub struct TSIParser;
 
-    let lut = parse_tsi_str(&contents).map_err(|e| anyhow!("Failed to parse TSI: {e:?}"))?;
+impl FileParser for TSIParser {
+    type Output = TSIFile;
 
-    Ok(lut)
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        let contents = utf16_bom_to_string(bytes)?;
+
+        let lut = parse_tsi_str(&contents).map_err(|e| anyhow!("Failed to parse TSI: {e:?}"))?;
+
+        Ok(lut)
+    }
 }
 
-fn parse_tsi_str(contents: &str) -> LResult<HashMap<String, String>> {
+fn parse_tsi_str(contents: &str) -> LResult<TSIFile> {
     let lines = contents
         .lines()
         .filter(|l| !l.is_empty())

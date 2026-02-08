@@ -1,13 +1,10 @@
 pub mod cat;
-pub mod dump_arm;
 pub mod dump_art;
-pub mod dump_ecf;
-pub mod dump_rs;
 pub mod dump_tables;
 pub mod dump_trees;
-pub mod dump_tsi;
 pub mod extract;
 pub mod list;
+pub mod translate;
 
 #[derive(Debug, Clone)]
 pub enum Patch {

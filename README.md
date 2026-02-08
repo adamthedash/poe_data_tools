@@ -9,6 +9,7 @@
 - `dump-tables`: Extracts data tables (.datc64), applies the [community-curated schemas](https://github.com/poe-tool-dev/dat-schema),
   and saves them out as CSVs where the schema was successfully applied.  
 - `dump-tree`: Extracts passive skill trees (player, atlas, ruthless, etc.) to JSON
+- `translate`: Extracts files and converts them to more accessible formats.  
 
 
 ## Usage
@@ -72,7 +73,6 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 
 - Proper documentation for the lib crate
 - Swap image.rs version once [DDS support is merged](https://github.com/image-rs/image/pull/2258)
-- Consolidate all of the `dump-xxx` commands into a single one.  
 
 # Testing
 

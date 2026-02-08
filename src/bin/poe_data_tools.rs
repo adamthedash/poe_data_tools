@@ -8,9 +8,8 @@ use poe_data_tools::{
     bundle_fs::FS,
     bundle_loader::cdn_base_url,
     commands::{
-        Patch, cat::cat_file, dump_arm::dump_arm, dump_art::extract_art, dump_ecf::dump_ecf,
-        dump_rs::dump_rs, dump_tables::dump_tables, dump_trees::dump_trees, dump_tsi::dump_tsi,
-        extract::extract_files, list::list_files,
+        Patch, cat::cat_file, dump_art::extract_art, dump_tables::dump_tables,
+        dump_trees::dump_trees, extract::extract_files, list::list_files, translate::translate,
     },
 };
 
@@ -64,39 +63,12 @@ enum Command {
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
     },
-    /// Extracts .arm (Room File) files as JSON
-    DumpARM {
+    /// Extracts files into more accessible formats
+    Translate {
         output_folder: PathBuf,
 
         /// Glob patterns to filter the list of files
-        #[clap(default_value = "**/*.arm")]
-        #[arg(num_args = 1..)]
-        globs: Vec<Pattern>,
-    },
-    /// Extracts .tsi (Master File) files as JSON
-    DumpTSI {
-        output_folder: PathBuf,
-
-        /// Glob patterns to filter the list of files
-        #[clap(default_value = "**/*.tsi")]
-        #[arg(num_args = 1..)]
-        globs: Vec<Pattern>,
-    },
-    /// Extracts .rs (Room Set) files as JSON
-    DumpRS {
-        output_folder: PathBuf,
-
-        /// Glob patterns to filter the list of files
-        #[clap(default_value = "**/*.rs")]
-        #[arg(num_args = 1..)]
-        globs: Vec<Pattern>,
-    },
-    /// Extracts .ecf (Edge Combination) files as JSON
-    DumpECF {
-        output_folder: PathBuf,
-
-        /// Glob patterns to filter the list of files
-        #[clap(default_value = "**/*.ecf")]
+        #[clap(default_value = "**/*")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
     },
@@ -236,29 +208,18 @@ fn main() -> Result<()> {
             )
             .context("Dump Tree command failed")?;
         }
-        Command::DumpARM {
+        Command::Translate {
             output_folder,
             globs,
         } => {
-            dump_arm(&mut fs, &globs, &output_folder).context("Dump Maps command failed")?;
-        }
-        Command::DumpTSI {
-            output_folder,
-            globs,
-        } => {
-            dump_tsi(&mut fs, &globs, &output_folder).context("Dump TSI command failed")?;
-        }
-        Command::DumpRS {
-            output_folder,
-            globs,
-        } => {
-            dump_rs(&mut fs, &globs, &output_folder).context("Dump RS command failed")?;
-        }
-        Command::DumpECF {
-            output_folder,
-            globs,
-        } => {
-            dump_ecf(&mut fs, &globs, &output_folder).context("Dump ECF command failed")?;
+            translate(
+                &mut fs,
+                &globs,
+                &args.cache_dir,
+                &output_folder,
+                &args.patch,
+            )
+            .context("Translate command failed")?;
         }
     }
 
