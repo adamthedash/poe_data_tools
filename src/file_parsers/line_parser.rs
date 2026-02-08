@@ -100,6 +100,26 @@ pub fn terminated<'a, T>(
     }
 }
 
+/// Apply the inner parser until we run out of input
+pub fn take_forever<'a, T>(
+    mut item_parser: impl MultilineParser<'a, T>,
+) -> impl MultilineParser<'a, Vec<T>> {
+    move |mut lines| {
+        let mut items = vec![];
+        loop {
+            // Check if there's any more lines
+            if lines.is_empty() {
+                return Ok((lines, items));
+            }
+
+            // Apply inner
+            let (rest, item) = item_parser(lines)?;
+            items.push(item);
+            lines = rest;
+        }
+    }
+}
+
 /// Adapts a single-line parser to a multi-line one
 /// Inner parser must consume the entire line
 pub fn single_line<'a, T>(
@@ -130,7 +150,7 @@ pub fn nom_adapter<'a, T>(
 mod tests {
     use std::assert_matches;
 
-    use crate::arm::line_parser::{length_prefixed, nom_adapter, single_line, terminated, Error};
+    use super::{Error, length_prefixed, nom_adapter, single_line, terminated};
 
     #[test]
     fn test_length_prefixed_good() {

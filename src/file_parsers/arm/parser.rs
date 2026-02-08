@@ -2,55 +2,23 @@ use itertools::{Itertools, izip};
 use nom::{
     IResult, Parser,
     branch::alt,
-    bytes::complete::{is_not, tag, take_till1, take_until},
+    bytes::complete::{is_not, tag},
     character::complete::{char as C, i32 as I, space0, space1, u32 as U},
     combinator::{self, all_consuming, rest},
     multi::{count, length_count, separated_list1},
     number::complete::float as F,
-    sequence::{Tuple, delimited, preceded as P, separated_pair, terminated as T},
+    sequence::{Tuple, preceded as P, separated_pair, terminated as T},
 };
 
 use super::{
-    line_parser::{MultilineParser, length_prefixed, nom_adapter, single_line},
+    super::line_parser::{
+        MultilineParser, length_prefixed, nom_adapter, repeated, single_line, terminated,
+    },
     types::*,
 };
-use crate::arm::line_parser::{repeated, terminated};
-
-/// Parses a 0/1 as a bool
-fn parse_bool(line: &str) -> IResult<&str, bool> {
-    let (rest, item) = U(line)?;
-
-    let item = match item {
-        0 => false,
-        1 => true,
-        _ => {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                line,
-                // No better option here
-                nom::error::ErrorKind::Digit,
-            )));
-        }
-    };
-
-    Ok((rest, item))
-}
-
-fn version_line<'a>() -> impl MultilineParser<'a, u32> {
-    single_line(nom_adapter(P(tag("\u{feff}version "), U)))
-}
-
-/// Quoted string ending in newline
-fn quoted_str(input: &str) -> IResult<&str, String> {
-    delimited(C('"'), take_until("\""), C('"'))
-        .map(String::from)
-        .parse(input)
-}
-
-fn unquoted_str(input: &str) -> IResult<&str, String> {
-    take_till1(|c: char| c.is_whitespace())
-        .map(String::from)
-        .parse(input)
-}
+use crate::file_parsers::shared::{
+    parse_bool, quoted_str, unquoted_str, utf16_bom_to_string, version_line,
+};
 
 /// Either length-prefixed or "-1"-terminated depending on version
 fn group<'a, T: 'a>(
@@ -404,7 +372,7 @@ fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
 
 fn boss_lines<'a>(
     lines: &'a [&'a str],
-) -> super::line_parser::Result<(Vec<&'a str>, Vec<Vec<String>>)> {
+) -> super::super::line_parser::Result<(Vec<&'a str>, Vec<Vec<String>>)> {
     // NOTE: Boss string line is often not properly ended with a newline, causing the next
     // line to be appended on the end instead. We're accounting for this by cropping off
     // the end and prepending it to our list of lines
@@ -542,7 +510,7 @@ fn ground_overrides<'a>(
     }
 }
 
-pub fn thingy<'a>(strings: &[String]) -> impl MultilineParser<'a, Thingy> {
+fn thingy<'a>(strings: &[String]) -> impl MultilineParser<'a, Thingy> {
     let parser = |line| -> IResult<&str, Thingy> {
         let (line, index) = U(line)?;
 
@@ -566,7 +534,7 @@ pub fn thingy<'a>(strings: &[String]) -> impl MultilineParser<'a, Thingy> {
     single_line(nom_adapter(parser))
 }
 
-pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Map)> {
+fn parse_arm_str(input: &str) -> super::super::line_parser::Result<(Vec<String>, Arm)> {
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
 
     let (lines, version) = version_line()(&lines)?;
@@ -642,7 +610,7 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
 
     assert!(lines.is_empty(), "Extra lines: {:#?}", lines);
 
-    let map = Map {
+    let map = Arm {
         version,
         strings: strings.to_vec(),
         dimensions,
@@ -667,4 +635,13 @@ pub fn parse_map_str(input: &str) -> super::line_parser::Result<(Vec<String>, Ma
     let lines = lines.iter().map(|s| s.to_string()).collect::<Vec<_>>();
 
     Ok((lines, map))
+}
+
+pub fn parse_arm(contents: &[u8]) -> anyhow::Result<Arm> {
+    let contents = utf16_bom_to_string(contents)?;
+
+    let (_, map) = parse_arm_str(&contents)
+        .map_err(|e| anyhow::anyhow!("Failed to parse map file: {:?}", e))?;
+
+    Ok(map)
 }

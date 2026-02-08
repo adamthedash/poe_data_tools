@@ -145,7 +145,7 @@ pub struct Dimension {
 }
 
 #[derive(Debug, Serialize, Default)]
-pub struct Map {
+pub struct Arm {
     pub version: u32,
     pub strings: Vec<String>,
     pub dimensions: Dimension,

@@ -4,13 +4,13 @@
 #![feature(closure_lifetime_binder)]
 use std::sync::OnceLock;
 
-pub mod arm;
 pub mod bundle;
 pub mod bundle_fs;
 pub mod bundle_index;
 pub mod bundle_loader;
 pub mod commands;
 pub mod dat;
+pub mod file_parsers;
 pub mod hasher;
 pub mod path;
 pub mod steam;

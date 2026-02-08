@@ -1,24 +1,9 @@
 use std::{fs, io::BufWriter, path::Path};
 
-use anyhow::{Context, Result, anyhow, ensure};
+use anyhow::{Context, Result, ensure};
 use glob::{MatchOptions, Pattern};
 
-use crate::{
-    arm::{parser::parse_map_str, types::Map},
-    bundle_fs::FS,
-};
-
-fn parse_map(contents: &[u8]) -> Result<Map> {
-    ensure!(contents[..2] == [0xff, 0xfe], ".arm magic number mismatch");
-
-    let input =
-        String::from_utf16le(contents).context("Failed to parse contents as UTF16LE string")?;
-
-    let (_, map) =
-        parse_map_str(&input).map_err(|e| anyhow!("Failed to parse map file: {:?}", e))?;
-
-    Ok(map)
-}
+use crate::{bundle_fs::FS, file_parsers::arm::parser::parse_arm};
 
 /// Extract files to disk matching a glob pattern
 pub fn dump_maps(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Result<()> {
@@ -57,7 +42,7 @@ pub fn dump_maps(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Res
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
             println!("extracting: {:?}", filename);
-            let map = parse_map(&contents)
+            let map = parse_arm(&contents)
                 .with_context(|| format!("Failed to parse file: {:?}", filename))
                 .unwrap();
 
