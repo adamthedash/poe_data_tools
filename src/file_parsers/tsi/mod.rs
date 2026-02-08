@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use nom::{
     Parser,
     branch::alt,
@@ -11,18 +11,11 @@ use nom::{
 
 use crate::file_parsers::{
     line_parser::{Result as LResult, nom_adapter, single_line, take_forever},
-    shared::{quoted_str, unquoted_str},
+    shared::{quoted_str, unquoted_str, utf16_bom_to_string},
 };
 
 pub fn parse_tsi(contents: &[u8]) -> Result<HashMap<String, String>> {
-    let parse_ut16 = match &contents[..2] {
-        [0xff, 0xfe] => String::from_utf16le,
-        [0xfe, 0xff] => String::from_utf16be,
-        bytes => bail!("Invalid BOM found: {:?}", bytes),
-    };
-
-    let contents =
-        parse_ut16(&contents[2..]).context("Failed to parse contents as UTF-16 string")?;
+    let contents = utf16_bom_to_string(contents)?;
 
     let lut = parse_tsi_str(&contents).map_err(|e| anyhow!("Failed to parse TSI: {e:?}"))?;
 
