@@ -150,7 +150,10 @@ pub fn nom_adapter<'a, T>(
 mod tests {
     use std::assert_matches;
 
+    use nom::bytes::complete::tag;
+
     use super::{Error, length_prefixed, nom_adapter, single_line, terminated};
+    use crate::file_parsers::line_parser::take_forever;
 
     #[test]
     fn test_length_prefixed_good() {
@@ -254,6 +257,29 @@ mod tests {
         let mut parser = nom_adapter(nom_parser);
 
         let err = parser(line).unwrap_err();
+        assert_matches!(err, Error::ParseError(..));
+    }
+
+    #[test]
+    fn test_take_forever_good() {
+        let lines = ["a", "a", "a"];
+
+        let line_parser = single_line(nom_adapter(tag("a")));
+        let mut parser = take_forever(line_parser);
+
+        let (rest, digits) = parser(&lines).unwrap();
+        assert!(rest.is_empty());
+        assert_eq!(digits, ["a", "a", "a"]);
+    }
+
+    #[test]
+    fn test_take_forever_bad() {
+        let lines = ["a", "a", "b"];
+
+        let line_parser = single_line(nom_adapter(tag("a")));
+        let mut parser = take_forever(line_parser);
+
+        let err = parser(&lines).unwrap_err();
         assert_matches!(err, Error::ParseError(..));
     }
 }
