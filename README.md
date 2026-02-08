@@ -55,10 +55,13 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 # World Area related files
 ![world areas](./images/world_areas.png)  
 
-# TSI File Format
+## TSI File Format
 ![tsi format](./images/tsi_spec.png)  
 
-# World Areas (ARM) File Format
+## RS File Format
+![rs format](./images/rs_spec.png)  
+
+## ARM File Format
 ![arm format](./images/arm_spec.png)  
 
 
