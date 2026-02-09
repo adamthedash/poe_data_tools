@@ -8,7 +8,8 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     file_parsers::{
-        FileParser, arm::parser::ARMParser, ecf::ECFParser, rs::RSParser, tsi::TSIParser,
+        FileParser, arm::parser::ARMParser, ecf::ECFParser, et::ETParser, rs::RSParser,
+        tsi::TSIParser,
     },
 };
 
@@ -39,6 +40,7 @@ enum Parser {
     Rs(RSParser),
     Arm(ARMParser),
     Ecf(ECFParser),
+    Et(ETParser),
 }
 
 impl Parser {
@@ -49,6 +51,7 @@ impl Parser {
             Rs(p) => p.parse_to_json_file(bytes, output_folder),
             Arm(p) => p.parse_to_json_file(bytes, output_folder),
             Ecf(p) => p.parse_to_json_file(bytes, output_folder),
+            Et(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -60,6 +63,7 @@ impl Parser {
             "tsi" => Parser::Tsi(TSIParser),
             "arm" => Parser::Arm(ARMParser),
             "ecf" => Parser::Ecf(ECFParser),
+            "et" => Parser::Et(ETParser),
             _ => return None,
         };
 
@@ -107,18 +111,21 @@ pub fn translate(
         })
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
+            eprintln!("Extracting file: {filename}");
             let parser = Parser::from_filename(Path::new(filename))
                 .expect("Already verified parser exists above");
 
             let out_path = output_folder.join(filename).with_added_extension("json");
-            parser.parse_to_json_file(&contents, &out_path)?;
+            parser
+                .parse_to_json_file(&contents, &out_path)
+                .with_context(|| format!("Failed to process file: {:?}", filename))?;
 
             Ok(filename)
         })
         // Report results
         .for_each(|result| match result {
             Ok(filename) => eprintln!("Extracted file: {}", filename),
-            Err(e) => eprintln!("Failed to extract file: {:?}", e),
+            Err(e) => eprintln!("{:?}", e),
         });
 
     Ok(())

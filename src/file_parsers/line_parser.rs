@@ -120,6 +120,19 @@ pub fn take_forever<'a, T>(
     }
 }
 
+/// Try to apply the inner parser. If it fails, return the full input untouched
+pub fn optional<'a, T>(
+    mut item_parser: impl MultilineParser<'a, T>,
+) -> impl MultilineParser<'a, Option<T>> {
+    move |lines| {
+        if let Ok((lines, item)) = item_parser(lines) {
+            Ok((lines, Some(item)))
+        } else {
+            Ok((lines, None))
+        }
+    }
+}
+
 /// Adapts a single-line parser to a multi-line one
 /// Inner parser must consume the entire line
 pub fn single_line<'a, T>(
@@ -153,7 +166,7 @@ mod tests {
     use nom::bytes::complete::tag;
 
     use super::{Error, length_prefixed, nom_adapter, single_line, terminated};
-    use crate::file_parsers::line_parser::take_forever;
+    use crate::file_parsers::line_parser::{optional, take_forever};
 
     #[test]
     fn test_length_prefixed_good() {
@@ -281,5 +294,29 @@ mod tests {
 
         let err = parser(&lines).unwrap_err();
         assert_matches!(err, Error::ParseError(..));
+    }
+
+    #[test]
+    fn test_optional_some() {
+        let lines = ["a", "b"];
+
+        let line_parser = single_line(nom_adapter(tag("a")));
+        let mut parser = optional(line_parser);
+
+        let (lines, item) = parser(&lines).unwrap();
+        assert_eq!(item, Some("a"));
+        assert_eq!(lines, &["b"]);
+    }
+
+    #[test]
+    fn test_optional_none() {
+        let lines = ["b", "b"];
+
+        let line_parser = single_line(nom_adapter(tag("a")));
+        let mut parser = optional(line_parser);
+
+        let (lines, item) = parser(&lines).unwrap();
+        assert_eq!(item, None);
+        assert_eq!(lines, &["b", "b"]);
     }
 }
