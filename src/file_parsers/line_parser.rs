@@ -120,6 +120,22 @@ pub fn take_forever<'a, T>(
     }
 }
 
+/// Apply the inner parser as many as we can, stopping at the first failure or when input is
+/// exhausted
+pub fn take_many<'a, T>(
+    mut item_parser: impl MultilineParser<'a, T>,
+) -> impl MultilineParser<'a, Vec<T>> {
+    move |mut lines| {
+        let mut items = vec![];
+        while let Ok((rest, item)) = item_parser(lines) {
+            items.push(item);
+            lines = rest;
+        }
+
+        Ok((lines, items))
+    }
+}
+
 /// Try to apply the inner parser. If it fails, return the full input untouched
 pub fn optional<'a, T>(
     mut item_parser: impl MultilineParser<'a, T>,
@@ -166,7 +182,7 @@ mod tests {
     use nom::bytes::complete::tag;
 
     use super::{Error, length_prefixed, nom_adapter, single_line, terminated};
-    use crate::file_parsers::line_parser::{optional, take_forever};
+    use crate::file_parsers::line_parser::{optional, take_forever, take_many};
 
     #[test]
     fn test_length_prefixed_good() {
@@ -318,5 +334,41 @@ mod tests {
         let (lines, item) = parser(&lines).unwrap();
         assert_eq!(item, None);
         assert_eq!(lines, &["b", "b"]);
+    }
+
+    #[test]
+    fn test_take_many_end_input() {
+        let lines = ["a", "a"];
+
+        let line_parser = single_line(nom_adapter(tag("a")));
+        let mut parser = take_many(line_parser);
+
+        let (lines, item) = parser(&lines).unwrap();
+        assert_eq!(item[..], ["a", "a"]);
+        assert!(lines.is_empty())
+    }
+
+    #[test]
+    fn test_take_many_end_other() {
+        let lines = ["a", "a", "b"];
+
+        let line_parser = single_line(nom_adapter(tag("a")));
+        let mut parser = take_many(line_parser);
+
+        let (lines, item) = parser(&lines).unwrap();
+        assert_eq!(item[..], ["a", "a"]);
+        assert_eq!(lines, &["b"]);
+    }
+
+    #[test]
+    fn test_take_many_none() {
+        let lines = ["b"];
+
+        let line_parser = single_line(nom_adapter(tag("a")));
+        let mut parser = take_many(line_parser);
+
+        let (lines, item) = parser(&lines).unwrap();
+        assert!(item.is_empty());
+        assert_eq!(lines, &["b"]);
     }
 }
