@@ -29,6 +29,20 @@ pub fn parse_bool(line: &str) -> IResult<&str, bool> {
     Ok((rest, item))
 }
 
+/// Parses a u32, ensuring that it hasn't just parsed the first digit of what's actually a float
+pub fn safe_u32(line: &str) -> IResult<&str, u32> {
+    let (line, uint) = U(line)?;
+    if line.starts_with(".") {
+        // fail - actually a float
+        return Err(nom::Err::Error(nom::error::Error::new(
+            line,
+            nom::error::ErrorKind::Digit,
+        )));
+    }
+
+    Ok((line, uint))
+}
+
 pub fn quoted_str(input: &str) -> IResult<&str, String> {
     delimited(C('"'), take_until("\""), C('"'))
         .map(String::from)

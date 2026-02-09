@@ -32,6 +32,8 @@ where
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub trait NomParser<'a, T> = nom::Parser<&'a str, T, nom::error::Error<&'a str>>;
+
 /// Signature of a line parser. Takes in lines as a slice of strings,
 /// Returns the parsed item and remaining unused lines
 pub trait MultilineParser<'a, T> = FnMut(&'a [&'a str]) -> Result<(&'a [&'a str], T)>;
@@ -169,9 +171,7 @@ pub fn single_line<'a, T>(
 }
 
 /// Adapts a nom &str parser into a SingleLineParser
-pub fn nom_adapter<'a, T>(
-    mut nom_parser: impl nom::Parser<&'a str, T, nom::error::Error<&'a str>>,
-) -> impl SingleLineParser<'a, T> {
+pub fn nom_adapter<'a, T>(mut nom_parser: impl NomParser<'a, T>) -> impl SingleLineParser<'a, T> {
     move |line| nom_parser.parse(line).map_err(Into::into)
 }
 
