@@ -8,8 +8,8 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     file_parsers::{
-        FileParser, arm::parser::ARMParser, ecf::ECFParser, et::ETParser, rs::RSParser,
-        tsi::TSIParser,
+        FileParser, arm::parser::ARMParser, ecf::ECFParser, et::ETParser, gt::GTParser,
+        rs::RSParser, tsi::TSIParser,
     },
 };
 
@@ -41,6 +41,7 @@ enum Parser {
     Arm(ARMParser),
     Ecf(ECFParser),
     Et(ETParser),
+    Gt(GTParser),
 }
 
 impl Parser {
@@ -52,6 +53,7 @@ impl Parser {
             Arm(p) => p.parse_to_json_file(bytes, output_folder),
             Ecf(p) => p.parse_to_json_file(bytes, output_folder),
             Et(p) => p.parse_to_json_file(bytes, output_folder),
+            Gt(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -64,6 +66,7 @@ impl Parser {
             "arm" => Parser::Arm(ARMParser),
             "ecf" => Parser::Ecf(ECFParser),
             "et" => Parser::Et(ETParser),
+            "gt" => Parser::Gt(GTParser),
             _ => return None,
         };
 

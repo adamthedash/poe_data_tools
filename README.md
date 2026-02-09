@@ -68,6 +68,9 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ## ET File Format
 ![et format](./images/et_spec.png)  
 
+## GT File Format
+![gt format](./images/gt_spec.png)  
+
 ## ARM File Format
 ![arm format](./images/arm_spec.png)  
 

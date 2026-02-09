@@ -26,7 +26,7 @@ impl FileParser for ETParser {
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        let parsed = parse_gt_str(&contents).map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        let parsed = parse_et_str(&contents).map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
         Ok(parsed)
     }
@@ -106,7 +106,7 @@ fn virtual_section<'a>() -> impl MultilineParser<'a, VirtualSection> {
     }
 }
 
-fn parse_gt_str(contents: &str) -> LResult<ETFile> {
+fn parse_et_str(contents: &str) -> LResult<ETFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
