@@ -4,6 +4,7 @@ pub mod dump_tables;
 pub mod dump_trees;
 pub mod extract;
 pub mod list;
+pub mod translate;
 
 #[derive(Debug, Clone)]
 pub enum Patch {

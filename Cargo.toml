@@ -1,7 +1,7 @@
 [package]
 name = "poe_data_tools"
 version = "1.1.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "poe_data_tools"

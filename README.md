@@ -9,6 +9,7 @@
 - `dump-tables`: Extracts data tables (.datc64), applies the [community-curated schemas](https://github.com/poe-tool-dev/dat-schema),
   and saves them out as CSVs where the schema was successfully applied.  
 - `dump-tree`: Extracts passive skill trees (player, atlas, ruthless, etc.) to JSON
+- `translate`: Extracts files and converts them to more accessible formats.  
 
 
 ## Usage
@@ -52,6 +53,37 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ![psg file format poe1](./images/psg_spec_poe1.png)  
 ![psg file format poe2](./images/psg_spec_poe2.png)  
 
+# World Area related files
+![world areas](./images/world_areas.png)  
+
+## TSI File Format
+![tsi format](./images/tsi_spec.png)  
+
+## RS File Format
+![rs format](./images/rs_spec.png)  
+
+## ECF File Format
+![ecf format](./images/ecf_spec.png)  
+
+## ET File Format
+![et format](./images/et_spec.png)  
+
+## GT File Format
+![gt format](./images/gt_spec.png)  
+
+## GFT File Format
+![gft format](./images/gft_spec.png)  
+
+## DDT File Format
+![ddt format](./images/ddt_spec.png)  
+
+## AO File Format
+![ao format](./images/ao_spec.png)  
+
+## ARM File Format
+![arm format](./images/arm_spec.png)  
+
+
 **TODO List**
 
 - Proper documentation for the lib crate
@@ -60,3 +92,47 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 # Testing
 
 Tested on linux (WSL) and Windows with the Steam version of PoE 1, and rolling latest patch from the CDN for PoE 2.
+
+# Resources
+https://gitlab.com/zao/poe-rs
+https://gitlab.com/zao/poe-rs/blob/master/spec/arm.md
+
+```
+.act = Actor, UCS-2 plain
+.ais = AI Script, UCS-2 plain
+.amd = Animated Meta Data, UCS-2 plain
+.ao = Animated Object, UCS-2 plain
+.aoc = Animated Object Controller, UCS-2 plain
+.arm = Rooms, UCS-2 plain
+.ast = Skeleton, Binary
+.bank = FMOD Sound Bank, Binary
+.bk2 = Bink Video, Binary
+.cht = Chest Data, UCS-2 plain
+.dat = Game Data
+.dat64 = Game Data 64bits
+.dds = Texture, brotli compress or soft link
+.ddt = Doodads, UCS-2 plain
+.dlp = Doodads, UCS-2 plain
+.dgr = Digital Graph Document, UCS-2 plain
+.env = Environments, UCS-2 plain
+.filter = Loot Filter, UTF-8
+.ffx = FFX Render, UCS-2 plain
+.fx = Shader, Ascii
+.gm = Grandmaster, Binary
+.gt = Ground Types, UCS-2 plain
+.hlsl = Shader, Ascii
+.mat = Material, UCS-2 plain
+.ogg = Digital Multimedia, Binary
+.ot = Object Type, UCS-2 plain
+.otc = Object Type Codes, UCS-2 plain
+.pet = Particle Effect, Binary
+.pjd = Passive Jewel Data, Binary
+.psg = Passive Skill Graphic, Binary
+.rs = Room Set, UCS-2 plain
+.sm = Skin Mesh, UCS-2 plain
+.smd = Skin Mesh Data, binary
+.spritefont = Raster Font Data, Binary
+.tgt = Tile Group, UCS-2 plain
+.txt = Text, UCS-2 plain
+.ui = User Interface, UCS-2 plain
+```

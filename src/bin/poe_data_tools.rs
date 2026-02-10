@@ -1,16 +1,16 @@
 use std::path::PathBuf;
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use clap::{ArgGroup, Parser, Subcommand};
 use glob::Pattern;
 use poe_data_tools::{
+    VERBOSE,
     bundle_fs::FS,
     bundle_loader::cdn_base_url,
     commands::{
-        cat::cat_file, dump_art::extract_art, dump_tables::dump_tables, dump_trees::dump_trees,
-        extract::extract_files, list::list_files, Patch,
+        Patch, cat::cat_file, dump_art::extract_art, dump_tables::dump_tables,
+        dump_trees::dump_trees, extract::extract_files, list::list_files, translate::translate,
     },
-    VERBOSE,
 };
 
 #[derive(Debug, Subcommand)]
@@ -60,6 +60,15 @@ enum Command {
 
         /// Glob patterns to filter the list of files
         #[clap(default_value = "**/*.psg")]
+        #[arg(num_args = 1..)]
+        globs: Vec<Pattern>,
+    },
+    /// Extracts files into more accessible formats
+    Translate {
+        output_folder: PathBuf,
+
+        /// Glob patterns to filter the list of files
+        #[clap(default_value = "**/*")]
         #[arg(num_args = 1..)]
         globs: Vec<Pattern>,
     },
@@ -198,6 +207,19 @@ fn main() -> Result<()> {
                 &args.cache_dir,
             )
             .context("Dump Tree command failed")?;
+        }
+        Command::Translate {
+            output_folder,
+            globs,
+        } => {
+            translate(
+                &mut fs,
+                &globs,
+                &args.cache_dir,
+                &output_folder,
+                &args.patch,
+            )
+            .context("Translate command failed")?;
         }
     }
 
