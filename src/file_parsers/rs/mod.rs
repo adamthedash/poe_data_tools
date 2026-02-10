@@ -2,7 +2,7 @@ pub mod types;
 
 use anyhow::{Result, anyhow};
 use nom::{
-    character::complete::{space1, u32 as U},
+    character::complete::{space0, space1, u32 as U},
     combinator::{all_consuming, opt},
     multi::many0,
     sequence::{preceded, terminated},
@@ -40,7 +40,7 @@ fn parse_rs_str(contents: &str) -> LResult<RSFile> {
     let (lines, version) = version_line()(&lines)?;
 
     let line_parser = |line| {
-        let (line, weight) = opt(terminated(U, space1))(line)?;
+        let (line, weight) = opt(terminated(U, space0))(line)?;
 
         let (line, arm_file) = quoted_str(line)?;
 

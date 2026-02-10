@@ -28,7 +28,7 @@ fn parse_ecf_str(contents: &str) -> LResult<EcfFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
-        .filter(|l| !l.is_empty())
+        .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
 
     let (lines, version) = version_line()(&lines)?;

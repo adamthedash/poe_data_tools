@@ -78,7 +78,7 @@ fn parse_gft_str(contents: &str) -> LResult<GFTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
-        .filter(|l| !l.is_empty())
+        .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
 
     let (lines, version) = version_line()(&lines)?;
