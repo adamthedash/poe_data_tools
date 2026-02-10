@@ -71,6 +71,15 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ## GT File Format
 ![gt format](./images/gt_spec.png)  
 
+## GFT File Format
+![gft format](./images/gft_spec.png)  
+
+## DDT File Format
+![ddt format](./images/ddt_spec.png)  
+
+## AO File Format
+![ao format](./images/ao_spec.png)  
+
 ## ARM File Format
 ![arm format](./images/arm_spec.png)  
 

@@ -1,6 +1,6 @@
 use anyhow::{Context, bail};
 use nom::{
-    IResult, Parser,
+    IResult, InputTakeAtPosition, Parser,
     bytes::complete::{tag, take_till1, take_until},
     character::complete::{char as C, u32 as U},
     combinator::verify,
@@ -43,8 +43,27 @@ pub fn safe_u32(line: &str) -> IResult<&str, u32> {
     Ok((line, uint))
 }
 
+/// " \t\r\n" - at least 1
+pub fn space_or_nl1(input: &str) -> IResult<&str, &str> {
+    input.split_at_position1_complete(
+        |c| !(c == ' ' || c == '\t' || c == '\r' || c == '\n'),
+        nom::error::ErrorKind::Space,
+    )
+}
+
+/// " \t\r\n" - 0 or more
+pub fn space_or_nl0(input: &str) -> IResult<&str, &str> {
+    input.split_at_position_complete(|c| !(c == ' ' || c == '\t' || c == '\r' || c == '\n'))
+}
+
 pub fn quoted_str(input: &str) -> IResult<&str, String> {
     delimited(C('"'), take_until("\""), C('"'))
+        .map(String::from)
+        .parse(input)
+}
+
+pub fn single_quoted_str(input: &str) -> IResult<&str, String> {
+    delimited(C('\''), take_until("'"), C('\''))
         .map(String::from)
         .parse(input)
 }
