@@ -1,18 +1,18 @@
 use std::{any::type_name, collections::HashMap, path::Path};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use arrow_array::{
-    cast::AsArray,
-    types::{Int32Type, UInt16Type, UInt64Type},
     ArrowPrimitiveType, BooleanArray, GenericListArray, GenericStringArray, PrimitiveArray,
     RecordBatch,
+    cast::AsArray,
+    types::{Int32Type, UInt16Type, UInt64Type},
 };
 use itertools::izip;
 use serde::Serialize;
 
 use crate::{
     bundle_fs::FS,
-    commands::{dump_tables::load_parsed_table, Patch},
+    commands::{Patch, dump_tables::load_parsed_table},
     dat::ivy_schema::fetch_schema,
 };
 
@@ -181,15 +181,12 @@ pub fn load_passive_info(
     // Stats
 
     let stat_ids = passive_table.get_column_as_list("Stats")?.iter().map(|s| {
-        let stat_ids = s
-            .expect("Stats list is null")
+        s.expect("Stats list is null")
             .as_primitive_opt::<UInt64Type>()
             .expect("Couldn't cast stats list to u64")
             .into_iter()
             .map(|x| x.expect("Stat ID value is null"))
-            .collect::<Vec<_>>();
-
-        stat_ids
+            .collect::<Vec<_>>()
     });
 
     let stat_values = (1..=5)
@@ -242,8 +239,7 @@ pub fn load_passive_info(
         .get_column_as_list("ReminderStrings")?
         .iter()
         .map(|s| {
-            let text_ids = s
-                .expect("Reminder text list is null")
+            s.expect("Reminder text list is null")
                 .as_primitive_opt::<UInt64Type>()
                 .expect("Couldn't cast stats list to u64")
                 .into_iter()
@@ -255,9 +251,7 @@ pub fn load_passive_info(
                         .unwrap()
                         .to_string()
                 })
-                .collect::<Vec<_>>();
-
-            text_ids
+                .collect::<Vec<_>>()
         });
 
     let passive_skills = izip!(

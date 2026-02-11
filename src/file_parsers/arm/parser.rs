@@ -1,24 +1,25 @@
 use itertools::{Itertools, izip};
 use nom::{
-    IResult, Parser,
+    Parser,
     branch::alt,
     bytes::complete::{is_not, tag},
     character::complete::{char as C, i32 as I, space0, space1, u32 as U},
-    combinator::{self, all_consuming, rest},
+    combinator::{all_consuming, cond, opt, rest, verify},
     multi::{count, length_count, separated_list1},
     number::complete::float as F,
-    sequence::{Tuple, preceded as P, separated_pair, terminated as T},
+    sequence::{preceded as P, separated_pair, terminated as T},
 };
 
-use super::{
-    super::line_parser::{
-        MultilineParser, length_prefixed, nom_adapter, repeated, single_line, terminated,
-    },
-    types::*,
-};
+use super::types::*;
 use crate::file_parsers::{
     FileParser,
-    shared::{parse_bool, quoted_str, unquoted_str, utf16_bom_to_string, version_line},
+    line_parser::{
+        MultilineParser, NomParser, Result as LResult, length_prefixed, nom_adapter, optional,
+        repeated, single_line, terminated,
+    },
+    shared::{
+        parse_bool, quoted_str, separated_array, unquoted_str, utf16_bom_to_string, version_line,
+    },
 };
 
 /// Either length-prefixed or "-1"-terminated depending on version
@@ -39,30 +40,12 @@ fn string_section<'a>() -> impl MultilineParser<'a, Vec<String>> {
 }
 
 fn dimensions<'a>(version: u32) -> impl MultilineParser<'a, Dimension> {
-    let parser = move |line| -> IResult<&str, Dimension> {
-        let (line, side_length) = U(line)?;
-
-        let line = match version {
-            ..31 => {
-                let (line, _) = P(space1, U)(line)?;
-                line
-            }
-            31.. => line,
-        };
-
-        let (line, uint1) = match version {
-            ..22 => (line, None),
-            22.. => {
-                let (line, bool1) = P(space1, U)(line)?;
-
-                (line, Some(bool1))
-            }
-        };
-
-        let dimension = Dimension { side_length, uint1 };
-
-        Ok((line, dimension))
-    };
+    let parser = (
+        U,
+        cond(version < 31, P(space1, U)),
+        cond(version >= 22, P(space1, U)),
+    )
+        .map(|(side_length, _duplicate_side_length, uint1)| Dimension { side_length, uint1 });
 
     single_line(nom_adapter(parser))
 }
@@ -73,68 +56,73 @@ fn uints<'a>() -> impl MultilineParser<'a, Vec<u32>> {
 }
 
 /// "k" followed by 23-24 numbers
-fn slot_k<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, SlotK> {
-    let (input, _letter) = T(C('k'), C(' '))(input)?;
-
-    let (input, grid_dims) = count(T(U, C(' ')), 2)(input)?;
-
-    let (input, edges) = count(T(U, C(' ')), 4)(input)?;
-
-    let (input, exits) = count(T(U, C(' ')), 8)(input)?;
-
-    let (input, corner_grounds) = count(T(U, C(' ')), 4)(input)?;
-
-    let (input, corner_heights) = count(T(I, C(' ')), 4)(input)?;
-
-    let (input, slot_tag) = U(input)?;
-
-    let (input, origin_dir) = combinator::opt(P(C(' '), U))(input)?;
-
-    let edges = izip!(
-        Direction::cardinal().into_iter(),
-        edges,
-        exits.into_iter().tuples(),
+fn slot_k<'a>(strings: &[String]) -> impl NomParser<'a, SlotK> {
+    (
+        tag("k"),
+        P(space1, separated_array::<2, _, _, _>(space1, U)),
+        P(space1, separated_array::<4, _, _, _>(space1, U)),
+        P(space1, separated_array::<8, _, _, _>(space1, U)),
+        P(space1, separated_array::<4, _, _, _>(space1, U)),
+        P(space1, separated_array::<4, _, _, _>(space1, I)),
+        P(space1, U),
+        opt(P(C(' '), U)),
     )
-    .map(|(direction, edge, (exit, virtual_exit))| Edge {
-        direction,
-        // 0 -> None,
-        // i -> Some(i - 1)
-        edge: (edge > 0).then(|| strings[(edge - 1) as usize].clone()),
-        exit,
-        virtual_exit,
-    })
-    .collect::<Vec<_>>()
-    .try_into()
-    .expect("Parser should take care of counts");
+        .map(
+            |(
+                _letter,
+                grid_dims,
+                edges,
+                exits,
+                corner_grounds,
+                corner_heights,
+                slot_tag,
+                origin_dir,
+            )| {
+                let edges = izip!(
+                    Direction::cardinal().into_iter(),
+                    edges,
+                    exits.into_iter().tuples(),
+                )
+                .map(|(direction, edge, (exit, virtual_exit))| Edge {
+                    direction,
+                    // 0 -> None,
+                    // i -> Some(i - 1)
+                    edge: (edge > 0).then(|| strings[(edge - 1) as usize].clone()),
+                    exit,
+                    virtual_exit,
+                })
+                .collect::<Vec<_>>()
+                .try_into()
+                .expect("Parser should take care of counts");
 
-    let corners = izip!(
-        Direction::diagonals().into_iter(),
-        corner_grounds,
-        corner_heights,
-    )
-    .map(|(direction, ground, height)| Corner {
-        direction,
-        ground: (ground > 0).then(|| strings[ground as usize - 1].clone()),
-        height,
-    })
-    .collect::<Vec<_>>()
-    .try_into()
-    .expect("Parser should take care of counts");
+                let corners = izip!(
+                    Direction::diagonals().into_iter(),
+                    corner_grounds,
+                    corner_heights,
+                )
+                .map(|(direction, ground, height)| Corner {
+                    direction,
+                    ground: (ground > 0).then(|| strings[ground as usize - 1].clone()),
+                    height,
+                })
+                .collect::<Vec<_>>()
+                .try_into()
+                .expect("Parser should take care of counts");
 
-    let slot = SlotK {
-        width: grid_dims[0],
-        height: grid_dims[1],
-        edges,
-        corners,
-        slot_tag: (slot_tag > 0).then(|| strings[slot_tag as usize - 1].clone()),
-        origin: Direction::diagonals()[origin_dir.unwrap_or(0) as usize],
-    };
-
-    Ok((input, slot))
+                SlotK {
+                    width: grid_dims[0],
+                    height: grid_dims[1],
+                    edges,
+                    corners,
+                    slot_tag: (slot_tag > 0).then(|| strings[slot_tag as usize - 1].clone()),
+                    origin: Direction::diagonals()[origin_dir.unwrap_or(0) as usize],
+                }
+            },
+        )
 }
 
 /// k, f, s, o, n slots
-fn parse_slot<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, Slot> {
+fn slot<'a>(strings: &[String]) -> impl NomParser<'a, Slot> {
     alt((
         C('n').map(|_| Slot::N),
         C('s').map(|_| Slot::S),
@@ -142,48 +130,51 @@ fn parse_slot<'a>(input: &'a str, strings: &[String]) -> IResult<&'a str, Slot> 
         P(tag("f "), U).map(|i| Slot::F {
             fill: (i > 0).then(|| strings[i as usize - 1].clone()),
         }),
-        (|input| slot_k(input, strings)).map(Slot::K),
-    ))(input)
+        slot_k(strings).map(Slot::K),
+    ))
 }
 
 fn root_slot<'a>(strings: &'a [String]) -> impl MultilineParser<'a, Slot> {
-    single_line(nom_adapter(|line| parse_slot(line, strings)))
+    single_line(nom_adapter(slot(strings)))
 }
 
 /// Grid of Slots
 fn grid<'a>(
     height: usize,
-    _width: usize,
+    width: usize,
     strings: &'a [String],
 ) -> impl MultilineParser<'a, Vec<Vec<Slot>>> {
-    let row_parser = single_line(nom_adapter(separated_list1(C(' '), |l| {
-        parse_slot(l, strings)
-    })));
+    let line_parser = verify(
+        separated_list1(C(' '), slot(strings)),
+        move |row: &Vec<_>| {
+            let pass = row.len() == width;
+            if !pass {
+                println!("grid fail");
+            }
+            pass
+        },
+    );
+
+    let row_parser = single_line(nom_adapter(line_parser));
 
     repeated(row_parser, height)
 }
 
 /// Single PoI line - 3 uints & a string
 fn poi<'a>() -> impl MultilineParser<'a, PoI> {
-    let line_parser = |line| -> IResult<&str, PoI> {
-        let (line, (x, y, rotation, tag)) = (
-            U,
-            P(space1, U),
-            P(space1, F),
-            // TODO: Remove \u0000 chars from this
-            P(space1, quoted_str),
-        )
-            .parse(line)?;
-
-        let poi = PoI {
+    let line_parser = (
+        U,
+        P(space1, U),
+        P(space1, F),
+        // TODO: Remove \u0000 chars from this
+        P(space1, quoted_str),
+    )
+        .map(|(x, y, rotation, tag)| PoI {
             x,
             y,
             rotation,
             tag,
-        };
-
-        Ok((line, poi))
-    };
+        });
 
     single_line(nom_adapter(line_parser))
 }
@@ -204,176 +195,122 @@ fn poi_groups<'a>(version: u32) -> impl MultilineParser<'a, Vec<Vec<PoI>>> {
 
 /// Single doodad string
 fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
-    let parser = for<'b> move |line: &'b str| -> IResult<&'b str, Doodad> {
-        let (line, x) = U(line)?;
-        let (line, _) = space1(line)?;
-
-        let (line, y) = U(line)?;
-        let (line, _) = space1(line)?;
-
-        let (line, float_pairs) = match version {
-            ..34 => (line, None),
-            34.. => {
-                let (line, count1) = U(line)?;
-                let (line, _) = space1(line)?;
-
-                let (line, pairs) =
-                    count(T(separated_pair(F, space1, F), space1), count1 as usize)(line)?;
-
-                (line, Some(pairs))
-            }
-        };
-
-        let (line, radians1) = F(line)?;
-        let (line, _) = space1(line)?;
-
-        let (line, (trig1, trig2, trig3, trig4)) = match version {
-            ..18 => (line, (None, None, None, None)),
-            18.. => {
-                let (line, radians2) = F(line)?;
-                let (line, _) = space1(line)?;
-
-                let (line, radians3) = F(line)?;
-                let (line, _) = space1(line)?;
-
-                let (line, radians4) = F(line)?;
-                let (line, _) = space1(line)?;
-
-                let (line, radians5) = F(line)?;
-                let (line, _) = space1(line)?;
-
-                (
-                    line,
-                    (
-                        Some(radians2),
-                        Some(radians3),
-                        Some(radians4),
-                        Some(radians5),
-                    ),
-                )
-            }
-        };
-
-        let (line, bool1) = parse_bool(line)?;
-        let (line, _) = space1(line)?;
-
-        let (line, bool2) = match version {
-            ..25 => (line, None),
-            25.. => {
-                let (line, bool2) = parse_bool(line)?;
-                let (line, _) = space1(line)?;
-
-                (line, Some(bool2))
-            }
-        };
-
-        let (line, count1) = U(line)?;
-        let (line, _) = space1(line)?;
-
-        let (line, floats) = count(T(F, space1), count1 as usize)(line)?;
-
-        let (line, scale) = F(line)?;
-        let (line, _) = space1(line)?;
-
-        let (line, ao_file) = quoted_str(line)?;
-        let (line, _) = space1(line)?;
-
-        let (line, stub) = quoted_str(line)?;
-
-        let (line, key_values) = match version {
-            ..36 => (line, None),
-            36.. => {
-                let (line, _) = space1(line)?;
-                let (line, count1) = U(line)?;
-
-                let (line, key_values) = count(
+    let line_parser = (
+        U,
+        P(space1, U),
+        cond(
+            version >= 34,
+            P(space1, length_count(U, (P(space1, F), P(space1, F)))),
+        ),
+        P(space1, F),
+        cond(
+            version >= 18,
+            P(space1, separated_array::<4, _, _, _>(space1, F)),
+        ),
+        P(space1, parse_bool),
+        cond(version >= 25, P(space1, parse_bool)),
+        P(space1, length_count(U, P(space1, F))),
+        P(space1, F),
+        P(space1, quoted_str),
+        P(space1, quoted_str),
+        cond(
+            version >= 36,
+            P(
+                space1,
+                length_count(
+                    U,
                     P(space1, separated_pair(is_not("="), C('='), is_not(" "))),
-                    count1 as usize,
-                )(line)?;
+                ),
+            ),
+        ),
+    )
+        .map(
+            |(
+                x,
+                y,
+                float_pairs,
+                radians1,
+                trigs,
+                bool1,
+                bool2,
+                floats,
+                scale,
+                ao_file,
+                stub,
+                key_values,
+            )| {
+                let [trig1, trig2, trig3, trig4] = if let Some(trigs) = trigs {
+                    trigs.map(Some)
+                } else {
+                    [None; _]
+                };
 
-                let key_values = key_values
-                    .into_iter()
-                    .map(|(k, v)| (k.to_string(), v.to_string()))
-                    .collect();
+                let key_values = key_values.map(|key_values| {
+                    key_values
+                        .into_iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect()
+                });
 
-                (line, Some(key_values))
-            }
-        };
+                Doodad {
+                    x,
+                    y,
+                    float_pairs,
+                    radians1,
+                    trig1,
+                    trig2,
+                    trig3,
+                    trig4,
+                    bool1,
+                    bool2,
+                    floats,
+                    scale,
+                    ao_file,
+                    stub,
+                    key_values,
+                }
+            },
+        );
 
-        let doodad = Doodad {
-            x,
-            y,
-            float_pairs,
-            radians1,
-            trig1,
-            trig2,
-            trig3,
-            trig4,
-            bool1,
-            bool2,
-            floats,
-            scale,
-            ao_file,
-            stub,
-            key_values,
-        };
-
-        Ok((line, doodad))
-    };
-
-    single_line(nom_adapter(parser))
+    single_line(nom_adapter(line_parser))
 }
 
 fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<DoodadConnection>> {
-    let doodad_connection = single_line(nom_adapter(count(T(U, space1), 2).and(quoted_str).map(
-        |(nums, tag)| DoodadConnection {
-            from: nums[0],
-            to: nums[1],
-            tag,
-        },
-    )));
+    let line_parser = (
+        U, //
+        P(space1, U),
+        P(space1, quoted_str),
+    )
+        .map(|(from, to, tag)| DoodadConnection { from, to, tag });
 
-    group(version, doodad_connection)
+    let connection_parser = single_line(nom_adapter(line_parser));
+
+    group(version, connection_parser)
 }
 
 /// Decale on a line
 fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
-    let parser = move |line| -> IResult<&str, Decal> {
-        let (line, floats) = count(T(F, space1), 3)(line)?;
-
-        let (line, bool1) = match version {
-            ..17 => (line, None),
-            17.. => {
-                let (line, uint1) = T(parse_bool, space1)(line)?;
-                (line, Some(uint1))
-            }
-        };
-
-        let (line, scale) = T(F, space1)(line)?;
-
-        let (line, atlas_file) = T(quoted_str, space1)(line)?;
-
-        let (line, tag) = quoted_str(line)?;
-
-        let decal = Decal {
-            x: floats[0],
-            y: floats[1],
-            rotation: floats[2],
+    let line_parser = (
+        separated_array::<3, _, _, _>(space1, F),
+        cond(version >= 17, P(space1, parse_bool)),
+        P(space1, F),
+        P(space1, quoted_str),
+        P(space1, quoted_str),
+    )
+        .map(|([x, y, rotation], bool1, scale, atlas_file, tag)| Decal {
+            x,
+            y,
+            rotation,
             bool1,
             scale,
             atlas_file,
             tag,
-        };
+        });
 
-        Ok((line, decal))
-    };
-
-    single_line(nom_adapter(parser))
+    single_line(nom_adapter(line_parser))
 }
 
-fn boss_lines<'a>(
-    lines: &'a [&'a str],
-) -> super::super::line_parser::Result<(Vec<&'a str>, Vec<Vec<String>>)> {
+fn boss_lines<'a>(lines: &'a [&'a str]) -> LResult<(Vec<&'a str>, Vec<Vec<String>>)> {
     // NOTE: Boss string line is often not properly ended with a newline, causing the next
     // line to be appended on the end instead. We're accounting for this by cropping off
     // the end and prepending it to our list of lines
@@ -405,40 +342,41 @@ fn boss_lines<'a>(
 }
 
 fn zone<'a>(version: u32) -> impl MultilineParser<'a, Zone> {
-    let parser = move |line| -> IResult<&str, Zone> {
-        let (line, name) = match version {
-            ..35 => unquoted_str(line)?,
-            35.. => quoted_str(line)?,
-        };
+    let line_parser = (
+        move |line| match version {
+            ..35 => unquoted_str(line),
+            35.. => quoted_str(line),
+        },
+        P(space1, separated_array::<4, _, _, _>(space1, I)),
+        cond(
+            version >= 35,
+            (
+                P(space1, quoted_str), //
+                P(space1, quoted_str),
+                P(space1, U),
+            ),
+        ),
+    )
+        .map(|(name, [x_min, y_min, x_max, y_max], optionals)| {
+            let (disable_teleports, env_file, uint1) = if let Some((d, e, u)) = optionals {
+                (Some(d), Some(e), Some(u))
+            } else {
+                (None, None, None)
+            };
 
-        let (line, bbox) = count(P(space1, I), 4)(line)?;
-
-        let (line, string1, env_file, uint1) = match version {
-            ..35 => (line, None, None, None),
-            35.. => {
-                let (line, string1) = P(space1, quoted_str)(line)?;
-                let (line, env_file) = P(space1, quoted_str)(line)?;
-                let (line, uint1) = P(space1, U)(line)?;
-
-                (line, Some(string1), Some(env_file), Some(uint1))
+            Zone {
+                name,
+                x_min,
+                y_min,
+                x_max,
+                y_max,
+                disable_teleports,
+                env_file,
+                uint1,
             }
-        };
+        });
 
-        let zone = Zone {
-            name,
-            x_min: bbox[0],
-            y_min: bbox[1],
-            x_max: bbox[2],
-            y_max: bbox[3],
-            disable_teleports: string1,
-            env_file,
-            uint1,
-        };
-
-        Ok((line, zone))
-    };
-
-    single_line(nom_adapter(parser))
+    single_line(nom_adapter(line_parser))
 }
 
 fn zones<'a>(version: u32) -> impl MultilineParser<'a, Vec<Zone>> {
@@ -454,11 +392,11 @@ fn zones<'a>(version: u32) -> impl MultilineParser<'a, Vec<Zone>> {
 }
 
 fn tags<'a>() -> impl MultilineParser<'a, Option<Vec<String>>> {
-    |lines| {
+    let mut line_parser = opt(all_consuming(length_count(U, P(space1, unquoted_str))));
+
+    move |lines| {
         if let Some(&first) = lines.first() {
-            let mut line_parser =
-                combinator::opt(all_consuming(length_count(U, P(space1, unquoted_str))));
-            let (_, tags) = line_parser(first)?;
+            let (_, tags) = line_parser.parse_complete(first)?;
 
             // Crop off last line if successful
             let lines = if tags.is_some() { &lines[1..] } else { lines };
@@ -473,69 +411,54 @@ fn tags<'a>() -> impl MultilineParser<'a, Option<Vec<String>>> {
 /// Line of space separated uints, sometimes with a space a the end
 fn ground_overrides<'a>(
     strings: &[String],
-    _grid_height: usize,
+    grid_height: usize,
     grid_width: usize,
 ) -> impl MultilineParser<'a, Option<Vec<Vec<Option<String>>>>> {
-    move |lines| {
-        let (lines, trailing) = if let Some(&last) = lines.first() {
-            let mut line_parser = combinator::opt(all_consuming(T(
-                separated_list1(
-                    space1::<_, nom::error::Error<_>>,
-                    U.map(|i| (i > 0).then(|| strings[i as usize - 1].clone())),
-                )
-                .map(|list| {
-                    // Chunk into 2D grid
-                    list.into_iter()
-                        .chunks(grid_width - 1)
-                        .into_iter()
-                        .map(|c| c.collect::<Vec<_>>())
-                        .collect::<Vec<_>>()
-                }),
-                space0,
-            )));
-            let (_, trailing_nums) = line_parser(last)?;
+    let line_parser = T(
+        verify(separated_list1(space1, U), move |items: &Vec<_>| {
+            items.len() == (grid_height - 1) * (grid_width - 1)
+        }),
+        space0,
+    );
 
-            // Crop off last line if successful
-            let lines = if trailing_nums.is_some() {
-                &lines[1..]
-            } else {
-                lines
-            };
+    let line_parser = line_parser.map(move |indices| {
+        // Chunk into 2D grid
+        indices
+            .into_iter()
+            .chunks(grid_width - 1)
+            .into_iter()
+            .map(|c| {
+                c.map(|i| (i > 0).then(|| strings[i as usize - 1].clone()))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
+    });
 
-            (lines, trailing_nums)
-        } else {
-            (lines, None)
-        };
-
-        Ok((lines, trailing))
-    }
+    optional(single_line(nom_adapter(line_parser)))
 }
 
 fn thingy<'a>(strings: &[String]) -> impl MultilineParser<'a, Thingy> {
-    let parser = |line| -> IResult<&str, Thingy> {
-        let (line, index) = U(line)?;
+    let line_parser = (
+        U, //
+        P(space1, I),
+        count(opt(P(space1, parse_bool)), 3),
+    )
+        .map(|(i, int, bools)| {
+            let et_file = (i > 0).then(|| strings[i as usize - 1].clone());
 
-        let et_file = (index > 0).then(|| strings[index as usize - 1].clone());
+            Thingy {
+                et_file,
+                int,
+                bool1: bools[0],
+                bool2: bools[1],
+                bool3: bools[2],
+            }
+        });
 
-        let (line, int) = P(space1, I)(line)?;
-
-        let (line, bools) = count(combinator::opt(P(space1, parse_bool)), 3)(line)?;
-
-        let thingy = Thingy {
-            et_file,
-            int,
-            bool1: bools[0],
-            bool2: bools[1],
-            bool3: bools[2],
-        };
-
-        Ok((line, thingy))
-    };
-
-    single_line(nom_adapter(parser))
+    single_line(nom_adapter(line_parser))
 }
 
-fn parse_arm_str(input: &str) -> super::super::line_parser::Result<(Vec<String>, Arm)> {
+fn parse_arm_str(input: &str) -> LResult<Arm> {
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
 
     let (lines, version) = version_line()(&lines)?;
@@ -632,10 +555,7 @@ fn parse_arm_str(input: &str) -> super::super::line_parser::Result<(Vec<String>,
         ground_overrides,
     };
 
-    // TODO: Return &str once we figure out lifetimes
-    let lines = lines.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-
-    Ok((lines, map))
+    Ok(map)
 }
 
 pub struct ARMParser;
@@ -646,8 +566,8 @@ impl FileParser for ARMParser {
     fn parse(&self, bytes: &[u8]) -> anyhow::Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        let (_, arm) = parse_arm_str(&contents)
-            .map_err(|e| anyhow::anyhow!("Failed to parse map file: {:?}", e))?;
+        let arm = parse_arm_str(&contents)
+            .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
 
         Ok(arm)
     }

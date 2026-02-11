@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use nom::{
-    multi::count,
+    IResult, Parser,
+    multi::length_count,
     number::complete::{le_f32, le_i32, le_u32, le_u64, u8},
-    IResult,
 };
 use serde::Serialize;
 
@@ -64,21 +64,20 @@ impl Passive {
         input: &[u8],
         connection_parser: fn(&[u8]) -> IResult<&[u8], Connection>,
     ) -> IResult<&[u8], Self> {
-        let (input, id) = le_u32(input)?;
-        let (input, radius) = le_i32(input)?;
-        let (input, position) = le_u32(input)?;
+        let mut parser = (
+            le_u32,
+            le_i32,
+            le_u32,
+            length_count(le_u32, connection_parser),
+        )
+            .map(|(id, orbit, orbit_position, connections)| Passive {
+                id,
+                orbit,
+                orbit_position,
+                connections,
+            });
 
-        let (input, num_connections) = le_u32(input)?;
-        let (input, connections) = count(connection_parser, num_connections as usize)(input)?;
-
-        let passive = Passive {
-            id,
-            orbit: radius,
-            orbit_position: position,
-            connections,
-        };
-
-        Ok((input, passive))
+        parser.parse_complete(input)
     }
 }
 
@@ -106,25 +105,24 @@ impl Group {
         input: &[u8],
         passive_parser: fn(&[u8]) -> IResult<&[u8], Passive>,
     ) -> IResult<&[u8], Self> {
-        let (input, x) = le_f32(input)?;
-        let (input, y) = le_f32(input)?;
-        let (input, flags) = le_u32(input)?;
-        let (input, unk1) = le_u32(input)?;
-        let (input, unk2) = u8(input)?;
+        let mut parser = (
+            le_f32,
+            le_f32,
+            le_u32,
+            le_u32,
+            u8,
+            length_count(le_u32, passive_parser),
+        )
+            .map(|(x, y, flags, unk1, unk2, passives)| Group {
+                x,
+                y,
+                flags,
+                unk1,
+                unk2,
+                passives,
+            });
 
-        let (input, num_passives) = le_u32(input)?;
-        let (input, passives) = count(passive_parser, num_passives as usize)(input)?;
-
-        let group = Group {
-            x,
-            y,
-            flags,
-            unk1,
-            unk2,
-            passives,
-        };
-
-        Ok((input, group))
+        parser.parse_complete(input)
     }
 }
 
@@ -156,31 +154,26 @@ impl PassiveSkillGraph {
         passive_parser: fn(&[u8]) -> IResult<&[u8], Passive>,
         passive_id_parser: fn(&[u8]) -> IResult<&[u8], u64>,
     ) -> IResult<&[u8], Self> {
-        let (input, version) = u8(input)?;
-        assert_eq!(version, 3, "Only PSG version 3 supported.");
+        let mut parser = (
+            u8,
+            u8,
+            length_count(u8, u8),
+            length_count(le_u32, passive_id_parser),
+            length_count(le_u32, |x| Group::parse(x, passive_parser)),
+        )
+            .map(
+                |(version, graph_type, passives_per_orbit, root_passives, groups)| {
+                    PassiveSkillGraph {
+                        version,
+                        root_passives,
+                        groups,
+                        graph_type,
+                        passives_per_orbit,
+                        passive_info: None,
+                    }
+                },
+            );
 
-        let (input, graph_type) = u8(input)?;
-
-        let (input, num_orbits) = u8(input)?;
-        let (input, skills_per_orbit) = count(u8, num_orbits as usize)(input)?;
-
-        let (input, num_passives) = le_u32(input)?;
-        let (input, passives) = count(passive_id_parser, num_passives as usize)(input)?;
-
-        let (input, num_groups) = le_u32(input)?;
-
-        let (input, groups) =
-            count(|x| Group::parse(x, passive_parser), num_groups as usize)(input)?;
-
-        let psg = PassiveSkillGraph {
-            version,
-            root_passives: passives,
-            groups,
-            graph_type,
-            passives_per_orbit: skills_per_orbit,
-            passive_info: None,
-        };
-
-        Ok((input, psg))
+        parser.parse_complete(input)
     }
 }

@@ -6,9 +6,9 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use bytes::Bytes;
-use nom::{bytes::complete::take, multi::count, number::complete::le_u8, IResult};
+use nom::{IResult, Parser, bytes::complete::take, multi::count, number::complete::le_u8};
 use reqwest::blocking::Client;
 use url::Url;
 
@@ -98,7 +98,7 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
 fn parse_response(input: &[u8]) -> IResult<&[u8], Vec<String>> {
     let (input, num_strings) = le_u8(input)?; // Parse the number of strings (N)
     let (input, _) = take(33usize)(input)?; // Discard the next 33 bytes (padding)
-    count(parse_utf16_string, num_strings as usize)(input) // Parse N strings
+    count(parse_utf16_string, num_strings as usize).parse_complete(input) // Parse N strings
 }
 
 fn parse_utf16_string(input: &[u8]) -> IResult<&[u8], String> {

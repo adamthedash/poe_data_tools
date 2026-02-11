@@ -1,13 +1,13 @@
 use std::path::Path;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use bytes::Bytes;
 use nom::{
+    IResult, Parser,
     bytes::complete::take,
     combinator::rest,
-    multi::count,
+    multi::length_count,
     number::complete::{le_u32, le_u64},
-    IResult,
 };
 use url::Url;
 
@@ -66,8 +66,7 @@ fn parse_bundle_info(input: &[u8]) -> IResult<&[u8], BundleInfo> {
 
 // Parser for a vector of Bundles
 fn parse_bundles(input: &[u8]) -> IResult<&[u8], Vec<BundleInfo>> {
-    let (input, bundle_count) = le_u32(input)?;
-    count(parse_bundle_info, bundle_count as usize)(input)
+    length_count(le_u32, parse_bundle_info).parse_complete(input)
 }
 
 // Parser for a FileInfo
@@ -89,8 +88,7 @@ fn parse_file_info(input: &[u8]) -> IResult<&[u8], FileInfo> {
 
 // Parser for a vector of FileInfo
 fn parse_file_infos(input: &[u8]) -> IResult<&[u8], Vec<FileInfo>> {
-    let (input, file_count) = le_u32(input)?;
-    count(parse_file_info, file_count as usize)(input)
+    length_count(le_u32, parse_file_info).parse_complete(input)
 }
 
 // Parser for a PathRep
@@ -112,8 +110,7 @@ fn parse_path_rep(input: &[u8]) -> IResult<&[u8], PathRep> {
 
 // Parser for a vector of PathRep
 fn parse_path_reps(input: &[u8]) -> IResult<&[u8], Vec<PathRep>> {
-    let (input, path_count) = le_u32(input)?;
-    count(parse_path_rep, path_count as usize)(input)
+    length_count(le_u32, parse_path_rep).parse_complete(input)
 }
 
 // Parser for the entire BundleIndex

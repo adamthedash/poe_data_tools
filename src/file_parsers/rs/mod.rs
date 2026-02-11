@@ -2,6 +2,7 @@ pub mod types;
 
 use anyhow::{Result, anyhow};
 use nom::{
+    Parser,
     character::complete::{space0, space1, u32 as U},
     combinator::{all_consuming, opt},
     multi::many0,
@@ -39,21 +40,16 @@ fn parse_rs_str(contents: &str) -> LResult<RSFile> {
 
     let (lines, version) = version_line()(&lines)?;
 
-    let line_parser = |line| {
-        let (line, weight) = opt(terminated(U, space0))(line)?;
-
-        let (line, arm_file) = quoted_str(line)?;
-
-        let (line, rotations) = all_consuming(many0(preceded(space1, unquoted_str)))(line)?;
-
-        let room = Room {
+    let line_parser = (
+        opt(terminated(U, space0)),
+        quoted_str,
+        all_consuming(many0(preceded(space1, unquoted_str))),
+    )
+        .map(|(weight, arm_file, rotations)| Room {
             weight,
             arm_file,
             rotations,
-        };
-
-        Ok((line, room))
-    };
+        });
 
     let (lines, rooms) = take_forever(single_line(nom_adapter(line_parser)))(lines)?;
     assert!(lines.is_empty(), "File not fully consumed");

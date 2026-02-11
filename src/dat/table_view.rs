@@ -1,12 +1,10 @@
 use std::fmt::Display;
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use nom::{
+    IResult, Parser,
     bytes::complete::{tag, take_until},
-    combinator::map_res,
     number::complete::le_u32,
-    sequence::tuple,
-    IResult,
 };
 
 /// Splits a byte slice into two parts around 16 consecutive 0xBB bytes.
@@ -16,20 +14,20 @@ fn split_on_8_bb(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
     const DELIMITER: &[u8] = &[0xBB; 8];
 
     // Parser to take until the delimiter and then consume it
-    let parser = tuple((
+    let mut parser = (
         take_until(DELIMITER), // Take everything up to the delimiter
         tag(DELIMITER),        // Match the delimiter itself
-    ));
+    )
+        // Apply the parser and return the remaining parts
+        .map_res(
+            |(before, _delimiter): (&[u8], &[u8])| -> Result<(&[u8], &[u8]), ()> {
+                // The rest of the input after the delimiter
+                let remaining: &[u8] = &input[before.len() + DELIMITER.len()..];
+                Ok((before, remaining))
+            },
+        );
 
-    // Apply the parser and return the remaining parts
-    map_res(
-        parser,
-        |(before, _delimiter): (&[u8], &[u8])| -> Result<(&[u8], &[u8]), ()> {
-            // The rest of the input after the delimiter
-            let remaining: &[u8] = &input[before.len() + DELIMITER.len()..];
-            Ok((before, remaining))
-        },
-    )(input)
+    parser.parse_complete(input)
 }
 
 // Take a null-terminated UTF-16 string

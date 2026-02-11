@@ -1,5 +1,4 @@
 pub mod types;
-
 use anyhow::{Result, anyhow};
 use nom::{
     Parser,
@@ -8,12 +7,12 @@ use nom::{
     character::complete::{space1, u32 as U},
     combinator::opt,
     number::complete::float as F,
-    sequence::{Tuple, preceded as P},
+    sequence::preceded as P,
 };
+use types::*;
 
 use crate::file_parsers::{
     FileParser,
-    ddt::types::{DDTFile, Group, Line1, Object, Weight},
     line_parser::{
         MultilineParser, NomParser, Result as LResult, nom_adapter, optional, single_line,
         take_forever, take_many,
@@ -37,59 +36,47 @@ impl FileParser for DDTParser {
 }
 
 fn line1<'a>() -> impl MultilineParser<'a, Line1> {
-    let parser = |line| {
-        let (line, scale) = F(line)?;
-
-        let (line, uint1) = opt(P(space1, U))(line)?;
-        let (line, uint2) = opt(P(space1, U))(line)?;
-
-        let line1 = Line1 {
+    let line_parser = (
+        F, //
+        opt(P(space1, U)),
+        opt(P(space1, U)),
+    )
+        .map(|(scale, uint1, uint2)| Line1 {
             scale,
             uint1,
             uint2,
-        };
+        });
 
-        Ok((line, line1))
-    };
-
-    single_line(nom_adapter(parser))
+    single_line(nom_adapter(line_parser))
 }
 
 fn group_header<'a>(
     name_parser: impl NomParser<'a, String>,
 ) -> impl MultilineParser<'a, (String, Option<String>, Option<f32>)> {
-    let mut line_parser = (
+    let line_parser = (
         name_parser, //
         opt(P(space1, unquoted_str)),
         opt(P(space1, F)),
     );
-    let line_parser = move |line| line_parser.parse(line);
 
     single_line(nom_adapter(line_parser))
 }
 
 fn object<'a>() -> impl MultilineParser<'a, Object> {
-    let line_parser = |line| {
-        let (line, weight) = alt((tag("All").map(|_| Weight::All), F.map(Weight::Float)))(line)?;
-
-        let (line, ao_file) = P(space1, quoted_str)(line)?;
-
-        let (line, uint1) = opt(P(space1, safe_u32))(line)?;
-
-        let (line, d) = opt(P(space1, tag("D").map(String::from)))(line)?;
-
-        let (line, float1) = opt(P(space1, F))(line)?;
-
-        let object = Object {
+    let line_parser = (
+        alt((tag("All").map(|_| Weight::All), F.map(Weight::Float))),
+        P(space1, quoted_str),
+        opt(P(space1, safe_u32)),
+        opt(P(space1, tag("D").map(String::from))),
+        opt(P(space1, F)),
+    )
+        .map(|(weight, ao_file, uint1, d, float1)| Object {
             weight,
             ao_file,
+            uint1,
             d,
             float1,
-            uint1,
-        };
-
-        Ok((line, object))
-    };
+        });
 
     single_line(nom_adapter(line_parser))
 }

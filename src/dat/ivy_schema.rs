@@ -51,13 +51,13 @@ pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
     let etag_path = schema_path.with_extension("json.etag");
 
     // File fresh? Use it
-    if let Ok(metadata) = fs::metadata(&schema_path) {
-        if metadata.modified()?.elapsed()?.as_secs() < 3600 {
-            eprintln!("Using cached schema");
-            return Ok(serde_json::from_str(
-                fs::read_to_string(schema_path)?.as_str(),
-            )?);
-        }
+    if let Ok(metadata) = fs::metadata(&schema_path)
+        && metadata.modified()?.elapsed()?.as_secs() < 3600
+    {
+        eprintln!("Using cached schema");
+        return Ok(serde_json::from_str(
+            fs::read_to_string(schema_path)?.as_str(),
+        )?);
     }
 
     eprintln!("Fetching schema from github");

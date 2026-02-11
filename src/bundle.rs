@@ -1,12 +1,12 @@
 use std::{fs, path::Path};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use bytes::Bytes;
 use nom::{
+    IResult, Parser,
     bytes::complete::take,
     multi::count,
     number::complete::{le_u32, le_u64},
-    IResult,
 };
 use oozextract::Extractor;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
@@ -101,17 +101,32 @@ fn parse_first_file_encode(input: &[u8]) -> IResult<&[u8], FirstFileEncode> {
 
 // Parser for HeadPayload
 fn parse_head_payload(input: &[u8]) -> IResult<&[u8], (HeadPayload, Vec<u32>)> {
-    let (input, _) = take(12usize)(input)?; // Skip bytes 0-12
-    let (input, first_file_encode) = parse_first_file_encode(input)?;
-    let (input, _) = take(4usize)(input)?; // Skip bytes 16-20
-    let (input, uncompressed_size) = le_u64(input)?;
-    let (input, total_payload_size) = le_u64(input)?;
-    let (input, block_count) = le_u32(input)?;
-    let (input, uncompressed_block_granularity) = le_u32(input)?;
-    let (input, _) = take(16usize)(input)?; // Skip bytes 44-60
+    let (
+        input,
+        (
+            _,
+            first_file_encode,
+            _,
+            uncompressed_size,
+            total_payload_size,
+            block_count,
+            uncompressed_block_granularity,
+            _,
+        ),
+    ) = (
+        take(12_usize),
+        parse_first_file_encode,
+        take(4_usize),
+        le_u64,
+        le_u64,
+        le_u32,
+        le_u32,
+        take(16_usize),
+    )
+        .parse_complete(input)?;
 
     // Read block sizes (block_count u32s)
-    let (input, block_sizes) = count(le_u32, block_count as usize)(input)?;
+    let (input, block_sizes) = count(le_u32, block_count as usize).parse_complete(input)?;
 
     Ok((
         input,

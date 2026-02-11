@@ -1,10 +1,10 @@
 use anyhow::{Context, bail};
+use itertools::Itertools;
 use nom::{
-    IResult, InputTakeAtPosition, Parser,
+    IResult, Input, Parser,
     bytes::complete::{tag, take_till1, take_until},
     character::complete::{char as C, u32 as U},
-    combinator::verify,
-    multi::separated_list0,
+    multi::count,
     sequence::{delimited, preceded as P},
 };
 
@@ -91,26 +91,23 @@ pub fn utf16_bom_to_string(contents: &[u8]) -> anyhow::Result<String> {
 }
 
 /// nom::sequence::separated_list but exact sized
-pub fn separated_array<const N: usize, I, S, F, OS, OF, E>(
+pub fn separated_array<const N: usize, I, S, F>(
     sep: S,
     item: F,
-) -> impl FnMut(I) -> IResult<I, [OF; N], E>
+) -> impl Parser<I, Output = [F::Output; N], Error = F::Error>
 where
-    I: Clone + nom::InputLength,
-    S: Parser<I, OS, E>,
-    F: Parser<I, OF, E>,
-    E: nom::error::ParseError<I>,
+    I: Input,
+    S: Parser<I>,
+    F: Parser<I, Error = S::Error> + Clone,
 {
-    let mut parser = verify(separated_list0(sep, item), |items: &Vec<OF>| {
-        items.len() == N
-    });
-
-    move |input| {
-        let (input, items) = parser(input)?;
-
-        let Ok(items) = items.try_into() else {
-            unreachable!("Verify should take care of length")
-        };
-        Ok((input, items))
-    }
+    (
+        item.clone(), //
+        count(P(sep, item), N - 1),
+    )
+        .map(|(first, rest)| {
+            std::iter::once(first)
+                .chain(rest)
+                .collect_array()
+                .unwrap_or_else(|| unreachable!())
+        })
 }

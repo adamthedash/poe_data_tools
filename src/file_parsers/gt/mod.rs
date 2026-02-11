@@ -1,19 +1,14 @@
 use anyhow::{Result, anyhow};
-use nom::{
-    character::complete::space1,
-    combinator::opt,
-    sequence::{Tuple, preceded as P},
-};
+use nom::{character::complete::space1, combinator::opt, sequence::preceded as P};
 
-use super::line_parser::Result as LResult;
 use crate::file_parsers::{
     FileParser,
-    gt::types::GTFile,
-    line_parser::{MultilineParser, nom_adapter, optional, single_line},
+    line_parser::{MultilineParser, Result as LResult, nom_adapter, optional, single_line},
     shared::{parse_bool, quoted_str, unquoted_str, utf16_bom_to_string},
 };
 
 pub mod types;
+use types::*;
 
 pub struct GTParser;
 
@@ -30,16 +25,13 @@ impl FileParser for GTParser {
 }
 
 fn bools<'a>() -> impl MultilineParser<'a, (bool, bool, Option<bool>, Option<bool>, Option<bool>)> {
-    let line_parser = |line| {
-        (
-            parse_bool,
-            P(space1, parse_bool),
-            opt(P(space1, parse_bool)),
-            opt(P(space1, parse_bool)),
-            opt(P(space1, parse_bool)),
-        )
-            .parse(line)
-    };
+    let line_parser = (
+        parse_bool,
+        P(space1, parse_bool),
+        opt(P(space1, parse_bool)),
+        opt(P(space1, parse_bool)),
+        opt(P(space1, parse_bool)),
+    );
 
     single_line(nom_adapter(line_parser))
 }

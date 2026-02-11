@@ -9,7 +9,6 @@ use nom::{
 
 use crate::file_parsers::{
     FileParser,
-    gft::types::{GFTFile, GenFile, Section},
     line_parser::{
         MultilineParser, Result as LResult, nom_adapter, single_line, take_forever, take_many,
     },
@@ -17,6 +16,7 @@ use crate::file_parsers::{
 };
 
 pub mod types;
+use types::*;
 
 pub struct GFTParser;
 
@@ -34,21 +34,16 @@ impl FileParser for GFTParser {
 }
 
 fn file<'a>() -> impl MultilineParser<'a, GenFile> {
-    let line_parser = |line| {
-        let (line, weight) = U(line)?;
-
-        let (line, path) = preceded(space1, quoted_str)(line)?;
-
-        let (line, rotations) = all_consuming(many0(preceded(space1, unquoted_str)))(line)?;
-
-        let gen_file = GenFile {
+    let line_parser = (
+        U,
+        preceded(space1, quoted_str),
+        all_consuming(many0(preceded(space1, unquoted_str))),
+    )
+        .map(|(weight, path, rotations)| GenFile {
             weight,
             path,
             rotations,
-        };
-
-        Ok((line, gen_file))
-    };
+        });
 
     single_line(nom_adapter(line_parser))
 }
