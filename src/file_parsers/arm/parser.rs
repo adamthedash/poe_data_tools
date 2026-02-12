@@ -1,3 +1,5 @@
+use std::{rc::Rc, sync::Mutex};
+
 use itertools::{Itertools, izip};
 use nom::{
     Parser,
@@ -5,7 +7,7 @@ use nom::{
     bytes::complete::{is_not, tag},
     character::complete::{char as C, i32 as I, space0, space1, u32 as U},
     combinator::{all_consuming, cond, opt, rest, verify},
-    multi::{count, length_count, separated_list1},
+    multi::{count, length_count, many_till, separated_list1},
     number::complete::float as F,
     sequence::{preceded as P, separated_pair, terminated as T},
 };
@@ -13,46 +15,65 @@ use nom::{
 use super::types::*;
 use crate::file_parsers::{
     FileParser,
-    line_parser::{
-        MultilineParser, NomParser, Result as LResult, length_prefixed, nom_adapter, optional,
-        repeated, single_line, terminated,
-    },
+    lift::{SliceParser, ToSliceParser},
+    line_parser::{NomParser, Result as LResult},
+    my_slice::MySlice,
     shared::{
-        parse_bool, quoted_str, separated_array, unquoted_str, utf16_bom_to_string, version_line,
+        parse_bool, quoted_str, separated_array, unquoted_str, utf16_bom_to_string, version_line2,
     },
 };
 
+fn length_prefixed2<'a, T>(
+    item_parser: impl NomParser<'a, T>,
+) -> impl SliceParser<'a, &'a str, Vec<T>> {
+    length_count(U::<_, nom::error::Error<_>>.lift(), item_parser.lift())
+}
+
+fn terminated2<'a, T>(
+    item_parser: impl NomParser<'a, T>,
+    sentinel: &str,
+) -> impl SliceParser<'a, &'a str, Vec<T>> {
+    many_till(
+        item_parser.lift(),
+        tag::<_, _, nom::error::Error<_>>(sentinel).lift(),
+    )
+    .map(|(items, _)| items)
+}
+
 /// Either length-prefixed or "-1"-terminated depending on version
-fn group<'a, T: 'a>(
+fn group<'a, const V: u32, T: 'a>(
     version: u32,
-    item_parser: impl MultilineParser<'a, T> + 'a,
-) -> impl MultilineParser<'a, Vec<T>> {
-    let group_parser: Box<dyn MultilineParser<'_, Vec<T>>> = match version {
-        ..32 => Box::new(length_prefixed(item_parser)) as _,
-        32.. => Box::new(terminated(item_parser, "-1")) as _,
+    item_parser: impl NomParser<'a, T> + 'a,
+) -> impl SliceParser<'a, &'a str, Vec<T>> {
+    let item_parser = Rc::new(Mutex::new(item_parser));
+
+    let i1 = {
+        let item_parser = item_parser.clone();
+        move |input| item_parser.lock().unwrap().parse_complete(input)
     };
+    let i2 = { move |input| item_parser.lock().unwrap().parse_complete(input) };
 
-    group_parser
+    (
+        cond(version < V, length_prefixed2(i1)),
+        cond(version >= V, terminated2(i2, "-1")),
+    )
+        .map(|(a, b)| a.or(b).expect("One parser should always be applied"))
 }
 
-fn string_section<'a>() -> impl MultilineParser<'a, Vec<String>> {
-    length_prefixed(single_line(nom_adapter(quoted_str)))
+fn string_section<'a>() -> impl SliceParser<'a, &'a str, Vec<String>> {
+    length_count(
+        U::<_, nom::error::Error<_>>.lift(), //
+        quoted_str.lift(),
+    )
 }
 
-fn dimensions<'a>(version: u32) -> impl MultilineParser<'a, Dimension> {
-    let parser = (
+fn dimensions<'a>(version: u32) -> impl NomParser<'a, Dimension> {
+    (
         U,
         cond(version < 31, P(space1, U)),
         cond(version >= 22, P(space1, U)),
     )
-        .map(|(side_length, _duplicate_side_length, uint1)| Dimension { side_length, uint1 });
-
-    single_line(nom_adapter(parser))
-}
-
-/// Space-separated uinsigned ints
-fn uints<'a>() -> impl MultilineParser<'a, Vec<u32>> {
-    single_line(nom_adapter(separated_list1(C(' '), U)))
+        .map(|(side_length, _duplicate_side_length, uint1)| Dimension { side_length, uint1 })
 }
 
 /// "k" followed by 23-24 numbers
@@ -134,16 +155,12 @@ fn slot<'a>(strings: &[String]) -> impl NomParser<'a, Slot> {
     ))
 }
 
-fn root_slot<'a>(strings: &'a [String]) -> impl MultilineParser<'a, Slot> {
-    single_line(nom_adapter(slot(strings)))
-}
-
 /// Grid of Slots
 fn grid<'a>(
     height: usize,
     width: usize,
     strings: &'a [String],
-) -> impl MultilineParser<'a, Vec<Vec<Slot>>> {
+) -> impl SliceParser<'a, &'a str, Vec<Vec<Slot>>> {
     let line_parser = verify(
         separated_list1(C(' '), slot(strings)),
         move |row: &Vec<_>| {
@@ -155,14 +172,12 @@ fn grid<'a>(
         },
     );
 
-    let row_parser = single_line(nom_adapter(line_parser));
-
-    repeated(row_parser, height)
+    count(line_parser.lift(), height)
 }
 
 /// Single PoI line - 3 uints & a string
-fn poi<'a>() -> impl MultilineParser<'a, PoI> {
-    let line_parser = (
+fn poi<'a>() -> impl NomParser<'a, PoI> {
+    (
         U,
         P(space1, U),
         P(space1, F),
@@ -174,28 +189,24 @@ fn poi<'a>() -> impl MultilineParser<'a, PoI> {
             y,
             rotation,
             tag,
-        });
-
-    single_line(nom_adapter(line_parser))
+        })
 }
 
-fn poi_groups<'a>(version: u32) -> impl MultilineParser<'a, Vec<Vec<PoI>>> {
+fn poi_groups<'a>(version: u32) -> impl SliceParser<'a, &'a str, Vec<Vec<PoI>>> {
     // Counts determined by version, manually curated
-    let count = match version {
+    let group_count = match version {
         ..20 => 9,
         20..26 => 10,
         26..29 => 5,
         29.. => 6,
     };
 
-    let group_parser = group(version, poi());
-
-    repeated(group_parser, count)
+    count(group::<32, _>(version, poi()), group_count)
 }
 
 /// Single doodad string
-fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
-    let line_parser = (
+fn doodad<'a>(version: u32) -> impl NomParser<'a, Doodad> {
+    (
         U,
         P(space1, U),
         cond(
@@ -270,12 +281,10 @@ fn doodad<'a>(version: u32) -> impl MultilineParser<'a, Doodad> {
                     key_values,
                 }
             },
-        );
-
-    single_line(nom_adapter(line_parser))
+        )
 }
 
-fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<DoodadConnection>> {
+fn doodad_connections<'a>(version: u32) -> impl SliceParser<'a, &'a str, Vec<DoodadConnection>> {
     let line_parser = (
         U, //
         P(space1, U),
@@ -283,14 +292,12 @@ fn doodad_connections<'a>(version: u32) -> impl MultilineParser<'a, Vec<DoodadCo
     )
         .map(|(from, to, tag)| DoodadConnection { from, to, tag });
 
-    let connection_parser = single_line(nom_adapter(line_parser));
-
-    group(version, connection_parser)
+    group::<32, _>(version, line_parser)
 }
 
 /// Decale on a line
-fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
-    let line_parser = (
+fn decal<'a>(version: u32) -> impl NomParser<'a, Decal> {
+    (
         separated_array::<3, _, _, _>(space1, F),
         cond(version >= 17, P(space1, parse_bool)),
         P(space1, F),
@@ -305,44 +312,52 @@ fn decal<'a>(version: u32) -> impl MultilineParser<'a, Decal> {
             scale,
             atlas_file,
             tag,
-        });
-
-    single_line(nom_adapter(line_parser))
+        })
 }
 
-fn boss_lines<'a>(lines: &'a [&'a str]) -> LResult<(Vec<&'a str>, Vec<Vec<String>>)> {
+fn boss_lines2<'a>() -> impl SliceParser<'a, &'a str, Vec<Vec<String>>> {
     // NOTE: Boss string line is often not properly ended with a newline, causing the next
     // line to be appended on the end instead. We're accounting for this by cropping off
     // the end and prepending it to our list of lines
-    let line_parser = separated_pair(separated_list1(space1, quoted_str), space1, rest);
-    let line_parser = single_line(nom_adapter(line_parser));
 
-    let (lines, boss_lines) = length_prefixed(line_parser)(lines)?;
-    let mut lines = lines.to_vec();
+    |lines| {
+        let line_parser = separated_pair(separated_list1(space1, quoted_str), space1, rest);
 
-    let (boss_lines, mut trailing) =
-        boss_lines
-            .into_iter()
-            .fold((vec![], vec![]), |(mut blines, mut tlines), (b, t)| {
-                blines.push(b);
-                tlines.push(t);
+        let mut parser = length_prefixed2(line_parser).map(|items| {
+            let (boss_lines, mut trailing) =
+                items
+                    .into_iter()
+                    .fold((vec![], vec![]), |(mut blines, mut tlines), (b, t)| {
+                        blines.push(b);
+                        tlines.push(t);
 
-                (blines, tlines)
-            });
+                        (blines, tlines)
+                    });
 
-    if let Some(t) = trailing.pop()
-        && !t.is_empty()
-    {
-        lines.insert(0, t);
+            let trailing = trailing.pop().filter(|t| !t.is_empty());
+
+            (boss_lines, trailing)
+        });
+
+        let (lines, (boss_lines, extra)) = parser.parse_complete(lines)?;
+
+        let lines = if let Some(extra) = extra {
+            let mut lines = lines.to_vec();
+            lines.insert(0, extra);
+
+            // TODO: Figure out if we can avoid this leak
+            let lines = Box::new(lines).leak();
+            MySlice(&*lines)
+        } else {
+            lines
+        };
+
+        Ok((lines, boss_lines))
     }
-
-    assert!(trailing.iter().all(|s| s.is_empty()));
-
-    Ok((lines, boss_lines))
 }
 
-fn zone<'a>(version: u32) -> impl MultilineParser<'a, Zone> {
-    let line_parser = (
+fn zone<'a>(version: u32) -> impl NomParser<'a, Zone> {
+    (
         move |line| match version {
             ..35 => unquoted_str(line),
             35.. => quoted_str(line),
@@ -374,38 +389,11 @@ fn zone<'a>(version: u32) -> impl MultilineParser<'a, Zone> {
                 env_file,
                 uint1,
             }
-        });
-
-    single_line(nom_adapter(line_parser))
+        })
 }
 
-fn zones<'a>(version: u32) -> impl MultilineParser<'a, Vec<Zone>> {
-    let line_parser = zone(version);
-
-    // NOTE: Appears to be LP until v33, then v36 appears another LP?
-    let group_parser: Box<dyn MultilineParser<'_, Vec<Zone>>> = match version {
-        ..33 => Box::new(length_prefixed(line_parser)) as _,
-        33.. => Box::new(terminated(line_parser, "-1")) as _,
-    };
-
-    group_parser
-}
-
-fn tags<'a>() -> impl MultilineParser<'a, Option<Vec<String>>> {
-    let mut line_parser = opt(all_consuming(length_count(U, P(space1, unquoted_str))));
-
-    move |lines| {
-        if let Some(&first) = lines.first() {
-            let (_, tags) = line_parser.parse_complete(first)?;
-
-            // Crop off last line if successful
-            let lines = if tags.is_some() { &lines[1..] } else { lines };
-
-            Ok((lines, tags))
-        } else {
-            Ok((lines, None))
-        }
-    }
+fn tags<'a>() -> impl NomParser<'a, Vec<String>> {
+    length_count(U, P(space1, unquoted_str))
 }
 
 /// Line of space separated uints, sometimes with a space a the end
@@ -413,15 +401,14 @@ fn ground_overrides<'a>(
     strings: &[String],
     grid_height: usize,
     grid_width: usize,
-) -> impl MultilineParser<'a, Option<Vec<Vec<Option<String>>>>> {
-    let line_parser = T(
+) -> impl NomParser<'a, Vec<Vec<Option<String>>>> {
+    T(
         verify(separated_list1(space1, U), move |items: &Vec<_>| {
             items.len() == (grid_height - 1) * (grid_width - 1)
         }),
         space0,
-    );
-
-    let line_parser = line_parser.map(move |indices| {
+    )
+    .map(move |indices| {
         // Chunk into 2D grid
         indices
             .into_iter()
@@ -432,13 +419,11 @@ fn ground_overrides<'a>(
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>()
-    });
-
-    optional(single_line(nom_adapter(line_parser)))
+    })
 }
 
-fn thingy<'a>(strings: &[String]) -> impl MultilineParser<'a, Thingy> {
-    let line_parser = (
+fn thingy<'a>(strings: &[String]) -> impl NomParser<'a, Thingy> {
+    (
         U, //
         P(space1, I),
         count(opt(P(space1, parse_bool)), 3),
@@ -453,88 +438,69 @@ fn thingy<'a>(strings: &[String]) -> impl MultilineParser<'a, Thingy> {
                 bool2: bools[1],
                 bool3: bools[2],
             }
-        });
-
-    single_line(nom_adapter(line_parser))
+        })
 }
 
-fn parse_arm_str(input: &str) -> LResult<Arm> {
+fn parse_arm_str(input: &str) -> LResult<ARMFile> {
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
+    let lines = MySlice(lines.as_slice());
 
-    let (lines, version) = version_line()(&lines)?;
+    let (lines, (version, strings)) = (
+        version_line2().lift(), //
+        string_section(),
+    )
+        .parse_complete(lines)?;
 
-    let (lines, strings) = string_section()(lines)?;
-
-    let (lines, dimensions) = dimensions(version)(lines)?;
-
-    let (lines, numbers1) = uints()(lines)?;
-
-    let (lines, tag1) = single_line(nom_adapter(quoted_str))(lines)?;
-
-    let (lines, bools) = single_line(nom_adapter(separated_list1(space1, parse_bool)))(lines)?;
-
-    let (lines, root_slot) = root_slot(&strings)(lines)?;
-
-    let (lines, thingies) =
-        repeated(thingy(&strings), numbers1.iter().sum::<u32>() as usize * 2)(lines)?;
-
-    let (lines, poi_groups) = poi_groups(version)(lines)?;
-
-    let (lines, string1) = match version {
-        ..35 => (lines, None),
-        35.. => {
-            let (lines, string1) = single_line(nom_adapter(quoted_str))(lines)?;
-            (lines, Some(string1))
-        }
-    };
+    let (lines, (dimensions, numbers1, tag1, bools, root_slot)) = (
+        dimensions(version).lift(),
+        separated_list1(C::<_, nom::error::Error<_>>(' '), U).lift(),
+        quoted_str.lift(),
+        separated_list1(space1, parse_bool).lift(),
+        slot(&strings).lift(),
+    )
+        .parse_complete(lines)?;
 
     let (grid_height, grid_width) = if let Slot::K(slot) = &root_slot {
         (slot.height as usize, slot.width as usize)
     } else {
         (1, 1)
     };
-    let (lines, grid) = grid(grid_height, grid_width, &strings)(lines)?;
 
-    let (lines, doodads) = group(version, doodad(version))(lines)?;
+    let parser = (
+        count(
+            thingy(&strings).lift(),
+            numbers1.iter().sum::<u32>() as usize * 2,
+        ),
+        poi_groups(version),
+        cond(version >= 35, quoted_str.lift()),
+        grid(grid_height, grid_width, &strings),
+        group::<32, _>(version, doodad(version)),
+        cond(version >= 23, doodad_connections(version)),
+        group::<32, _>(version, decal(version)),
+        cond(version >= 22, boss_lines2()),
+        cond(version >= 27, group::<33, _>(version, zone(version))),
+        opt(tags().lift()),
+        opt(ground_overrides(&strings, grid_height, grid_width).lift()),
+    );
 
-    let (lines, doodad_connections) = match version {
-        ..23 => (lines, vec![]),
-        23.. => doodad_connections(version)(lines)?,
-    };
+    let (
+        _,
+        (
+            thingies,
+            poi_groups,
+            string1,
+            grid,
+            doodads,
+            doodad_connections,
+            decals,
+            boss_lines,
+            zones,
+            tags,
+            ground_overrides,
+        ),
+    ) = all_consuming(parser).parse_complete(lines)?;
 
-    let (lines, decals) = group(version, decal(version))(lines)?;
-
-    let (lines, boss_lines) = match version {
-        ..22 => (lines.to_vec(), None),
-        22.. => {
-            let (lines, boss_lines) = boss_lines(lines)?;
-
-            (lines, Some(boss_lines))
-        }
-    };
-    let lines = lines.as_slice();
-
-    let (lines, zones) = match version {
-        ..27 => (lines, None),
-        27.. => {
-            let (lines, item_lines) = zones(version)(lines)?;
-
-            (lines, Some(item_lines))
-        }
-    };
-
-    // Optional line with tags
-    let (lines, tags) = match version {
-        ..10 => (lines, None),
-        10.. => tags()(lines)?,
-    };
-
-    // Optional trailing line with a bunch of numbers
-    let (lines, ground_overrides) = ground_overrides(&strings, grid_height, grid_width)(lines)?;
-
-    assert!(lines.is_empty(), "Extra lines: {:#?}", lines);
-
-    let map = Arm {
+    let arm_file = ARMFile {
         version,
         strings: strings.to_vec(),
         dimensions,
@@ -555,13 +521,13 @@ fn parse_arm_str(input: &str) -> LResult<Arm> {
         ground_overrides,
     };
 
-    Ok(map)
+    Ok(arm_file)
 }
 
 pub struct ARMParser;
 
 impl FileParser for ARMParser {
-    type Output = Arm;
+    type Output = ARMFile;
 
     fn parse(&self, bytes: &[u8]) -> anyhow::Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;

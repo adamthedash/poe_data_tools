@@ -5,7 +5,8 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{space1, u32 as U},
-    combinator::opt,
+    combinator::{all_consuming, opt},
+    multi::many0,
     number::complete::float as F,
     sequence::preceded as P,
 };
@@ -13,11 +14,10 @@ use types::*;
 
 use crate::file_parsers::{
     FileParser,
-    line_parser::{
-        MultilineParser, NomParser, Result as LResult, nom_adapter, optional, single_line,
-        take_forever, take_many,
-    },
-    shared::{quoted_str, safe_u32, unquoted_str, utf16_bom_to_string, version_line},
+    lift::{SliceParser, ToSliceParser},
+    line_parser::{NomParser, Result as LResult},
+    my_slice::MySlice,
+    shared::{quoted_str, safe_u32, unquoted_str, utf16_bom_to_string, version_line2},
 };
 
 pub struct DDTParser;
@@ -35,8 +35,8 @@ impl FileParser for DDTParser {
     }
 }
 
-fn line1<'a>() -> impl MultilineParser<'a, Line1> {
-    let line_parser = (
+fn line1<'a>() -> impl NomParser<'a, Line1> {
+    (
         F, //
         opt(P(space1, U)),
         opt(P(space1, U)),
@@ -45,25 +45,21 @@ fn line1<'a>() -> impl MultilineParser<'a, Line1> {
             scale,
             uint1,
             uint2,
-        });
-
-    single_line(nom_adapter(line_parser))
+        })
 }
 
 fn group_header<'a>(
     name_parser: impl NomParser<'a, String>,
-) -> impl MultilineParser<'a, (String, Option<String>, Option<f32>)> {
-    let line_parser = (
+) -> impl NomParser<'a, (String, Option<String>, Option<f32>)> {
+    (
         name_parser, //
         opt(P(space1, unquoted_str)),
         opt(P(space1, F)),
-    );
-
-    single_line(nom_adapter(line_parser))
+    )
 }
 
-fn object<'a>() -> impl MultilineParser<'a, Object> {
-    let line_parser = (
+fn object<'a>() -> impl NomParser<'a, Object> {
+    (
         alt((tag("All").map(|_| Weight::All), F.map(Weight::Float))),
         P(space1, quoted_str),
         opt(P(space1, safe_u32)),
@@ -76,28 +72,20 @@ fn object<'a>() -> impl MultilineParser<'a, Object> {
             uint1,
             d,
             float1,
-        });
-
-    single_line(nom_adapter(line_parser))
+        })
 }
 
-fn group<'a>(name_parser: impl NomParser<'a, String>) -> impl MultilineParser<'a, Group> {
-    let mut group_header = group_header(name_parser);
-
-    move |lines| {
-        let (lines, (name, d, float1)) = group_header(lines)?;
-
-        let (lines, objects) = take_many(object())(lines)?;
-
-        let group = Group {
+fn group<'a>(name_parser: impl NomParser<'a, String>) -> impl SliceParser<'a, &'a str, Group> {
+    (
+        group_header(name_parser).lift(), //
+        many0(object().lift()),
+    )
+        .map(|((name, d, float1), objects)| Group {
             name,
             d,
             float1,
             objects,
-        };
-
-        Ok((lines, group))
-    }
+        })
 }
 
 fn parse_ddt_str(contents: &str) -> LResult<DDTFile> {
@@ -106,28 +94,26 @@ fn parse_ddt_str(contents: &str) -> LResult<DDTFile> {
         .map(|l| l.trim())
         .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
+    let lines = MySlice(lines.as_slice());
 
-    let (lines, version) = version_line()(&lines)?;
+    let parser = (
+        version_line2().lift(),
+        line1().lift(),
+        opt(U::<_, nom::error::Error<_>>.lift()),
+        group(unquoted_str),
+        many0(group(quoted_str)),
+    )
+        .map(|(version, line1, uint1, default_group, mut groups)| {
+            groups.insert(0, default_group);
+            DDTFile {
+                version,
+                line1,
+                uint1,
+                groups,
+            }
+        });
 
-    let (lines, line1) = line1()(lines)?;
-
-    let (lines, uint1) = optional(single_line(nom_adapter(U)))(lines)?;
-
-    // Default line
-    let (lines, default_group) = group(unquoted_str)(lines)?;
-
-    // Rest of groups
-    let (lines, mut groups) = take_forever(group(quoted_str))(lines)?;
-    groups.insert(0, default_group);
-
-    assert!(lines.is_empty(), "Lines remaining: {:?}", lines);
-
-    let ddt_file = DDTFile {
-        version,
-        line1,
-        uint1,
-        groups,
-    };
+    let (_, ddt_file) = all_consuming(parser).parse_complete(lines)?;
 
     Ok(ddt_file)
 }

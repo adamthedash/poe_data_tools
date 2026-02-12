@@ -1,5 +1,10 @@
 use anyhow::{Result, anyhow};
-use nom::{Parser, character::complete::space1, combinator::opt, sequence::preceded as P};
+use nom::{
+    Parser,
+    character::complete::space1,
+    combinator::{all_consuming, opt},
+    sequence::preceded as P,
+};
 
 use crate::file_parsers::{
     FileParser,
@@ -44,7 +49,7 @@ fn parse_gt_str(contents: &str) -> LResult<GTFile> {
         .collect::<Vec<_>>();
     let lines = MySlice(lines.as_slice());
 
-    let mut parser = (
+    let parser = (
         unquoted_str.lift(), //
         bools().lift(),
         opt(quoted_str.lift()),
@@ -61,7 +66,7 @@ fn parse_gt_str(contents: &str) -> LResult<GTFile> {
             },
         );
 
-    let (_, gt_file) = parser.parse_complete(lines)?;
+    let (_, gt_file) = all_consuming(parser).parse_complete(lines)?;
 
     Ok(gt_file)
 }

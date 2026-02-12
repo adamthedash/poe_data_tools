@@ -145,7 +145,7 @@ pub struct Dimension {
 }
 
 #[derive(Debug, Serialize, Default)]
-pub struct Arm {
+pub struct ARMFile {
     pub version: u32,
     pub strings: Vec<String>,
     pub dimensions: Dimension,
@@ -158,7 +158,7 @@ pub struct Arm {
     pub string1: Option<String>,
     pub grid: Vec<Vec<Slot>>,
     pub doodads: Vec<Doodad>,
-    pub doodad_connections: Vec<DoodadConnection>,
+    pub doodad_connections: Option<Vec<DoodadConnection>>,
     pub decals: Vec<Decal>,
     pub boss_lines: Option<Vec<Vec<String>>>,
     pub zones: Option<Vec<Zone>>,

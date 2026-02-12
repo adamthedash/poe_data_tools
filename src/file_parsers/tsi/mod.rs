@@ -18,7 +18,7 @@ use super::{
     line_parser::Result as LResult,
     shared::{quoted_str, unquoted_str, utf16_bom_to_string},
 };
-use crate::file_parsers::{lift::ToSliceParser, my_slice::MySlice};
+use crate::file_parsers::{lift::ToSliceParser, line_parser::NomParser, my_slice::MySlice};
 
 pub struct TSIParser;
 
@@ -34,6 +34,15 @@ impl FileParser for TSIParser {
     }
 }
 
+fn key_value<'a>() -> impl NomParser<'a, (String, String)> {
+    separated_pair(
+        unquoted_str,
+        space1,
+        // Attempt to un-quote single quoted strings, otherwise just take the rest as-is
+        rest.and_then(alt((all_consuming(quoted_str), rest.map(String::from)))),
+    )
+}
+
 fn parse_tsi_str(contents: &str) -> LResult<TSIFile> {
     let lines = contents
         .lines()
@@ -41,17 +50,9 @@ fn parse_tsi_str(contents: &str) -> LResult<TSIFile> {
         .collect::<Vec<_>>();
     let lines = MySlice(lines.as_slice());
 
-    let line_parser = separated_pair(
-        unquoted_str,
-        space1,
-        // Attempt to un-quote single quoted strings, otherwise just take the rest as-is
-        rest.and_then(alt((all_consuming(quoted_str), rest.map(String::from)))),
-    );
+    let parser = many0(key_value().lift()).map(HashMap::from_iter);
 
-    let (lines, pairs) = all_consuming(many0(line_parser.lift())).parse_complete(lines)?;
+    let (_, tsi_file) = all_consuming(parser).parse_complete(lines)?;
 
-    // let (lines, pairs) = take_forever(single_line(nom_adapter(line_parser)))(&lines)?;
-    assert!(lines.is_empty(), "TSI file not fully consumed");
-
-    Ok(HashMap::from_iter(pairs))
+    Ok(tsi_file)
 }
