@@ -11,9 +11,8 @@ use nom::{
 use crate::file_parsers::{
     FileParser,
     lift::{SliceParser, ToSliceParser},
-    line_parser::{NomParser, Result as LResult},
-    my_slice::MySlice,
-    shared::{parse_bool, separated_array, unquoted_str, utf16_bom_to_string},
+    shared::{NomParser, parse_bool, separated_array, unquoted_str, utf16_bom_to_string},
+    slice::Slice,
 };
 
 pub mod types;
@@ -27,9 +26,7 @@ impl FileParser for ETParser {
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        let parsed = parse_et_str(&contents).map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-        Ok(parsed)
+        parse_et_str(&contents)
     }
 }
 
@@ -83,13 +80,13 @@ fn virtual_section<'a>() -> impl SliceParser<'a, &'a str, VirtualSection> {
         )
 }
 
-fn parse_et_str(contents: &str) -> LResult<ETFile> {
+fn parse_et_str(contents: &str) -> Result<ETFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
         .collect::<Vec<_>>();
-    let lines = MySlice(lines.as_slice());
+    let lines = Slice(lines.as_slice());
 
     let parser = (
         name_hex().lift(),
@@ -109,7 +106,9 @@ fn parse_et_str(contents: &str) -> LResult<ETFile> {
             },
         );
 
-    let (_, et_file) = all_consuming(parser).parse_complete(lines)?;
+    let (_, et_file) = all_consuming(parser)
+        .parse_complete(lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     Ok(et_file)
 }

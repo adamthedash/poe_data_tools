@@ -9,9 +9,8 @@ use nom::{
 use crate::file_parsers::{
     FileParser,
     lift::ToSliceParser,
-    line_parser::{NomParser, Result as LResult},
-    my_slice::MySlice,
-    shared::{parse_bool, quoted_str, unquoted_str, utf16_bom_to_string},
+    shared::{NomParser, parse_bool, quoted_str, unquoted_str, utf16_bom_to_string},
+    slice::Slice,
 };
 
 pub mod types;
@@ -25,9 +24,7 @@ impl FileParser for GTParser {
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        let parsed = parse_gt_str(&contents).map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-        Ok(parsed)
+        parse_gt_str(&contents)
     }
 }
 
@@ -41,13 +38,13 @@ fn bools<'a>() -> impl NomParser<'a, (bool, bool, Option<bool>, Option<bool>, Op
     )
 }
 
-fn parse_gt_str(contents: &str) -> LResult<GTFile> {
+fn parse_gt_str(contents: &str) -> Result<GTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
         .collect::<Vec<_>>();
-    let lines = MySlice(lines.as_slice());
+    let lines = Slice(lines.as_slice());
 
     let parser = (
         unquoted_str.lift(), //
@@ -66,7 +63,9 @@ fn parse_gt_str(contents: &str) -> LResult<GTFile> {
             },
         );
 
-    let (_, gt_file) = all_consuming(parser).parse_complete(lines)?;
+    let (_, gt_file) = all_consuming(parser)
+        .parse_complete(lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     Ok(gt_file)
 }

@@ -6,10 +6,9 @@ pub mod et;
 pub mod gft;
 pub mod gt;
 pub mod lift;
-pub mod line_parser;
-pub mod my_slice;
 pub mod rs;
 pub mod shared;
+pub mod slice;
 pub mod tsi;
 
 use anyhow::Result;

@@ -8,8 +8,7 @@ use nom::{
     sequence::{delimited, preceded as P},
 };
 
-use super::line_parser::{MultilineParser, nom_adapter, single_line};
-use crate::file_parsers::line_parser::NomParser;
+pub trait NomParser<'a, T> = nom::Parser<&'a str, Output = T, Error = nom::error::Error<&'a str>>;
 
 /// Parses a 0/1 as a bool
 pub fn parse_bool(line: &str) -> IResult<&str, bool> {
@@ -75,11 +74,7 @@ pub fn unquoted_str(input: &str) -> IResult<&str, String> {
         .parse(input)
 }
 
-pub fn version_line<'a>() -> impl MultilineParser<'a, u32> {
-    single_line(nom_adapter(P(tag("version "), U)))
-}
-
-pub fn version_line2<'a>() -> impl NomParser<'a, u32> {
+pub fn version_line<'a>() -> impl NomParser<'a, u32> {
     P(tag("version "), U)
 }
 

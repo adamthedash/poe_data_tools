@@ -1,4 +1,4 @@
-use crate::file_parsers::lift::ToSliceParser;
+use crate::file_parsers::{lift::ToSliceParser, shared::NomParser};
 pub mod types;
 
 use anyhow::{Result, anyhow};
@@ -13,9 +13,8 @@ use types::*;
 
 use crate::file_parsers::{
     FileParser,
-    line_parser::{NomParser, Result as LResult},
-    my_slice::MySlice,
-    shared::{quoted_str, unquoted_str, utf16_bom_to_string, version_line2},
+    shared::{quoted_str, unquoted_str, utf16_bom_to_string, version_line},
+    slice::Slice,
 };
 
 pub struct RSParser;
@@ -26,9 +25,7 @@ impl FileParser for RSParser {
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        let lut = parse_rs_str(&contents).map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-        Ok(lut)
+        parse_rs_str(&contents)
     }
 }
 
@@ -45,22 +42,24 @@ fn room<'a>() -> impl NomParser<'a, Room> {
         })
 }
 
-fn parse_rs_str(contents: &str) -> LResult<RSFile> {
+fn parse_rs_str(contents: &str) -> Result<RSFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
         // Skip empty/commented lines
         .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
-    let lines = MySlice(lines.as_slice());
+    let lines = Slice(lines.as_slice());
 
     let parser = (
-        version_line2().lift(), //
+        version_line().lift(), //
         many0(room().lift()),
     )
         .map(|(version, rooms)| RSFile { version, rooms });
 
-    let (_, room_file) = all_consuming(parser).parse_complete(lines)?;
+    let (_, room_file) = all_consuming(parser)
+        .parse_complete(lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     Ok(room_file)
 }

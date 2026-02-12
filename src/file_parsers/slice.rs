@@ -9,15 +9,15 @@ use nom::Input;
 
 /// Purely a newtype wrapper over &[T]
 #[derive(Clone, Debug, PartialEq)]
-pub struct MySlice<T>(pub T);
+pub struct Slice<T>(pub T);
 
-impl<'a, T> From<&'a [T]> for MySlice<&'a [T]> {
+impl<'a, T> From<&'a [T]> for Slice<&'a [T]> {
     fn from(value: &'a [T]) -> Self {
         Self(value)
     }
 }
 
-impl<T> Deref for MySlice<T> {
+impl<T> Deref for Slice<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -25,7 +25,7 @@ impl<T> Deref for MySlice<T> {
     }
 }
 
-impl<'a, T: Clone> Input for MySlice<&'a [T]> {
+impl<'a, T: Clone> Input for Slice<&'a [T]> {
     type Item = T;
 
     type Iter = Cloned<Iter<'a, T>>;
@@ -78,11 +78,11 @@ impl<'a, T: Clone> Input for MySlice<&'a [T]> {
 mod tests {
     use nom::{Parser, bytes::complete::take, multi::count};
 
-    use super::MySlice;
+    use super::Slice;
 
     #[test]
     fn test_my_slice() {
-        let input: MySlice<&[_]> = ["a", "b", "c"].as_slice().into();
+        let input: Slice<&[_]> = ["a", "b", "c"].as_slice().into();
 
         let mut parser = take::<_, _, nom::error::Error<_>>(1_usize);
 
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn test_combinator() {
-        let input: MySlice<&[_]> = ["a", "b", "c"].as_slice().into();
+        let input: Slice<&[_]> = ["a", "b", "c"].as_slice().into();
 
         let parser = take::<_, _, nom::error::Error<_>>(1_usize);
         let mut parser = count(parser, 2);

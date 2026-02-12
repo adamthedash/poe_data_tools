@@ -4,19 +4,19 @@ use nom::{
     error::{Error, ErrorKind, ParseError},
 };
 
-use crate::file_parsers::my_slice::MySlice;
+use crate::file_parsers::slice::Slice;
 
 /// Nom parser over `&[I]` input
-pub trait SliceParser<'a, I, O, E = Error<MySlice<&'a [I]>>> = Parser<MySlice<&'a [I]>, Output = O, Error = E>
+pub trait SliceParser<'a, I, O, E = Error<Slice<&'a [I]>>> = Parser<Slice<&'a [I]>, Output = O, Error = E>
 where
     I: 'a,
-    E: ParseError<MySlice<&'a [I]>>;
+    E: ParseError<Slice<&'a [I]>>;
 
 pub struct Lift<P> {
     inner: P,
 }
 
-impl<'a, P, I> Parser<MySlice<&'a [I]>> for Lift<P>
+impl<'a, P, I> Parser<Slice<&'a [I]>> for Lift<P>
 where
     I: Input,
     P: Parser<I>,
@@ -24,12 +24,12 @@ where
 {
     type Output = P::Output;
 
-    type Error = Error<MySlice<&'a [I]>>;
+    type Error = Error<Slice<&'a [I]>>;
 
     fn process<OM: OutputMode>(
         &mut self,
-        input: MySlice<&'a [I]>,
-    ) -> PResult<OM, MySlice<&'a [I]>, Self::Output, Self::Error> {
+        input: Slice<&'a [I]>,
+    ) -> PResult<OM, Slice<&'a [I]>, Self::Output, Self::Error> {
         // Handle where there's no more input
         let Some((first, rest)) = input.split_first() else {
             return Err(Err::Error(OM::Error::bind(|| {
@@ -39,7 +39,7 @@ where
 
         // Apply the inner parser
         match self.inner.process::<OM>(first.clone()) {
-            Ok((_, item)) => Ok((MySlice(rest), item)),
+            Ok((_, item)) => Ok((Slice(rest), item)),
             // TODO: Figure out a way to bubble up the inner parser error and replace I with
             // &[I]
             Err(_) => Err(Err::Error(OM::Error::bind(|| {
@@ -73,7 +73,7 @@ where
     I: Input,
     P: Parser<I>,
 {
-    fn lift<'a>(self) -> impl SliceParser<'a, I, Self::Output, Error<MySlice<&'a [I]>>>
+    fn lift<'a>(self) -> impl SliceParser<'a, I, Self::Output, Error<Slice<&'a [I]>>>
     where
         I: 'a,
     {
@@ -92,11 +92,11 @@ mod tests {
         multi::{count, many1},
     };
 
-    use crate::file_parsers::{lift::ToSliceParser, my_slice::MySlice};
+    use crate::file_parsers::{lift::ToSliceParser, slice::Slice};
 
     #[test]
     fn test_nested() {
-        let input: MySlice<&[_]> = ["a", "a", "b"].as_slice().into();
+        let input: Slice<&[_]> = ["a", "a", "b"].as_slice().into();
 
         // In-line parser
         let parser = tag("a");
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_nested_bad() {
-        let input: MySlice<&[_]> = ["a", "a", "b"].as_slice().into();
+        let input: Slice<&[_]> = ["a", "a", "b"].as_slice().into();
 
         // In-line parser
         let parser = tag("a");

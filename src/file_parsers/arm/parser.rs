@@ -1,5 +1,6 @@
 use std::{rc::Rc, sync::Mutex};
 
+use anyhow::Result;
 use itertools::{Itertools, izip};
 use nom::{
     Parser,
@@ -16,11 +17,11 @@ use super::types::*;
 use crate::file_parsers::{
     FileParser,
     lift::{SliceParser, ToSliceParser},
-    line_parser::{NomParser, Result as LResult},
-    my_slice::MySlice,
     shared::{
-        parse_bool, quoted_str, separated_array, unquoted_str, utf16_bom_to_string, version_line2,
+        NomParser, parse_bool, quoted_str, separated_array, unquoted_str, utf16_bom_to_string,
+        version_line,
     },
+    slice::Slice,
 };
 
 fn length_prefixed2<'a, T>(
@@ -347,7 +348,7 @@ fn boss_lines2<'a>() -> impl SliceParser<'a, &'a str, Vec<Vec<String>>> {
 
             // TODO: Figure out if we can avoid this leak
             let lines = Box::new(lines).leak();
-            MySlice(&*lines)
+            Slice(&*lines)
         } else {
             lines
         };
@@ -441,15 +442,16 @@ fn thingy<'a>(strings: &[String]) -> impl NomParser<'a, Thingy> {
         })
 }
 
-fn parse_arm_str(input: &str) -> LResult<ARMFile> {
+fn parse_arm_str(input: &str) -> Result<ARMFile> {
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
-    let lines = MySlice(lines.as_slice());
+    let lines = Slice(lines.as_slice());
 
     let (lines, (version, strings)) = (
-        version_line2().lift(), //
+        version_line().lift(), //
         string_section(),
     )
-        .parse_complete(lines)?;
+        .parse_complete(lines)
+        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
 
     let (lines, (dimensions, numbers1, tag1, bools, root_slot)) = (
         dimensions(version).lift(),
@@ -458,7 +460,8 @@ fn parse_arm_str(input: &str) -> LResult<ARMFile> {
         separated_list1(space1, parse_bool).lift(),
         slot(&strings).lift(),
     )
-        .parse_complete(lines)?;
+        .parse_complete(lines)
+        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
 
     let (grid_height, grid_width) = if let Slot::K(slot) = &root_slot {
         (slot.height as usize, slot.width as usize)
@@ -498,7 +501,9 @@ fn parse_arm_str(input: &str) -> LResult<ARMFile> {
             tags,
             ground_overrides,
         ),
-    ) = all_consuming(parser).parse_complete(lines)?;
+    ) = all_consuming(parser)
+        .parse_complete(lines)
+        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
 
     let arm_file = ARMFile {
         version,
@@ -532,9 +537,6 @@ impl FileParser for ARMParser {
     fn parse(&self, bytes: &[u8]) -> anyhow::Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        let arm = parse_arm_str(&contents)
-            .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
-
-        Ok(arm)
+        parse_arm_str(&contents)
     }
 }

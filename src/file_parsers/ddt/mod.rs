@@ -15,9 +15,8 @@ use types::*;
 use crate::file_parsers::{
     FileParser,
     lift::{SliceParser, ToSliceParser},
-    line_parser::{NomParser, Result as LResult},
-    my_slice::MySlice,
-    shared::{quoted_str, safe_u32, unquoted_str, utf16_bom_to_string, version_line2},
+    shared::{NomParser, quoted_str, safe_u32, unquoted_str, utf16_bom_to_string, version_line},
+    slice::Slice,
 };
 
 pub struct DDTParser;
@@ -28,10 +27,7 @@ impl FileParser for DDTParser {
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        let parsed =
-            parse_ddt_str(&contents).map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-        Ok(parsed)
+        parse_ddt_str(&contents)
     }
 }
 
@@ -88,16 +84,16 @@ fn group<'a>(name_parser: impl NomParser<'a, String>) -> impl SliceParser<'a, &'
         })
 }
 
-fn parse_ddt_str(contents: &str) -> LResult<DDTFile> {
+fn parse_ddt_str(contents: &str) -> Result<DDTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
-    let lines = MySlice(lines.as_slice());
+    let lines = Slice(lines.as_slice());
 
     let parser = (
-        version_line2().lift(),
+        version_line().lift(),
         line1().lift(),
         opt(U::<_, nom::error::Error<_>>.lift()),
         group(unquoted_str),
@@ -113,7 +109,9 @@ fn parse_ddt_str(contents: &str) -> LResult<DDTFile> {
             }
         });
 
-    let (_, ddt_file) = all_consuming(parser).parse_complete(lines)?;
+    let (_, ddt_file) = all_consuming(parser)
+        .parse_complete(lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     Ok(ddt_file)
 }

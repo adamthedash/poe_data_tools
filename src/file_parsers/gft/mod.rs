@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::{Result, anyhow};
 use nom::{
     Parser,
     character::complete::{space1, u32 as U},
@@ -10,9 +10,8 @@ use nom::{
 use crate::file_parsers::{
     FileParser,
     lift::{SliceParser, ToSliceParser},
-    line_parser::{NomParser, Result as LResult},
-    my_slice::MySlice,
-    shared::{quoted_str, unquoted_str, utf16_bom_to_string, version_line2},
+    shared::{NomParser, quoted_str, unquoted_str, utf16_bom_to_string, version_line},
+    slice::Slice,
 };
 
 pub mod types;
@@ -26,10 +25,7 @@ impl FileParser for GFTParser {
     fn parse(&self, bytes: &[u8]) -> anyhow::Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        let parsed =
-            parse_gft_str(&contents).map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-        Ok(parsed)
+        parse_gft_str(&contents)
     }
 }
 
@@ -55,15 +51,18 @@ fn section<'a>(version: u32) -> impl SliceParser<'a, &'a str, Section> {
         .map(|((name, uint1), _, files)| Section { name, files, uint1 })
 }
 
-fn parse_gft_str(contents: &str) -> LResult<GFTFile> {
+fn parse_gft_str(contents: &str) -> Result<GFTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
-    let lines = MySlice(lines.as_slice());
+    let lines = Slice(lines.as_slice());
 
-    let (lines, version) = version_line2().lift().parse_complete(lines)?;
+    let (lines, version) = version_line()
+        .lift()
+        .parse_complete(lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     let parser = (
         cond(version == 1, U::<_, nom::error::Error<_>>.lift()), //
@@ -71,7 +70,9 @@ fn parse_gft_str(contents: &str) -> LResult<GFTFile> {
     )
         .map(|(_num_sections, sections)| GFTFile { version, sections });
 
-    let (_, gft_file) = all_consuming(parser).parse_complete(lines)?;
+    let (_, gft_file) = all_consuming(parser)
+        .parse_complete(lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     Ok(gft_file)
 }

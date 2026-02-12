@@ -1,5 +1,5 @@
 pub mod types;
-use anyhow::{Result, anyhow, ensure};
+use anyhow::{Result, anyhow};
 use nom::{
     IResult, Parser,
     branch::alt,
@@ -13,8 +13,9 @@ use types::*;
 
 use crate::file_parsers::{
     FileParser,
-    line_parser::NomParser,
-    shared::{quoted_str, single_quoted_str, space_or_nl1, unquoted_str, utf16_bom_to_string},
+    shared::{
+        NomParser, quoted_str, single_quoted_str, space_or_nl1, unquoted_str, utf16_bom_to_string,
+    },
 };
 
 pub struct AOParser;
@@ -25,9 +26,8 @@ impl FileParser for AOParser {
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        let (contents, parsed) =
+        let (_, parsed) =
             parse_ao_str(contents.trim()).map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-        ensure!(contents.is_empty(), "Input remaining: {:?}", contents);
 
         Ok(parsed)
     }
@@ -72,7 +72,7 @@ fn spaces_or_comments<'a>() -> impl NomParser<'a, String> {
 }
 
 fn parse_ao_str(contents: &str) -> IResult<&str, AOFile> {
-    (
+    let parser = (
         P(tag("version "), U),
         opt(P(spaces_or_comments(), tag("abstract"))),
         many1(P(
@@ -81,13 +81,14 @@ fn parse_ao_str(contents: &str) -> IResult<&str, AOFile> {
         )),
         many0(P(spaces_or_comments(), parse_struct())),
         // Trailing junk
-        all_consuming(opt(spaces_or_comments())),
+        opt(spaces_or_comments()),
     )
         .map(|(version, is_abstract, extends, structs, _)| AOFile {
             version,
             is_abstract: is_abstract.is_some(),
             extends: extends.into_iter().filter(|e| e == "nothing").collect(),
             structs,
-        })
-        .parse_complete(contents)
+        });
+
+    all_consuming(parser).parse_complete(contents)
 }
