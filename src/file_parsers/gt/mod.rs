@@ -1,9 +1,11 @@
 use anyhow::{Result, anyhow};
-use nom::{character::complete::space1, combinator::opt, sequence::preceded as P};
+use nom::{Parser, character::complete::space1, combinator::opt, sequence::preceded as P};
 
 use crate::file_parsers::{
     FileParser,
-    line_parser::{MultilineParser, Result as LResult, nom_adapter, optional, single_line},
+    lift::ToSliceParser,
+    line_parser::{NomParser, Result as LResult},
+    my_slice::MySlice,
     shared::{parse_bool, quoted_str, unquoted_str, utf16_bom_to_string},
 };
 
@@ -24,16 +26,14 @@ impl FileParser for GTParser {
     }
 }
 
-fn bools<'a>() -> impl MultilineParser<'a, (bool, bool, Option<bool>, Option<bool>, Option<bool>)> {
-    let line_parser = (
+fn bools<'a>() -> impl NomParser<'a, (bool, bool, Option<bool>, Option<bool>, Option<bool>)> {
+    (
         parse_bool,
         P(space1, parse_bool),
         opt(P(space1, parse_bool)),
         opt(P(space1, parse_bool)),
         opt(P(space1, parse_bool)),
-    );
-
-    single_line(nom_adapter(line_parser))
+    )
 }
 
 fn parse_gt_str(contents: &str) -> LResult<GTFile> {
@@ -42,24 +42,26 @@ fn parse_gt_str(contents: &str) -> LResult<GTFile> {
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
         .collect::<Vec<_>>();
+    let lines = MySlice(lines.as_slice());
 
-    let (lines, name) = single_line(nom_adapter(unquoted_str))(&lines)?;
+    let mut parser = (
+        unquoted_str.lift(), //
+        bools().lift(),
+        opt(quoted_str.lift()),
+    )
+        .map(
+            |(name, (bool1, bool2, bool3, bool4, bool5), string1)| GTFile {
+                name,
+                bool1,
+                bool2,
+                bool3,
+                bool4,
+                bool5,
+                string1,
+            },
+        );
 
-    let (lines, (bool1, bool2, bool3, bool4, bool5)) = bools()(lines)?;
-
-    let (lines, string1) = optional(single_line(nom_adapter(quoted_str)))(lines)?;
-
-    assert!(lines.is_empty(), "File not fully consumed: {:#?}", lines);
-
-    let gt_file = GTFile {
-        name,
-        bool1,
-        bool2,
-        bool3,
-        bool4,
-        bool5,
-        string1,
-    };
+    let (_, gt_file) = parser.parse_complete(lines)?;
 
     Ok(gt_file)
 }

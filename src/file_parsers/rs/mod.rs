@@ -1,3 +1,4 @@
+use crate::file_parsers::lift::ToSliceParser;
 pub mod types;
 
 use anyhow::{Result, anyhow};
@@ -12,8 +13,9 @@ use types::*;
 
 use crate::file_parsers::{
     FileParser,
-    line_parser::{Result as LResult, nom_adapter, single_line, take_forever},
-    shared::{quoted_str, unquoted_str, utf16_bom_to_string, version_line},
+    line_parser::{NomParser, Result as LResult},
+    my_slice::MySlice,
+    shared::{quoted_str, unquoted_str, utf16_bom_to_string, version_line2},
 };
 
 pub struct RSParser;
@@ -24,10 +26,23 @@ impl FileParser for RSParser {
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        let lut = parse_rs_str(&contents).map_err(|e| anyhow!("Failed to parse RS: {e:?}"))?;
+        let lut = parse_rs_str(&contents).map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
         Ok(lut)
     }
+}
+
+fn room<'a>() -> impl NomParser<'a, Room> {
+    (
+        opt(terminated(U, space0)),
+        quoted_str,
+        all_consuming(many0(preceded(space1, unquoted_str))),
+    )
+        .map(|(weight, arm_file, rotations)| Room {
+            weight,
+            arm_file,
+            rotations,
+        })
 }
 
 fn parse_rs_str(contents: &str) -> LResult<RSFile> {
@@ -37,24 +52,15 @@ fn parse_rs_str(contents: &str) -> LResult<RSFile> {
         // Skip empty/commented lines
         .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
+    let lines = MySlice(lines.as_slice());
 
-    let (lines, version) = version_line()(&lines)?;
-
-    let line_parser = (
-        opt(terminated(U, space0)),
-        quoted_str,
-        all_consuming(many0(preceded(space1, unquoted_str))),
+    let parser = (
+        version_line2().lift(), //
+        many0(room().lift()),
     )
-        .map(|(weight, arm_file, rotations)| Room {
-            weight,
-            arm_file,
-            rotations,
-        });
+        .map(|(version, rooms)| RSFile { version, rooms });
 
-    let (lines, rooms) = take_forever(single_line(nom_adapter(line_parser)))(lines)?;
-    assert!(lines.is_empty(), "File not fully consumed");
-
-    let room_file = RSFile { version, rooms };
+    let (_, room_file) = all_consuming(parser).parse_complete(lines)?;
 
     Ok(room_file)
 }

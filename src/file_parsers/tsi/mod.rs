@@ -8,15 +8,17 @@ use nom::{
     branch::alt,
     character::complete::space1,
     combinator::{all_consuming, rest},
+    multi::many0,
     sequence::separated_pair,
 };
 use types::*;
 
 use super::{
     FileParser,
-    line_parser::{Result as LResult, nom_adapter, single_line, take_forever},
+    line_parser::Result as LResult,
     shared::{quoted_str, unquoted_str, utf16_bom_to_string},
 };
+use crate::file_parsers::{lift::ToSliceParser, my_slice::MySlice};
 
 pub struct TSIParser;
 
@@ -37,6 +39,7 @@ fn parse_tsi_str(contents: &str) -> LResult<TSIFile> {
         .lines()
         .filter(|l| !l.is_empty())
         .collect::<Vec<_>>();
+    let lines = MySlice(lines.as_slice());
 
     let line_parser = separated_pair(
         unquoted_str,
@@ -45,7 +48,9 @@ fn parse_tsi_str(contents: &str) -> LResult<TSIFile> {
         rest.and_then(alt((all_consuming(quoted_str), rest.map(String::from)))),
     );
 
-    let (lines, pairs) = take_forever(single_line(nom_adapter(line_parser)))(&lines)?;
+    let (lines, pairs) = all_consuming(many0(line_parser.lift())).parse_complete(lines)?;
+
+    // let (lines, pairs) = take_forever(single_line(nom_adapter(line_parser)))(&lines)?;
     assert!(lines.is_empty(), "TSI file not fully consumed");
 
     Ok(HashMap::from_iter(pairs))

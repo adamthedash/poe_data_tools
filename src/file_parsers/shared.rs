@@ -9,6 +9,7 @@ use nom::{
 };
 
 use super::line_parser::{MultilineParser, nom_adapter, single_line};
+use crate::file_parsers::line_parser::NomParser;
 
 /// Parses a 0/1 as a bool
 pub fn parse_bool(line: &str) -> IResult<&str, bool> {
@@ -76,6 +77,10 @@ pub fn unquoted_str(input: &str) -> IResult<&str, String> {
 
 pub fn version_line<'a>() -> impl MultilineParser<'a, u32> {
     single_line(nom_adapter(P(tag("version "), U)))
+}
+
+pub fn version_line2<'a>() -> impl NomParser<'a, u32> {
+    P(tag("version "), U)
 }
 
 /// Parse the bytes of a UTF-16 file with BOM

@@ -2,17 +2,17 @@ use anyhow::anyhow;
 use nom::{
     Parser,
     character::complete::{space1, u32 as U},
-    combinator::{all_consuming, opt},
+    combinator::{all_consuming, cond, opt},
     multi::many0,
     sequence::preceded,
 };
 
 use crate::file_parsers::{
     FileParser,
-    line_parser::{
-        MultilineParser, Result as LResult, nom_adapter, single_line, take_forever, take_many,
-    },
-    shared::{quoted_str, unquoted_str, utf16_bom_to_string, version_line},
+    lift::{SliceParser, ToSliceParser},
+    line_parser::{NomParser, Result as LResult},
+    my_slice::MySlice,
+    shared::{quoted_str, unquoted_str, utf16_bom_to_string, version_line2},
 };
 
 pub mod types;
@@ -33,8 +33,8 @@ impl FileParser for GFTParser {
     }
 }
 
-fn file<'a>() -> impl MultilineParser<'a, GenFile> {
-    let line_parser = (
+fn file<'a>() -> impl NomParser<'a, GenFile> {
+    (
         U,
         preceded(space1, quoted_str),
         all_consuming(many0(preceded(space1, unquoted_str))),
@@ -43,30 +43,16 @@ fn file<'a>() -> impl MultilineParser<'a, GenFile> {
             weight,
             path,
             rotations,
-        });
-
-    single_line(nom_adapter(line_parser))
+        })
 }
 
-fn section<'a>(version: u32) -> impl MultilineParser<'a, Section> {
-    move |lines| {
-        let (lines, (name, uint1)) =
-            single_line(nom_adapter(quoted_str.and(opt(preceded(space1, U)))))(lines)?;
-
-        let (lines, _num_files) = if version == 1 {
-            let (lines, num_files) = single_line(nom_adapter(U))(lines)?;
-
-            (lines, Some(num_files))
-        } else {
-            (lines, None)
-        };
-
-        let (lines, files) = take_many(file())(lines)?;
-
-        let section = Section { name, files, uint1 };
-
-        Ok((lines, section))
-    }
+fn section<'a>(version: u32) -> impl SliceParser<'a, &'a str, Section> {
+    (
+        quoted_str.and(opt(preceded(space1, U))).lift(),
+        cond(version == 1, U::<_, nom::error::Error<_>>.lift()),
+        many0(file().lift()),
+    )
+        .map(|((name, uint1), _, files)| Section { name, files, uint1 })
 }
 
 fn parse_gft_str(contents: &str) -> LResult<GFTFile> {
@@ -75,21 +61,17 @@ fn parse_gft_str(contents: &str) -> LResult<GFTFile> {
         .map(|l| l.trim())
         .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
+    let lines = MySlice(lines.as_slice());
 
-    let (lines, version) = version_line()(&lines)?;
+    let (lines, version) = version_line2().lift().parse_complete(lines)?;
 
-    let (lines, _num_sections) = if version == 1 {
-        let (lines, num_sections) = single_line(nom_adapter(U))(lines)?;
+    let parser = (
+        cond(version == 1, U::<_, nom::error::Error<_>>.lift()), //
+        many0(section(version)),
+    )
+        .map(|(_num_sections, sections)| GFTFile { version, sections });
 
-        (lines, Some(num_sections))
-    } else {
-        (lines, None)
-    };
-
-    let (lines, sections) = take_forever(section(version))(lines)?;
-    assert!(lines.is_empty(), "File not fully consumed: {:#?}", lines);
-
-    let gft_file = GFTFile { version, sections };
+    let (_, gft_file) = all_consuming(parser).parse_complete(lines)?;
 
     Ok(gft_file)
 }
