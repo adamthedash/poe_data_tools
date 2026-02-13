@@ -6,6 +6,7 @@ pub mod et;
 pub mod gft;
 pub mod gt;
 pub mod lift;
+pub mod lift_winnow;
 pub mod rs;
 pub mod shared;
 pub mod slice;
