@@ -1,4 +1,3 @@
-use anyhow::{Context, bail};
 use itertools::Itertools;
 use nom::{
     IResult, Input, Parser,
@@ -76,18 +75,6 @@ pub fn unquoted_str(input: &str) -> IResult<&str, String> {
 
 pub fn version_line<'a>() -> impl NomParser<'a, u32> {
     P(tag("version "), U)
-}
-
-/// Parse the bytes of a UTF-16 file with BOM
-/// https://en.wikipedia.org/wiki/Byte_order_mark#UTF-16
-pub fn utf16_bom_to_string(contents: &[u8]) -> anyhow::Result<String> {
-    let parse_ut16 = match &contents[..2] {
-        [0xff, 0xfe] => String::from_utf16le,
-        [0xfe, 0xff] => String::from_utf16be,
-        bytes => bail!("Invalid BOM found: {:?}", bytes),
-    };
-
-    parse_ut16(&contents[2..]).context("Failed to parse contents as UTF-16 string")
 }
 
 /// nom::sequence::separated_list but exact sized

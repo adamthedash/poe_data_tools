@@ -1,9 +1,11 @@
 use winnow::{
     Parser,
-    combinator::{impls::Context, trace},
+    combinator::impls::Context,
     error::{ContextError, Result, StrContext},
     stream::Stream,
 };
+
+use crate::file_parsers::shared::winnow::TraceHelper;
 
 /// Winnow parser over `&[I]` input
 pub trait SliceParser<'a, I, O, E> = Parser<&'a [I], O, E> where I: 'a;
@@ -57,7 +59,7 @@ where
     S: Stream<Token = I>,
     P: Parser<I, O, ContextError>,
 {
-    trace("lift", Lift::new(parser))
+    Lift::new(parser).trace("lift")
 }
 
 #[cfg(test)]
