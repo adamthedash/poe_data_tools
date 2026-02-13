@@ -1,16 +1,16 @@
 use std::{collections::HashMap, fs::create_dir_all, path::Path};
 
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use glob::{MatchOptions, Pattern};
 
 use super::Patch;
 use crate::{
+    VERBOSE,
     bundle_fs::FS,
     tree::{
-        passive_info::{load_passive_info, PassiveSkillInfo},
+        passive_info::{PassiveSkillInfo, load_passive_info},
         psg::PassiveSkillGraph,
     },
-    VERBOSE,
 };
 
 fn process_file(
