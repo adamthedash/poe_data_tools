@@ -6,7 +6,9 @@ use winnow::{
 };
 
 use super::{super::shared::winnow::space_or_nl1 as S, types::*};
-use crate::file_parsers::shared::winnow::{TraceHelper, WinnowParser, quoted_str, version_line};
+use crate::file_parsers::shared::winnow::{
+    TraceHelper, WinnowParser, parse_bool, quoted_str, version_line,
+};
 
 fn filename<'a>(extension: &str) -> impl WinnowParser<&'a str, String> {
     let ext = format!(".{extension}");
@@ -54,7 +56,7 @@ fn group(contents: &mut &str) -> winnow::Result<Group> {
 
     let nums = cond(
         num_b > 0, //
-        P(S, (dec_uint, P(S, dec_uint))),
+        P(S, (dec_uint, P(S, parse_bool))),
     )
     .parse_next(contents)?;
 
@@ -64,7 +66,7 @@ fn group(contents: &mut &str) -> winnow::Result<Group> {
         name,
         entries,
         weight_line,
-        nums,
+        extra_line: nums,
         extra_mat_files,
     };
 

@@ -11,7 +11,7 @@ pub struct Group {
     pub name: Option<String>,
     pub entries: Vec<Entry>,
     pub weight_line: Option<(Vec<u32>, u32)>,
-    pub nums: Option<(u32, u32)>,
+    pub extra_line: Option<(u32, bool)>,
     pub extra_mat_files: Vec<String>,
 }
 
