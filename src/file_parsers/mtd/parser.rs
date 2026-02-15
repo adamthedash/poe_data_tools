@@ -7,17 +7,8 @@ use winnow::{
 
 use super::{super::shared::winnow::space_or_nl1 as S, types::*};
 use crate::file_parsers::shared::winnow::{
-    TraceHelper, WinnowParser, parse_bool, quoted_str, version_line,
+    TraceHelper, WinnowParser, filename, parse_bool, quoted_str, version_line,
 };
-
-fn filename<'a>(extension: &str) -> impl WinnowParser<&'a str, String> {
-    let ext = format!(".{extension}");
-
-    // TODO: to_string after verify passes instead of before
-    quoted_str
-        .verify(move |s: &String| s.ends_with(&ext))
-        .trace("filename")
-}
 
 fn entry(contents: &mut &str) -> winnow::Result<Entry> {
     (

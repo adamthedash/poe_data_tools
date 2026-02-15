@@ -80,6 +80,17 @@ pub fn unquoted_str(input: &mut &str) -> winnow::Result<String> {
         .parse_next(input)
 }
 
+/// Filename with the provided extension in a "quoted_string"
+pub fn filename<'a>(extension: &str) -> impl WinnowParser<&'a str, String> {
+    let ext = format!(".{extension}");
+
+    // TODO: to_string after verify passes instead of before
+    delimited('"', take_until(0.., '"'), '"')
+        .verify(move |s: &str| s.ends_with(&ext))
+        .map(String::from)
+        .trace("filename")
+}
+
 pub fn version_line<'a>() -> impl WinnowParser<&'a str, u32> {
     preceded(literal("version "), dec_uint).trace("version_line")
 }
