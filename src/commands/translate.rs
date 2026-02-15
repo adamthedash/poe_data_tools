@@ -9,7 +9,7 @@ use crate::{
     commands::Patch,
     file_parsers::{
         FileParser, ao::AOParser, arm::parser::ARMParser, ddt::DDTParser, ecf::ECFParser,
-        et::ETParser, gft::GFTParser, gt::GTParser, rs::RSParser, tsi::TSIParser,
+        et::ETParser, gft::GFTParser, gt::GTParser, mtd::MTDParser, rs::RSParser, tsi::TSIParser,
     },
 };
 
@@ -44,7 +44,8 @@ enum Parser {
     Gt(GTParser),
     Gft(GFTParser),
     Ddt(DDTParser),
-    AO(AOParser),
+    Ao(AOParser),
+    Mtd(MTDParser),
 }
 
 impl Parser {
@@ -59,7 +60,8 @@ impl Parser {
             Gt(p) => p.parse_to_json_file(bytes, output_folder),
             Gft(p) => p.parse_to_json_file(bytes, output_folder),
             Ddt(p) => p.parse_to_json_file(bytes, output_folder),
-            AO(p) => p.parse_to_json_file(bytes, output_folder),
+            Ao(p) => p.parse_to_json_file(bytes, output_folder),
+            Mtd(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -75,7 +77,8 @@ impl Parser {
             "gt" => Parser::Gt(GTParser),
             "gft" => Parser::Gft(GFTParser),
             "ddt" => Parser::Ddt(DDTParser),
-            "ao" => Parser::AO(AOParser),
+            "ao" => Parser::Ao(AOParser),
+            "mtd" => Parser::Mtd(MTDParser),
             _ => return None,
         };
 
