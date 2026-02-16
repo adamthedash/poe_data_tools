@@ -7,6 +7,7 @@ pub mod gft;
 pub mod gt;
 pub mod lift;
 pub mod lift_winnow;
+pub mod mat;
 pub mod mtd;
 pub mod rs;
 pub mod shared;

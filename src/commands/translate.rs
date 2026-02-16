@@ -9,7 +9,8 @@ use crate::{
     commands::Patch,
     file_parsers::{
         FileParser, ao::AOParser, arm::parser::ARMParser, ddt::DDTParser, ecf::ECFParser,
-        et::ETParser, gft::GFTParser, gt::GTParser, mtd::MTDParser, rs::RSParser, tsi::TSIParser,
+        et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, rs::RSParser,
+        tsi::TSIParser,
     },
 };
 
@@ -46,6 +47,7 @@ enum Parser {
     Ddt(DDTParser),
     Ao(AOParser),
     Mtd(MTDParser),
+    Mat(MATParser),
 }
 
 impl Parser {
@@ -62,23 +64,26 @@ impl Parser {
             Ddt(p) => p.parse_to_json_file(bytes, output_folder),
             Ao(p) => p.parse_to_json_file(bytes, output_folder),
             Mtd(p) => p.parse_to_json_file(bytes, output_folder),
+            Mat(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
     fn from_filename(filename: &Path) -> Option<Self> {
         let ext = filename.extension()?.to_str()?;
 
+        use Parser::*;
         let f = match ext {
-            "rs" => Parser::Rs(RSParser),
-            "tsi" => Parser::Tsi(TSIParser),
-            "arm" => Parser::Arm(ARMParser),
-            "ecf" => Parser::Ecf(ECFParser),
-            "et" => Parser::Et(ETParser),
-            "gt" => Parser::Gt(GTParser),
-            "gft" => Parser::Gft(GFTParser),
-            "ddt" => Parser::Ddt(DDTParser),
-            "ao" => Parser::Ao(AOParser),
-            "mtd" => Parser::Mtd(MTDParser),
+            "rs" => Rs(RSParser),
+            "tsi" => Tsi(TSIParser),
+            "arm" => Arm(ARMParser),
+            "ecf" => Ecf(ECFParser),
+            "et" => Et(ETParser),
+            "gt" => Gt(GTParser),
+            "gft" => Gft(GFTParser),
+            "ddt" => Ddt(DDTParser),
+            "ao" => Ao(AOParser),
+            "mtd" => Mtd(MTDParser),
+            "mat" => Mat(MATParser),
             _ => return None,
         };
 
