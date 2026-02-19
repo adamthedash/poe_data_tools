@@ -3,8 +3,8 @@ pub mod types;
 pub mod winnow_parser;
 
 use anyhow::Result;
-use nom_parser::parse_ddt_str;
 use types::*;
+use winnow_parser::parse_ddt_str;
 
 use crate::file_parsers::{FileParser, shared::utf16_bom_to_string};
 

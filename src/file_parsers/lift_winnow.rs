@@ -8,7 +8,7 @@ use winnow::{
 use crate::file_parsers::shared::winnow::TraceHelper;
 
 /// Winnow parser over `&[I]` input
-pub trait SliceParser<'a, I, O, E> = Parser<&'a [I], O, E> where I: 'a;
+pub trait SliceParser<'a, I, O> = Parser<&'a [I], O, ContextError> where I: 'a;
 
 pub struct Lift<P> {
     inner: P,
