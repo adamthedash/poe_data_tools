@@ -1,4 +1,8 @@
-use annotated_parser::{combinators::TakeTillExc, parsers::TakeArray, prelude::*};
+use annotated_parser::{
+    combinators::TakeTillExc,
+    parsers::{Empty, TakeArray},
+    prelude::*,
+};
 
 /// Simpler trait alias for byte parsers
 pub trait U8Parser: for<'a> Parser<&'a [u8]> {}
@@ -16,6 +20,11 @@ pub fn take_arr_u8<const N: usize>() -> impl U8Parser<Output = [u8; N]> {
 /// For proper input type inference
 fn take_arr_str<const N: usize>() -> impl StrParser<Output = String> {
     TakeArray::<N>
+}
+
+/// For proper input type inference
+pub fn empty_u8() -> impl U8Parser<Output = ()> {
+    Empty
 }
 
 pub fn whitespace() -> impl StrParser<Output = String> {
