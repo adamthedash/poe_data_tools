@@ -8,9 +8,8 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     file_parsers::{
-        FileParser, ao::AOParser, arm::parser::ARMParser, ddt::DDTParser, ecf::ECFParser,
-        et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, rs::RSParser,
-        tsi::TSIParser,
+        FileParser, ao::AOParser, arm::ARMParser, ddt::DDTParser, ecf::ECFParser, et::ETParser,
+        gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, rs::RSParser, tsi::TSIParser,
     },
 };
 
