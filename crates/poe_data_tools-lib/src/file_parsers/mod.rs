@@ -27,6 +27,7 @@ pub mod rs;
 pub mod shared;
 pub mod sm;
 pub mod smd;
+pub mod tdt;
 pub mod tgm;
 pub mod tgt;
 pub mod tmo;
@@ -43,8 +44,8 @@ use self::{
     amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser, dct::DCTParser,
     ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser, et::ETParser, fmt::FMTParser,
     gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, pet::PETParser,
-    psg::PSGParser, rs::RSParser, sm::SMParser, smd::SMDParser, tgm::TGMParser, tgt::TGTParser,
-    tmo::TMOParser, toy::TOYParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
+    psg::PSGParser, rs::RSParser, sm::SMParser, smd::SMDParser, tdt::TDTParser, tgm::TGMParser,
+    tgt::TGTParser, tmo::TMOParser, toy::TOYParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
 };
 
 pub trait FileParser {
@@ -99,6 +100,7 @@ pub enum Parser {
     Rs(RSParser),
     Sm(SMParser),
     Smd(SMDParser),
+    Tdt(TDTParser),
     Tgm(TGMParser),
     Tgt(TGTParser),
     Tmo(TMOParser),
@@ -138,6 +140,7 @@ impl Parser {
             "rs" => Rs(RSParser),
             "sm" => Sm(SMParser),
             "smd" => Smd(SMDParser),
+            "tdt" => Tdt(TDTParser),
             "tgm" => Tgm(TGMParser),
             "tgt" => Tgt(TGTParser),
             "tmo" => Tmo(TMOParser),
@@ -180,6 +183,7 @@ impl FileParser for Parser {
             Rs(p) => ParserOutput::Rs(p.parse(bytes)?),
             Sm(p) => ParserOutput::Sm(p.parse(bytes)?),
             Smd(p) => ParserOutput::Smd(Box::new(p.parse(bytes)?)),
+            Tdt(p) => ParserOutput::Tdt(Box::new(p.parse(bytes)?)),
             Tgm(p) => ParserOutput::Tgm(p.parse(bytes)?),
             Tgt(p) => ParserOutput::Tgt(Box::new(p.parse(bytes)?)),
             Tmo(p) => ParserOutput::Tmo(p.parse(bytes)?),
@@ -221,6 +225,7 @@ pub enum ParserOutput {
     Rs(<RSParser as FileParser>::Output),
     Sm(<SMParser as FileParser>::Output),
     Smd(Box<<SMDParser as FileParser>::Output>),
+    Tdt(Box<<TDTParser as FileParser>::Output>),
     Tgm(<TGMParser as FileParser>::Output),
     Tgt(Box<<TGTParser as FileParser>::Output>),
     Tmo(<TMOParser as FileParser>::Output),
@@ -256,6 +261,7 @@ impl VersionedFile for ParserOutput {
             Rs(o) => o.version(),
             Sm(o) => o.version(),
             Smd(o) => o.version(),
+            Tdt(o) => o.version(),
             Tgm(o) => o.version(),
             Tgt(o) => o.version(),
             Tmo(o) => o.version(),
