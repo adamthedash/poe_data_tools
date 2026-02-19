@@ -12,7 +12,7 @@ use nom::{
 
 use super::types::*;
 use crate::file_parsers::{
-    lift::{SliceParser, ToSliceParser},
+    lift_nom::{SliceParser, ToSliceParser},
     shared::{NomParser, quoted_str, safe_u32, unquoted_str, version_line},
     slice::Slice,
 };

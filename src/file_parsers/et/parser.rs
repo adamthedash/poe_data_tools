@@ -10,7 +10,7 @@ use nom::{
 
 use super::types::*;
 use crate::file_parsers::{
-    lift::{SliceParser, ToSliceParser},
+    lift_nom::{SliceParser, ToSliceParser},
     shared::{NomParser, parse_bool, separated_array, unquoted_str},
     slice::Slice,
 };

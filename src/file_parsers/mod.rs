@@ -5,7 +5,7 @@ pub mod ecf;
 pub mod et;
 pub mod gft;
 pub mod gt;
-pub mod lift;
+pub mod lift_nom;
 pub mod lift_winnow;
 pub mod mat;
 pub mod mtd;

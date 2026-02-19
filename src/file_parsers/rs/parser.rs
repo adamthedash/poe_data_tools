@@ -9,7 +9,7 @@ use nom::{
 
 use super::types::*;
 use crate::file_parsers::{
-    lift::ToSliceParser,
+    lift_nom::ToSliceParser,
     shared::{NomParser, quoted_str, unquoted_str, version_line},
     slice::Slice,
 };

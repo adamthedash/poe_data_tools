@@ -15,7 +15,7 @@ use nom::{
 
 use super::types::*;
 use crate::file_parsers::{
-    lift::{SliceParser, ToSliceParser},
+    lift_nom::{SliceParser, ToSliceParser},
     shared::{NomParser, parse_bool, quoted_str, separated_array, unquoted_str, version_line},
     slice::Slice,
 };
