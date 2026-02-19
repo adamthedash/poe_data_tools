@@ -26,6 +26,7 @@ pub mod rs;
 pub mod shared;
 pub mod sm;
 pub mod smd;
+pub mod tdt;
 pub mod tgm;
 pub mod tgt;
 pub mod tmo;
