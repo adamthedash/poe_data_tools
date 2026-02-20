@@ -2,7 +2,7 @@ use winnow::{
     Parser,
     combinator::impls::Context,
     error::{ContextError, Result, StrContext},
-    stream::Stream,
+    stream::{Stream, StreamIsPartial},
 };
 
 use crate::file_parsers::shared::winnow::TraceHelper;
@@ -27,14 +27,14 @@ where
 
 impl<P, I, S, O> Parser<S, O, ContextError> for Lift<P>
 where
-    I: Stream,
+    I: Stream + StreamIsPartial,
     S: Stream<Token = I>,
     P: Parser<I, O, ContextError>,
 {
     fn parse_next(&mut self, input: &mut S) -> Result<O> {
         let checkpoint = input.checkpoint();
 
-        let Some(mut token) = input.next_token() else {
+        let Some(token) = input.next_token() else {
             let mut context = ContextError::new();
             context.extend([StrContext::Label("outer")]);
             return Err(context);
@@ -42,20 +42,20 @@ where
 
         // TODO: Does this ensure input is fully consumed?
         //      Also do we need to add more context here?
-        let result = self.inner.parse_next(&mut token);
+        let result = self.inner.parse(token);
         if result.is_err() {
             // Reset input back to where it was before
             input.reset(&checkpoint);
         }
 
-        result
+        result.map_err(|e| e.into_inner())
     }
 }
 
 /// "Lifts" the parser up one level, allowing it to parse &[I] instead of I
 pub fn lift<I, S, O, P>(parser: P) -> impl Parser<S, O, ContextError>
 where
-    I: Stream,
+    I: Stream + StreamIsPartial,
     S: Stream<Token = I>,
     P: Parser<I, O, ContextError>,
 {
@@ -70,7 +70,7 @@ mod tests {
 
     #[test]
     fn test_nested() {
-        let input = vec!["as", "a", "b"];
+        let input = vec!["a", "a", "b"];
         let mut input = input.as_slice();
 
         // In-line parser
