@@ -10,6 +10,7 @@ use crate::{
     file_parsers::{
         FileParser, ao::AOParser, arm::ARMParser, ddt::DDTParser, ecf::ECFParser, et::ETParser,
         gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, rs::RSParser, tsi::TSIParser,
+        tst::TSTParser,
     },
 };
 
@@ -47,6 +48,7 @@ enum Parser {
     Ao(AOParser),
     Mtd(MTDParser),
     Mat(MATParser),
+    Tst(TSTParser),
 }
 
 impl Parser {
@@ -64,6 +66,7 @@ impl Parser {
             Ao(p) => p.parse_to_json_file(bytes, output_folder),
             Mtd(p) => p.parse_to_json_file(bytes, output_folder),
             Mat(p) => p.parse_to_json_file(bytes, output_folder),
+            Tst(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -83,6 +86,7 @@ impl Parser {
             "ao" => Ao(AOParser),
             "mtd" => Mtd(MTDParser),
             "mat" => Mat(MATParser),
+            "tst" => Tst(TSTParser),
             _ => return None,
         };
 

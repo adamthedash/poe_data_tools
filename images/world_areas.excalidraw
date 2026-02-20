@@ -41024,7 +41024,7 @@
       "width": 151.7798614501953,
       "height": 25,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#2f9e44",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
@@ -41036,8 +41036,8 @@
       "index": "bP7",
       "roundness": null,
       "seed": 1799527281,
-      "version": 111,
-      "versionNonce": 1884421393,
+      "version": 112,
+      "versionNonce": 1987020653,
       "isDeleted": false,
       "boundElements": [
         {
@@ -41049,7 +41049,7 @@
           "type": "arrow"
         }
       ],
-      "updated": 1770503344752,
+      "updated": 1771611365161,
       "link": null,
       "locked": false,
       "text": "Doodads (.ddt)",

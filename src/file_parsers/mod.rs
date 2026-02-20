@@ -13,6 +13,7 @@ pub mod rs;
 pub mod shared;
 pub mod slice;
 pub mod tsi;
+pub mod tst;
 
 use anyhow::Result;
 

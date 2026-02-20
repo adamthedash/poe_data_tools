@@ -25,14 +25,15 @@ fn key_value<'a>() -> impl Parser<&'a str, (String, String), ContextError> {
 pub fn parse_tsi_str(contents: &str) -> Result<TSIFile> {
     let lines = contents
         .lines()
-        .filter(|l| !l.is_empty())
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
 
     let mut parser = repeat(0.., lift(key_value()));
 
     let tsi_file = parser
         .parse(lines.as_slice())
-        .map_err(|e| anyhow!("Failed to parse TSI: {e:?}"))?;
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     Ok(tsi_file)
 }
