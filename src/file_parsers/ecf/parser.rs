@@ -19,7 +19,10 @@ fn combination<'a>() -> impl NomParser<'a, EcfCombination> {
         separated_array(space1, quoted_str),
         opt(preceded(space1, parse_bool)),
     )
-        .map(|(et_files, bool1)| EcfCombination { et_files, bool1 })
+        .map(|(et_files, bool1)| EcfCombination {
+            et_files: et_files.map(Some),
+            bool1,
+        })
 }
 
 pub fn parse_ecf_str(contents: &str) -> Result<EcfFile> {

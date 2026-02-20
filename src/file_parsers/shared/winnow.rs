@@ -3,10 +3,10 @@ use std::fmt::Display;
 use winnow::{
     Parser,
     ascii::dec_uint,
-    combinator::{delimited, preceded, separated, trace},
+    combinator::{alt, delimited, eof, preceded, separated, trace},
     error::{ContextError, ParserError},
     stream::Stream,
-    token::{literal, take_until, take_while},
+    token::{literal, rest, take_until, take_while},
 };
 
 pub trait WinnowParser<I, T> = Parser<I, T, ContextError>;
@@ -59,15 +59,24 @@ pub fn space_or_nl0<'a>(input: &mut &'a str) -> winnow::Result<&'a str> {
     .parse_next(input)
 }
 
+fn quoted<'a>(quote: char) -> impl WinnowParser<&'a str, &'a str> {
+    delimited(
+        quote, //
+        take_until(0.., quote),
+        quote,
+    ) //
+    .trace(format!("quoted {quote:?}"))
+}
+
 pub fn quoted_str(input: &mut &str) -> winnow::Result<String> {
-    delimited('"', take_until(0.., '"'), '"')
+    quoted('"')
         .map(String::from)
         .trace("quoted_str")
         .parse_next(input)
 }
 
 pub fn single_quoted_str(input: &mut &str) -> winnow::Result<String> {
-    delimited('\'', take_until(0.., '\''), '\'')
+    quoted('\"')
         .map(String::from)
         .trace("single_quoted_str")
         .parse_next(input)
@@ -84,11 +93,23 @@ pub fn unquoted_str(input: &mut &str) -> winnow::Result<String> {
 pub fn filename<'a>(extension: &str) -> impl WinnowParser<&'a str, String> {
     let ext = format!(".{extension}");
 
-    // TODO: to_string after verify passes instead of before
-    delimited('"', take_until(0.., '"'), '"')
+    quoted('"')
         .verify(move |s: &str| s.ends_with(&ext))
         .map(String::from)
         .trace("filename")
+}
+
+/// Filename with the provided extension in a "quoted_string", or empty string
+pub fn optional_filename<'a>(extension: &str) -> impl WinnowParser<&'a str, Option<String>> {
+    let ext = format!(".{extension}");
+
+    quoted('"')
+        .and_then(alt((
+            eof.map(|_| None),
+            rest.verify(move |s: &str| s.ends_with(&ext))
+                .map(|s: &str| Some(s.to_string())),
+        )))
+        .trace("optional_filename")
 }
 
 pub fn version_line<'a>() -> impl WinnowParser<&'a str, u32> {

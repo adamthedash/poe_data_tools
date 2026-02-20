@@ -9,13 +9,13 @@ use super::types::*;
 use crate::file_parsers::{
     lift_winnow::lift,
     shared::winnow::{
-        TraceHelper, WinnowParser, parse_bool, quoted_str, separated_array, version_line,
+        TraceHelper, WinnowParser, optional_filename, parse_bool, separated_array, version_line,
     },
 };
 
 fn combination<'a>() -> impl WinnowParser<&'a str, EcfCombination> {
     (
-        separated_array(space1, quoted_str),
+        separated_array(space1, optional_filename("et")),
         opt(preceded(space1, parse_bool)),
     )
         .map(|(et_files, bool1)| EcfCombination { et_files, bool1 })

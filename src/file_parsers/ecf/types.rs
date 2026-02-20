@@ -8,6 +8,6 @@ pub struct EcfFile {
 
 #[derive(Debug, Serialize)]
 pub struct EcfCombination {
-    pub et_files: [String; 3],
+    pub et_files: [Option<String>; 3],
     pub bool1: Option<bool>,
 }
