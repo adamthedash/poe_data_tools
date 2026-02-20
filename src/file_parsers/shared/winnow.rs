@@ -3,10 +3,10 @@ use std::fmt::Display;
 use winnow::{
     Parser,
     ascii::dec_uint,
-    combinator::{alt, delimited, eof, preceded, separated, trace},
+    combinator::{alt, delimited, eof, preceded, repeat, separated, trace},
     error::{ContextError, ParserError},
-    stream::Stream,
-    token::{literal, rest, take_until, take_while},
+    stream::{AsChar, Stream},
+    token::{literal, rest, take_till, take_until, take_while},
 };
 
 pub trait WinnowParser<I, T> = Parser<I, T, ContextError>;
@@ -59,13 +59,17 @@ pub fn space_or_nl0<'a>(input: &mut &'a str) -> winnow::Result<&'a str> {
     .parse_next(input)
 }
 
-fn quoted<'a>(quote: char) -> impl WinnowParser<&'a str, &'a str> {
+pub fn quoted<'a>(quote: char) -> impl WinnowParser<&'a str, &'a str> {
     delimited(
         quote, //
         take_until(0.., quote),
         quote,
     ) //
     .trace(format!("quoted {quote:?}"))
+}
+
+pub fn unquoted<'a>() -> impl WinnowParser<&'a str, &'a str> {
+    take_till(1.., AsChar::is_space).trace("unquoted")
 }
 
 pub fn quoted_str(input: &mut &str) -> winnow::Result<String> {
@@ -83,31 +87,27 @@ pub fn single_quoted_str(input: &mut &str) -> winnow::Result<String> {
 }
 
 pub fn unquoted_str(input: &mut &str) -> winnow::Result<String> {
-    take_while(1.., |c: char| !c.is_whitespace())
+    unquoted()
         .map(String::from)
         .trace("unquoted_str")
         .parse_next(input)
 }
 
-/// Filename with the provided extension in a "quoted_string"
+/// Designed for use with Parser::and_then
 pub fn filename<'a>(extension: &str) -> impl WinnowParser<&'a str, String> {
     let ext = format!(".{extension}");
 
-    quoted('"')
-        .verify(move |s: &str| s.ends_with(&ext))
+    rest.verify(move |s: &str| s.ends_with(&ext))
         .map(String::from)
         .trace("filename")
 }
 
 /// Filename with the provided extension in a "quoted_string", or empty string
 pub fn optional_filename<'a>(extension: &str) -> impl WinnowParser<&'a str, Option<String>> {
-    let ext = format!(".{extension}");
-
     quoted('"')
         .and_then(alt((
-            eof.map(|_| None),
-            rest.verify(move |s: &str| s.ends_with(&ext))
-                .map(|s: &str| Some(s.to_string())),
+            eof.map(|_| None), //
+            filename(extension).map(Some),
         )))
         .trace("optional_filename")
 }
@@ -132,6 +132,21 @@ where
                 .unwrap_or_else(|_| unreachable!("Parser should take care of length"))
         })
         .trace("separated_array")
+}
+
+/// winnow::combinator::repeat but exact sized
+pub fn repeat_array<const N: usize, I, O>(
+    parser: impl WinnowParser<I, O>,
+) -> impl WinnowParser<I, [O; N]>
+where
+    I: Stream,
+{
+    repeat(N, parser)
+        .map(|x: Vec<_>| {
+            x.try_into()
+                .unwrap_or_else(|_| unreachable!("Parser should take care of length"))
+        })
+        .trace("repeat_array")
 }
 
 /// tail .trace()

@@ -7,13 +7,16 @@ use winnow::{
 
 use super::{super::shared::winnow::space_or_nl1 as S, types::*};
 use crate::file_parsers::shared::winnow::{
-    TraceHelper, WinnowParser, filename, parse_bool, quoted_str, version_line,
+    TraceHelper, WinnowParser, filename, parse_bool, quoted, quoted_str, version_line,
 };
 
 fn entry(contents: &mut &str) -> winnow::Result<Entry> {
     (
-        filename("mat"), //
-        opt(P(S, filename("dlp"))),
+        quoted('"').and_then(filename("mat")),
+        opt(P(
+            S, //
+            quoted('"').and_then(filename("dlp")),
+        )),
     )
         .map(|(mat_file, dlp_file)| Entry { mat_file, dlp_file })
         .trace("entry")
@@ -51,7 +54,14 @@ fn group(contents: &mut &str) -> winnow::Result<Group> {
     )
     .parse_next(contents)?;
 
-    let extra_mat_files = repeat(num_b, P(S, filename("mat"))).parse_next(contents)?;
+    let extra_mat_files = repeat(
+        num_b,
+        P(
+            S, //
+            quoted('"').and_then(filename("mat")),
+        ),
+    )
+    .parse_next(contents)?;
 
     let group = Group {
         name,

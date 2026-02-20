@@ -23,10 +23,16 @@ pub struct VirtualSection {
 }
 
 #[derive(Debug, Serialize)]
+pub enum GTFile {
+    Wildcard,
+    Path(String),
+}
+
+#[derive(Debug, Serialize)]
 pub struct ETFile {
     pub name: String,
     pub hex: Option<String>,
-    pub gt_files: [String; 2],
+    pub gt_files: [GTFile; 2],
     pub num_line: Option<NumLine>,
     pub gt_file2: Option<String>,
     pub virtual_section: Option<VirtualSection>,

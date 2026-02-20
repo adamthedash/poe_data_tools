@@ -84,7 +84,10 @@ pub fn parse_et_str(contents: &str) -> Result<ETFile> {
             |((name, hex), gt_files, num_line, gt_file2, virtual_section)| ETFile {
                 name,
                 hex,
-                gt_files,
+                gt_files: gt_files.map(|p| match p.as_str() {
+                    "wildcard" => GTFile::Wildcard,
+                    _ => GTFile::Path(p),
+                }),
                 num_line,
                 virtual_section,
                 gt_file2,

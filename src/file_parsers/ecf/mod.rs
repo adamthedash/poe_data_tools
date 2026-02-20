@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::file_parsers::{FileParser, shared::utf16_bom_to_string};
 
-pub mod parser;
+pub mod nom_parser;
 pub mod types;
 pub mod winnow_parser;
 use types::*;

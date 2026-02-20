@@ -10,7 +10,8 @@ use super::types::*;
 use crate::file_parsers::{
     lift_winnow::{SliceParser, lift},
     shared::winnow::{
-        TraceHelper, WinnowParser, filename, quoted_str, safe_u32, unquoted_str, version_line,
+        TraceHelper, WinnowParser, filename, quoted, quoted_str, safe_u32, unquoted_str,
+        version_line,
     },
 };
 
@@ -42,7 +43,7 @@ fn group_header<'a>(
 fn object<'a>() -> impl WinnowParser<&'a str, Object> {
     (
         alt((literal("All").map(|_| Weight::All), F.map(Weight::Float))),
-        P(space1, filename("ao")),
+        P(space1, quoted('"').and_then(filename("ao"))),
         opt(P(space1, safe_u32)),
         opt(P(space1, literal("D").map(String::from))),
         opt(P(space1, F)),
