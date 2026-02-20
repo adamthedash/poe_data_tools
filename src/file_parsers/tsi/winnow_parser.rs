@@ -2,8 +2,9 @@ use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     ascii::space1,
-    combinator::{alt, repeat, separated_pair},
+    combinator::{alt, eof, repeat, separated_pair, terminated},
     error::ContextError,
+    token::rest,
 };
 
 use super::types::TSIFile;
@@ -17,7 +18,10 @@ fn key_value<'a>() -> impl Parser<&'a str, (String, String), ContextError> {
         unquoted_str,
         space1,
         // Attempt to un-quote single quoted strings, otherwise just take the rest as-is
-        alt((quoted_str, unquoted_str)),
+        alt((
+            terminated(quoted_str, eof), //
+            rest.map(String::from),
+        )),
     )
     .trace("key_value")
 }

@@ -40,8 +40,7 @@ where
             return Err(context);
         };
 
-        // TODO: Does this ensure input is fully consumed?
-        //      Also do we need to add more context here?
+        //  TODO: Also do we need to add more context here?
         let result = self.inner.parse(token);
         if result.is_err() {
             // Reset input back to where it was before
