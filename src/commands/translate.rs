@@ -8,9 +8,9 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     file_parsers::{
-        FileParser, ao::AOParser, arm::ARMParser, clt::CLTParser, ddt::DDTParser, ecf::ECFParser,
-        et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, rs::RSParser,
-        tsi::TSIParser, tst::TSTParser,
+        FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, clt::CLTParser, ddt::DDTParser,
+        ecf::ECFParser, et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser,
+        rs::RSParser, tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -50,6 +50,7 @@ enum Parser {
     Mat(MATParser),
     Tst(TSTParser),
     Clt(CLTParser),
+    Amd(AMDParser),
 }
 
 impl Parser {
@@ -69,6 +70,7 @@ impl Parser {
             Mat(p) => p.parse_to_json_file(bytes, output_folder),
             Tst(p) => p.parse_to_json_file(bytes, output_folder),
             Clt(p) => p.parse_to_json_file(bytes, output_folder),
+            Amd(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -90,6 +92,7 @@ impl Parser {
             "mat" => Mat(MATParser),
             "tst" => Tst(TSTParser),
             "clt" => Clt(CLTParser),
+            "amd" => Amd(AMDParser),
             _ => return None,
         };
 

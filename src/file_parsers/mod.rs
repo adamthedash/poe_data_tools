@@ -1,3 +1,4 @@
+pub mod amd;
 pub mod ao;
 pub mod arm;
 pub mod clt;
