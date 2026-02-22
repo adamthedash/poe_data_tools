@@ -56,26 +56,8 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 # World Area related files
 ![world areas](./images/world_areas.png)  
 
-## TSI File Format
-![tsi format](./images/tsi_spec.png)  
-
-## RS File Format
-![rs format](./images/rs_spec.png)  
-
-## ECF File Format
-![ecf format](./images/ecf_spec.png)  
-
-## ET File Format
-![et format](./images/et_spec.png)  
-
-## GT File Format
-![gt format](./images/gt_spec.png)  
-
-## GFT File Format
-![gft format](./images/gft_spec.png)  
-
-## DDT File Format
-![ddt format](./images/ddt_spec.png)  
+## AMD File Format
+![amd format](./images/amd_spec.png)  
 
 ## AO File Format
 ![ao format](./images/ao_spec.png)  
@@ -83,6 +65,38 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ## ARM File Format
 ![arm format](./images/arm_spec.png)  
 
+## CLT File Format
+![clt format](./images/clt_spec.png)  
+
+## DDT File Format
+![ddt format](./images/ddt_spec.png)  
+
+## ECF File Format
+![ecf format](./images/ecf_spec.png)  
+
+## ET File Format
+![et format](./images/et_spec.png)  
+
+## GFT File Format
+![gft format](./images/gft_spec.png)  
+
+## GT File Format
+![gt format](./images/gt_spec.png)  
+
+## MAT File Format
+![mat format](./images/mat_spec.png)  
+
+## MTD File Format
+![mtd format](./images/mtd_spec.png)  
+
+## RS File Format
+![rs format](./images/rs_spec.png)  
+
+## TSI File Format
+![tsi format](./images/tsi_spec.png)  
+
+## TST File Format
+![tst format](./images/tst_spec.png)  
 
 **TODO List**
 
