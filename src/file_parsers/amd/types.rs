@@ -3,7 +3,7 @@ use serde::Serialize;
 #[derive(Debug, Serialize)]
 pub struct AnimationStage {
     pub name: String,
-    pub uint1: u32,
+    pub time: u32,
     pub floats: [f32; 3],
 }
 

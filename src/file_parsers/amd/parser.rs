@@ -21,11 +21,7 @@ fn animation_stage<'a>() -> impl SliceParser<'a, &'a str, AnimationStage> {
         lift(dec_uint),
         lift(separated_array(space1, float)),
     )
-        .map(|(name, uint1, floats)| AnimationStage {
-            name,
-            uint1,
-            floats,
-        })
+        .map(|(name, time, floats)| AnimationStage { name, time, floats })
         .trace("animation_stage")
 }
 
@@ -133,9 +129,9 @@ fn bone_groups<'a>() -> impl SliceParser<'a, &'a str, Vec<BoneGroup>> {
 }
 
 pub fn parse_amd_str(contents: &str) -> Result<AMDFile> {
+    // NOTE: Some files have missing newlines, so split on tabs aswell
     let lines = contents
-        .lines()
-        // TODO: trimming here might be a bad idea
+        .split_inclusive(['\n', '\t'])
         .map(|l| l.trim())
         .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
