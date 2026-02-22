@@ -15,12 +15,8 @@ use nom::{
 
 use super::types::*;
 use crate::file_parsers::{
-    FileParser,
-    lift::{SliceParser, ToSliceParser},
-    shared::{
-        NomParser, parse_bool, quoted_str, separated_array, unquoted_str, utf16_bom_to_string,
-        version_line,
-    },
+    lift_nom::{SliceParser, ToSliceParser},
+    shared::{NomParser, parse_bool, quoted_str, separated_array, unquoted_str, version_line},
     slice::Slice,
 };
 
@@ -442,7 +438,7 @@ fn thingy<'a>(strings: &[String]) -> impl NomParser<'a, Thingy> {
         })
 }
 
-fn parse_arm_str(input: &str) -> Result<ARMFile> {
+pub fn parse_arm_str(input: &str) -> Result<ARMFile> {
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
     let lines = Slice(lines.as_slice());
 
@@ -527,16 +523,4 @@ fn parse_arm_str(input: &str) -> Result<ARMFile> {
     };
 
     Ok(arm_file)
-}
-
-pub struct ARMParser;
-
-impl FileParser for ARMParser {
-    type Output = ARMFile;
-
-    fn parse(&self, bytes: &[u8]) -> anyhow::Result<Self::Output> {
-        let contents = utf16_bom_to_string(bytes)?;
-
-        parse_arm_str(&contents)
-    }
 }

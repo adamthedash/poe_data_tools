@@ -8,8 +8,9 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     file_parsers::{
-        FileParser, ao::AOParser, arm::parser::ARMParser, ddt::DDTParser, ecf::ECFParser,
-        et::ETParser, gft::GFTParser, gt::GTParser, rs::RSParser, tsi::TSIParser,
+        FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, clt::CLTParser, ddt::DDTParser,
+        ecf::ECFParser, epk::EPKParser, et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser,
+        mtd::MTDParser, rs::RSParser, tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -44,7 +45,13 @@ enum Parser {
     Gt(GTParser),
     Gft(GFTParser),
     Ddt(DDTParser),
-    AO(AOParser),
+    Ao(AOParser),
+    Mtd(MTDParser),
+    Mat(MATParser),
+    Tst(TSTParser),
+    Clt(CLTParser),
+    Amd(AMDParser),
+    Epk(EPKParser),
 }
 
 impl Parser {
@@ -59,23 +66,36 @@ impl Parser {
             Gt(p) => p.parse_to_json_file(bytes, output_folder),
             Gft(p) => p.parse_to_json_file(bytes, output_folder),
             Ddt(p) => p.parse_to_json_file(bytes, output_folder),
-            AO(p) => p.parse_to_json_file(bytes, output_folder),
+            Ao(p) => p.parse_to_json_file(bytes, output_folder),
+            Mtd(p) => p.parse_to_json_file(bytes, output_folder),
+            Mat(p) => p.parse_to_json_file(bytes, output_folder),
+            Tst(p) => p.parse_to_json_file(bytes, output_folder),
+            Clt(p) => p.parse_to_json_file(bytes, output_folder),
+            Amd(p) => p.parse_to_json_file(bytes, output_folder),
+            Epk(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
     fn from_filename(filename: &Path) -> Option<Self> {
         let ext = filename.extension()?.to_str()?;
 
+        use Parser::*;
         let f = match ext {
-            "rs" => Parser::Rs(RSParser),
-            "tsi" => Parser::Tsi(TSIParser),
-            "arm" => Parser::Arm(ARMParser),
-            "ecf" => Parser::Ecf(ECFParser),
-            "et" => Parser::Et(ETParser),
-            "gt" => Parser::Gt(GTParser),
-            "gft" => Parser::Gft(GFTParser),
-            "ddt" => Parser::Ddt(DDTParser),
-            "ao" => Parser::AO(AOParser),
+            "rs" => Rs(RSParser),
+            "tsi" => Tsi(TSIParser),
+            "arm" => Arm(ARMParser),
+            "ecf" => Ecf(ECFParser),
+            "et" => Et(ETParser),
+            "gt" => Gt(GTParser),
+            "gft" => Gft(GFTParser),
+            "ddt" => Ddt(DDTParser),
+            "ao" => Ao(AOParser),
+            "mtd" => Mtd(MTDParser),
+            "mat" => Mat(MATParser),
+            "tst" => Tst(TSTParser),
+            "clt" => Clt(CLTParser),
+            "amd" => Amd(AMDParser),
+            "epk" => Epk(EPKParser),
             _ => return None,
         };
 

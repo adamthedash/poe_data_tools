@@ -92,7 +92,7 @@ mod tests {
         multi::{count, many1},
     };
 
-    use crate::file_parsers::{lift::ToSliceParser, slice::Slice};
+    use crate::file_parsers::{lift_nom::ToSliceParser, slice::Slice};
 
     #[test]
     fn test_nested() {

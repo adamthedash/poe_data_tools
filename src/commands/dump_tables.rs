@@ -1,17 +1,17 @@
 use std::{
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use arrow_array::{
+    ArrayRef, BooleanArray, Float32Array, Int16Array, Int32Array, RecordBatch, StringArray,
+    UInt16Array, UInt32Array, UInt64Array,
     builder::{
         Float32Builder, Int16Builder, Int32Builder, ListBuilder, StringBuilder, UInt16Builder,
         UInt32Builder, UInt64Builder,
     },
-    ArrayRef, BooleanArray, Float32Array, Int16Array, Int32Array, RecordBatch, StringArray,
-    UInt16Array, UInt32Array, UInt64Array,
 };
 use arrow_cast::display::{ArrayFormatter, FormatOptions};
 use arrow_csv::Writer;
@@ -20,13 +20,13 @@ use bytes::Bytes;
 use glob::{MatchOptions, Pattern};
 
 use crate::{
+    VERBOSE,
     bundle_fs::FS,
     commands::Patch,
     dat::{
-        ivy_schema::{fetch_schema, ColumnSchema, DatTableSchema, SchemaCollection},
+        ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection, fetch_schema},
         table_view::DatTable,
     },
-    VERBOSE,
 };
 
 fn parse_foreignrow(bytes: &[u8]) -> u64 {

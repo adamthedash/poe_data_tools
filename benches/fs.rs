@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use dirs::cache_dir;
 use poe_data_tools::{bundle_fs::FS, bundle_loader::cdn_base_url, steam::steam_folder_search};
 

@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use glob::{MatchOptions, Pattern};
 
 use crate::bundle_fs::FS;
