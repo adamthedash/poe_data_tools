@@ -9,8 +9,8 @@ use crate::{
     commands::Patch,
     file_parsers::{
         FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, clt::CLTParser, ddt::DDTParser,
-        ecf::ECFParser, et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser,
-        rs::RSParser, tsi::TSIParser, tst::TSTParser,
+        ecf::ECFParser, epk::EPKParser, et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser,
+        mtd::MTDParser, rs::RSParser, tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -51,6 +51,7 @@ enum Parser {
     Tst(TSTParser),
     Clt(CLTParser),
     Amd(AMDParser),
+    Epk(EPKParser),
 }
 
 impl Parser {
@@ -71,6 +72,7 @@ impl Parser {
             Tst(p) => p.parse_to_json_file(bytes, output_folder),
             Clt(p) => p.parse_to_json_file(bytes, output_folder),
             Amd(p) => p.parse_to_json_file(bytes, output_folder),
+            Epk(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -93,6 +95,7 @@ impl Parser {
             "tst" => Tst(TSTParser),
             "clt" => Clt(CLTParser),
             "amd" => Amd(AMDParser),
+            "epk" => Epk(EPKParser),
             _ => return None,
         };
 
