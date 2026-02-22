@@ -140,6 +140,21 @@ pub fn attached_object_bone_index<'a>() -> impl WinnowParser<&'a str, Effect> {
         .trace("AttachedObject")
 }
 
+pub fn child_attached_object<'a>() -> impl WinnowParser<&'a str, Effect> {
+    (
+        quoted('"').and_then(filename("ao")), //
+        P((space1, literal("from_bone"), space1), quoted_str),
+        P((space1, literal("from_bone_group_index"), space1), dec_uint),
+    )
+        .map(
+            |(ao_file, from_bone, from_bone_group_index)| Effect::ChildAttachedObject {
+                ao_file,
+                from_bone,
+                from_bone_group_index,
+            },
+        )
+}
+
 pub fn trail_effect<'a>() -> impl WinnowParser<&'a str, Effect> {
     (
         quoted_str,
@@ -211,21 +226,6 @@ pub fn play_misc_effect_pack_after_delay<'a>() -> impl WinnowParser<&'a str, Eff
         .trace("PlayMiscEffectPackAfterDelay")
 }
 
-pub fn child_attached_object<'a>() -> impl WinnowParser<&'a str, Effect> {
-    (
-        quoted('"').and_then(filename("ao")), //
-        P((space1, literal("from_bone"), space1), quoted_str),
-        P((space1, literal("from_bone_group_index"), space1), dec_uint),
-    )
-        .map(
-            |(ao_file, from_bone, from_bone_group_index)| Effect::ChildAttachedObject {
-                ao_file,
-                from_bone,
-                from_bone_group_index,
-            },
-        )
-}
-
 pub fn other_effect<'a>(name: &str) -> impl WinnowParser<&'a str, Effect> {
     rest.map(|rest: &str| Effect::Other {
         name: name.to_string(),
@@ -242,6 +242,7 @@ pub fn effect<'a>() -> impl SliceParser<'a, &'a str, Effect> {
             "AttachedObject" => attached_object(),
             "AttachedObjectEx" => attached_object_ex(),
             "AttachedObjectBoneIndex" => attached_object_bone_index(),
+            "ChildAttachedObject" => child_attached_object(),
             "ParticleEffect" => particle_effect(),
             "TrailEffect" => trail_effect(),
             "ParentOnlyEffects" => eof.map(|_| Effect::ParentOnlyEffects),
@@ -253,7 +254,6 @@ pub fn effect<'a>() -> impl SliceParser<'a, &'a str, Effect> {
             "HideFirstPassAfterDelayForDuration" => hide_first_pass_after_delay_for_duration(),
             "HideFirstPassUsingEPKParameter" => hide_first_pass_using_epk_parameter(),
             "HideFirstPassUsingTimelineParameter" => hide_first_pass_using_timeline_parameter(),
-            "ChildAttachedObject" => child_attached_object(),
             name => other_effect(name),
         }),
     ))
