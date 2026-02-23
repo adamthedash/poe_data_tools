@@ -8,10 +8,10 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     file_parsers::{
-        FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, clt::CLTParser, ddt::DDTParser,
-        dlp::DLPParser, ecf::ECFParser, epk::EPKParser, et::ETParser, gft::GFTParser, gt::GTParser,
-        mat::MATParser, mtd::MTDParser, pet::PETParser, rs::RSParser, trl::TRLParser,
-        tsi::TSIParser, tst::TSTParser,
+        FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
+        ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser, et::ETParser,
+        gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, pet::PETParser, rs::RSParser,
+        trl::TRLParser, tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -56,6 +56,7 @@ enum Parser {
     Pet(PETParser),
     Trl(TRLParser),
     Dlp(DLPParser),
+    Cht(CHTParser),
 }
 
 impl Parser {
@@ -80,6 +81,7 @@ impl Parser {
             Pet(p) => p.parse_to_json_file(bytes, output_folder),
             Trl(p) => p.parse_to_json_file(bytes, output_folder),
             Dlp(p) => p.parse_to_json_file(bytes, output_folder),
+            Cht(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -106,6 +108,7 @@ impl Parser {
             "pet" => Pet(PETParser),
             "trl" => Trl(TRLParser),
             "dlp" => Dlp(DLPParser),
+            "cht" => Cht(CHTParser),
             _ => return None,
         };
 

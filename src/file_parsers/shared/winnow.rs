@@ -164,3 +164,17 @@ where
         trace(name, self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use winnow::Parser;
+
+    use super::unquoted;
+
+    #[test]
+    fn test_unquoted() {
+        let input = "hello";
+        let x = unquoted().parse(input).unwrap();
+        assert_eq!(x, "hello");
+    }
+}
