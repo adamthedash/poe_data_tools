@@ -43604,7 +43604,7 @@
       "width": 209.7397918701172,
       "height": 25,
       "angle": 0,
-      "strokeColor": "#1e1e1e",
+      "strokeColor": "#f08c00",
       "backgroundColor": "transparent",
       "fillStyle": "solid",
       "strokeWidth": 2,
@@ -43616,8 +43616,8 @@
       "index": "bPt",
       "roundness": null,
       "seed": 1114138253,
-      "version": 60,
-      "versionNonce": 831613101,
+      "version": 61,
+      "versionNonce": 1345772835,
       "isDeleted": false,
       "boundElements": [
         {
@@ -43625,7 +43625,7 @@
           "type": "arrow"
         }
       ],
-      "updated": 1771793659893,
+      "updated": 1771845407148,
       "link": null,
       "locked": false,
       "text": "Particle Effect (.pet)",

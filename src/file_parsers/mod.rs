@@ -12,6 +12,7 @@ pub mod lift_nom;
 pub mod lift_winnow;
 pub mod mat;
 pub mod mtd;
+pub mod pet;
 pub mod rs;
 pub mod shared;
 pub mod slice;

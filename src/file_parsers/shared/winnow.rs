@@ -102,14 +102,14 @@ pub fn filename<'a>(extension: &str) -> impl WinnowParser<&'a str, String> {
         .trace("filename")
 }
 
-/// Filename with the provided extension in a "quoted_string", or empty string
+/// Filename with the provided extension, or empty string
+/// Designed for use with Parser::and_then
 pub fn optional_filename<'a>(extension: &str) -> impl WinnowParser<&'a str, Option<String>> {
-    quoted('"')
-        .and_then(alt((
-            eof.map(|_| None), //
-            filename(extension).map(Some),
-        )))
-        .trace("optional_filename")
+    alt((
+        eof.map(|_| None), //
+        filename(extension).map(Some),
+    ))
+    .trace("optional_filename")
 }
 
 pub fn version_line<'a>() -> impl WinnowParser<&'a str, u32> {
