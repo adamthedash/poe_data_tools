@@ -9,9 +9,9 @@ use crate::{
     commands::Patch,
     file_parsers::{
         FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
-        ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser, et::ETParser,
-        gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, pet::PETParser, rs::RSParser,
-        trl::TRLParser, tsi::TSIParser, tst::TSTParser,
+        dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
+        et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, pet::PETParser,
+        rs::RSParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -57,6 +57,7 @@ enum Parser {
     Trl(TRLParser),
     Dlp(DLPParser),
     Cht(CHTParser),
+    Dct(DCTParser),
 }
 
 impl Parser {
@@ -82,6 +83,7 @@ impl Parser {
             Trl(p) => p.parse_to_json_file(bytes, output_folder),
             Dlp(p) => p.parse_to_json_file(bytes, output_folder),
             Cht(p) => p.parse_to_json_file(bytes, output_folder),
+            Dct(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -109,6 +111,7 @@ impl Parser {
             "trl" => Trl(TRLParser),
             "dlp" => Dlp(DLPParser),
             "cht" => Cht(CHTParser),
+            "dct" => Dct(DCTParser),
             _ => return None,
         };
 
