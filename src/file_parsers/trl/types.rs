@@ -1,11 +1,8 @@
+use std::collections::HashMap;
+
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
-pub struct Emitter {
-    // pub emitter_type: String,
-    // pub material: Option<String>,
-    pub key_values: String,
-}
+pub type Emitter = HashMap<String, String>;
 
 #[derive(Debug, Serialize)]
 pub struct TRLFile {

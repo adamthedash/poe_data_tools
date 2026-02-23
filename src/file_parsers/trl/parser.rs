@@ -1,15 +1,15 @@
 use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
-    ascii::dec_uint,
-    combinator::{opt, repeat, repeat_till},
+    ascii::{dec_uint, space1},
+    combinator::{opt, repeat, repeat_till, separated_pair},
     token::{literal, rest},
 };
 
 use super::types::*;
 use crate::file_parsers::{
     lift_winnow::{SliceParser, lift},
-    shared::winnow::{TraceHelper, version_line},
+    shared::winnow::{TraceHelper, unquoted_str, version_line},
 };
 
 fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
@@ -17,13 +17,11 @@ fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
         lift(literal("{")), //
         repeat_till::<_, _, Vec<_>, _, _, _, _>(
             .., //
-            lift(rest),
+            lift(separated_pair(unquoted_str, space1, rest.map(String::from))),
             lift(literal("}")),
         ),
     )
-        .map(|(_, (contents, _))| Emitter {
-            key_values: contents.join("\n"),
-        })
+        .map(|(_, (key_values, _))| Emitter::from_iter(key_values))
         .trace("emitter")
 }
 
