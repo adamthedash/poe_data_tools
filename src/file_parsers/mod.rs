@@ -3,6 +3,7 @@ pub mod ao;
 pub mod arm;
 pub mod clt;
 pub mod ddt;
+pub mod dlp;
 pub mod ecf;
 pub mod epk;
 pub mod et;
