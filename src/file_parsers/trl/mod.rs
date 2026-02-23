@@ -4,17 +4,17 @@ use crate::file_parsers::{FileParser, shared::utf16_bom_to_string};
 
 pub mod parser;
 pub mod types;
-use parser::parse_pet_str;
+use parser::parse_trl_str;
 use types::*;
 
-pub struct PETParser;
+pub struct TRLParser;
 
-impl FileParser for PETParser {
-    type Output = PETFile;
+impl FileParser for TRLParser {
+    type Output = TRLFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
-        parse_pet_str(&contents)
+        parse_trl_str(&contents)
     }
 }

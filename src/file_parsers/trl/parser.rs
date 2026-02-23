@@ -2,49 +2,46 @@ use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     ascii::dec_uint,
-    binary::length_repeat,
-    combinator::{opt, repeat_till},
+    combinator::{opt, repeat, repeat_till},
     token::{literal, rest},
 };
 
 use super::types::*;
 use crate::file_parsers::{
     lift_winnow::{SliceParser, lift},
-    shared::winnow::{TraceHelper, optional_filename, quoted, unquoted_str, version_line},
+    shared::winnow::{TraceHelper, version_line},
 };
 
 fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
     (
         lift(literal("{")), //
-        lift(unquoted_str),
-        lift(quoted('"').and_then(optional_filename("mat"))),
         repeat_till::<_, _, Vec<_>, _, _, _, _>(
             .., //
             lift(rest),
             lift(literal("}")),
         ),
     )
-        .map(|(_, emitter_type, material, (contents, _))| Emitter {
-            emitter_type,
-            material,
+        .map(|(_, (contents, _))| Emitter {
             key_values: contents.join("\n"),
         })
         .trace("emitter")
 }
 
-pub fn parse_pet_str(contents: &str) -> Result<PETFile> {
+pub fn parse_trl_str(contents: &str) -> Result<TRLFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
         .collect::<Vec<_>>();
+    let mut lines = lines.as_slice();
+
+    let num_emitters: usize = lift(dec_uint)
+        .parse_next(&mut lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     let mut parser = (
         opt(lift(version_line())), //
-        length_repeat(
-            lift(dec_uint::<_, u32, _>), //
-            emitter(),
-        ),
+        repeat(num_emitters, emitter()),
         rest.try_map(|lines: &[&str]| {
             if lines.is_empty() {
                 Ok(None)
@@ -53,14 +50,14 @@ pub fn parse_pet_str(contents: &str) -> Result<PETFile> {
             }
         }),
     )
-        .map(|(version, emitters, payload)| PETFile {
+        .map(|(version, emitters, payload)| TRLFile {
             version,
             emitters,
             payload,
         });
 
     let pet_file = parser
-        .parse(lines.as_slice())
+        .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     Ok(pet_file)
