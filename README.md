@@ -65,11 +65,17 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ## ARM File Format
 ![arm format](./images/arm_spec.png)  
 
+## CHT File Format
+![cht format](./images/cht_spec.png)  
+
 ## CLT File Format
 ![clt format](./images/clt_spec.png)  
 
 ## DDT File Format
 ![ddt format](./images/ddt_spec.png)  
+
+## DLP File Format
+![dlp format](./images/dlp_spec.png)  
 
 ## ECF File Format
 ![ecf format](./images/ecf_spec.png)  
@@ -92,8 +98,14 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ## MTD File Format
 ![mtd format](./images/mtd_spec.png)  
 
+## PET File Format
+![pet format](./images/pet_spec.png)  
+
 ## RS File Format
 ![rs format](./images/rs_spec.png)  
+
+## TRL File Format
+![trl format](./images/trl_spec.png)  
 
 ## TSI File Format
 ![tsi format](./images/tsi_spec.png)  
