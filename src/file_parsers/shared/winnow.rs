@@ -70,6 +70,27 @@ pub fn space_or_nl0<'a>(input: &mut &'a str) -> winnow::Result<&'a str> {
     .parse_next(input)
 }
 
+/// /* multiline comments */
+pub fn comment_multiline<'a>() -> impl WinnowParser<&'a str, &'a str> {
+    delimited("/*", take_until(0.., "*/"), "*/") //
+        .trace("multiline_comment")
+}
+
+/// // Single line comment
+pub fn comment_single_line<'a>() -> impl WinnowParser<&'a str, &'a str> {
+    preceded("//", take_while(0.., |c| !(c == '\r' || c == '\n'))) //
+        .trace("single_line_comment")
+}
+
+/// Some combination of spaces, newlines, or comments, at least 1
+pub fn spaces_or_comments<'a>() -> impl WinnowParser<&'a str, String> {
+    let part_parser = alt((space_or_nl1, comment_multiline(), comment_single_line()));
+
+    repeat(1.., part_parser)
+        .map(|parts: Vec<&str>| parts.concat())
+        .trace("spaces_or_comments")
+}
+
 pub fn quoted<'a>(quote: char) -> impl WinnowParser<&'a str, &'a str> {
     delimited(
         quote, //
@@ -110,7 +131,7 @@ pub fn filename<'a>(extension: &str) -> impl WinnowParser<&'a str, String> {
 
     rest.verify(move |s: &str| s.ends_with(&ext))
         .map(String::from)
-        .trace("filename")
+        .trace(format!("filename {extension:?}"))
 }
 
 /// Filename with the provided extension, or empty string
@@ -120,7 +141,7 @@ pub fn optional_filename<'a>(extension: &str) -> impl WinnowParser<&'a str, Opti
         eof.map(|_| None), //
         filename(extension).map(Some),
     ))
-    .trace("optional_filename")
+    .trace(format!("optional_filename {extension:?}"))
 }
 
 pub fn version_line<'a>() -> impl WinnowParser<&'a str, u32> {
