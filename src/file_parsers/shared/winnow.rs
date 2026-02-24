@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use winnow::{
     Parser,
-    ascii::dec_uint,
+    ascii::{dec_int, dec_uint},
     combinator::{alt, delimited, eof, preceded, repeat, separated, trace},
     error::{ContextError, ParserError},
     stream::{AsChar, Stream},
@@ -39,6 +39,17 @@ pub fn safe_u32(input: &mut &str) -> winnow::Result<u32> {
     };
 
     parser.trace("safe_u32").parse_next(input)
+}
+
+/// -1 or 0+
+pub fn nullable_uint<'a>() -> impl WinnowParser<&'a str, Option<u32>> {
+    dec_int
+        .map(|i: i32| match i {
+            -1 => None,
+            0.. => Some(i as u32),
+            _ => unreachable!("-1 or 0+ expected"),
+        })
+        .trace("nullable_uint")
 }
 
 /// " \t\r\n" - at least 1
@@ -114,6 +125,17 @@ pub fn optional_filename<'a>(extension: &str) -> impl WinnowParser<&'a str, Opti
 
 pub fn version_line<'a>() -> impl WinnowParser<&'a str, u32> {
     preceded(literal("version "), dec_uint).trace("version_line")
+}
+
+/// "hello, world"
+pub fn quoted_comma_separated<'a>() -> impl WinnowParser<&'a str, Vec<String>> {
+    quoted('"')
+        .and_then(separated(
+            1..,
+            take_while(1.., |c| c != ',').map(String::from),
+            literal(", "),
+        ))
+        .trace("quoted_comma_separated")
 }
 
 /// winnow::combinator::multi::separated but exact sized

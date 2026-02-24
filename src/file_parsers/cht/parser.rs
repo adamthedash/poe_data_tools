@@ -2,26 +2,14 @@ use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
-    combinator::{cond, preceded as P, repeat, separated},
-    token::{literal, take_while},
+    combinator::{cond, preceded as P, repeat},
 };
 
 use super::types::*;
 use crate::file_parsers::{
     lift_winnow::{SliceParser, lift},
-    shared::winnow::{TraceHelper, WinnowParser, quoted, version_line},
+    shared::winnow::{TraceHelper, WinnowParser, quoted_comma_separated, version_line},
 };
-
-/// "hello, world"
-fn quoted_comma_separated<'a>() -> impl WinnowParser<&'a str, Vec<String>> {
-    quoted('"')
-        .and_then(separated(
-            1..,
-            take_while(1.., |c| c != ',').map(String::from),
-            literal(", "),
-        ))
-        .trace("quoted_comma_separated")
-}
 
 fn num_line<'a>(version: u32) -> impl WinnowParser<&'a str, Nums> {
     (

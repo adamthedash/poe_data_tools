@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
-    ascii::{dec_int, dec_uint, float, space1},
+    ascii::{dec_uint, float, space1},
     binary::length_repeat,
     combinator::{cond, dispatch, empty, fail, opt, preceded as P, repeat, trace},
     token::literal,
@@ -11,8 +11,8 @@ use super::types::*;
 use crate::file_parsers::{
     lift_winnow::{SliceParser, lift},
     shared::winnow::{
-        TraceHelper, WinnowParser, quoted_str, repeat_array, separated_array, unquoted_str,
-        version_line,
+        TraceHelper, WinnowParser, nullable_uint, quoted_str, repeat_array, separated_array,
+        unquoted_str, version_line,
     },
 };
 
@@ -88,11 +88,7 @@ fn group<'a>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
             _ => fail,
         },
         cond(version >= 4, bone_rotations()),
-        opt(repeat_array(lift(dec_int.map(|i| match i {
-            -1 => None,
-            0.. => Some(i as u32),
-            _ => unreachable!("-1 or 0+ expected"),
-        })))),
+        opt(repeat_array(lift(nullable_uint()))),
     )
         .map(
             |(
