@@ -1,8 +1,9 @@
 use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
-    ascii::space1,
-    combinator::{repeat, separated_pair},
+    ascii::space0,
+    combinator::{repeat, separated_pair, terminated},
+    token::rest,
 };
 
 use super::types::*;
@@ -25,10 +26,20 @@ pub fn parse_tmo_str(contents: &str) -> Result<TMOFile> {
 
     let mut parser = repeat(
         0..,
-        lift(separated_pair(
-            quoted('"').and_then(filename("mat")),
-            space1,
-            quoted('"').and_then(filename("mat")),
+        lift(terminated(
+            separated_pair(
+                quoted('"').and_then(filename("mat")),
+                // NOTE: Edge case: missing space between files
+                space0,
+                quoted('"').and_then(filename("mat")),
+            ),
+            // NOTE: Edge case: Sometimes some extra crap at the end
+            rest.verify(|crap: &str| {
+                if !crap.is_empty() {
+                    eprintln!("WARN: Extra crap found: {crap:?}");
+                }
+                true
+            }),
         ))
         .map(|(from, to)| Override { from, to }),
     )
