@@ -10,9 +10,9 @@ use crate::{
     file_parsers::{
         FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
         dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
-        et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, pet::PETParser,
-        rs::RSParser, tmo::TMOParser, toy::TOYParser, trl::TRLParser, tsi::TSIParser,
-        tst::TSTParser,
+        et::ETParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser,
+        pet::PETParser, rs::RSParser, tmo::TMOParser, toy::TOYParser, trl::TRLParser,
+        tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -61,6 +61,7 @@ enum Parser {
     Dct(DCTParser),
     Toy(TOYParser),
     Tmo(TMOParser),
+    Gcf(GCFParser),
 }
 
 impl Parser {
@@ -89,6 +90,7 @@ impl Parser {
             Dct(p) => p.parse_to_json_file(bytes, output_folder),
             Toy(p) => p.parse_to_json_file(bytes, output_folder),
             Tmo(p) => p.parse_to_json_file(bytes, output_folder),
+            Gcf(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -119,6 +121,7 @@ impl Parser {
             "dct" => Dct(DCTParser),
             "toy" => Toy(TOYParser),
             "tmo" => Tmo(TMOParser),
+            "gcf" => Gcf(GCFParser),
             _ => return None,
         };
 
