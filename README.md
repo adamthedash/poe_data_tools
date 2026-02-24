@@ -71,6 +71,9 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 ## CLT File Format
 ![clt format](./images/clt_spec.png)  
 
+## DCT File Format
+![dct format](./images/dct_spec.png)  
+
 ## DDT File Format
 ![ddt format](./images/ddt_spec.png)  
 
@@ -85,6 +88,9 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 
 ## EPK File Format
 ![epk format](./images/epk_spec.png)  
+
+## GCF File Format
+![gcf format](./images/gcf_spec.png)  
 
 ## GFT File Format
 ![gft format](./images/gft_spec.png)  
@@ -103,6 +109,12 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 
 ## RS File Format
 ![rs format](./images/rs_spec.png)  
+
+## TMO File Format
+![tmo format](./images/tmo_spec.png)  
+
+## TOY File Format
+![toy format](./images/toy_spec.png)  
 
 ## TRL File Format
 ![trl format](./images/trl_spec.png)  
@@ -123,8 +135,11 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 Tested on linux (WSL) and Windows with the Steam version of PoE 1, and rolling latest patch from the CDN for PoE 2.
 
 # Resources
-https://gitlab.com/zao/poe-rs
-https://gitlab.com/zao/poe-rs/blob/master/spec/arm.md
+https://gitlab.com/zao/poe-rs  
+https://gist.github.com/zao/96cb1869db121fbd038f8cd66f7d5736 - for .fmt/tdt/tgm  
+https://gitlab.com/zao/poe-cpp/-/tree/master/libpoe/poe/format  
+https://bitbucket.org/zao/gggtools/src/evolve-ggpkviewer/spec/  
+
 
 ```
 .act = Actor, UCS-2 plain
