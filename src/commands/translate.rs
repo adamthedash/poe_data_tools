@@ -11,7 +11,7 @@ use crate::{
         FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
         dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
         et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser, pet::PETParser,
-        rs::RSParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
+        rs::RSParser, toy::TOYParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -58,6 +58,7 @@ enum Parser {
     Dlp(DLPParser),
     Cht(CHTParser),
     Dct(DCTParser),
+    Toy(TOYParser),
 }
 
 impl Parser {
@@ -84,6 +85,7 @@ impl Parser {
             Dlp(p) => p.parse_to_json_file(bytes, output_folder),
             Cht(p) => p.parse_to_json_file(bytes, output_folder),
             Dct(p) => p.parse_to_json_file(bytes, output_folder),
+            Toy(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -112,6 +114,7 @@ impl Parser {
             "dlp" => Dlp(DLPParser),
             "cht" => Cht(CHTParser),
             "dct" => Dct(DCTParser),
+            "toy" => Toy(TOYParser),
             _ => return None,
         };
 

@@ -19,6 +19,7 @@ pub mod pet;
 pub mod rs;
 pub mod shared;
 pub mod slice;
+pub mod toy;
 pub mod trl;
 pub mod tsi;
 pub mod tst;

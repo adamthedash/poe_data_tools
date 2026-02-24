@@ -10,3 +10,6 @@ run FILE:
 
 cat FILE:
 	cargo run --release -- -p 1 cat {{FILE}}
+
+list FILE:
+	cargo run --release -- -p 1 list {{FILE}}
