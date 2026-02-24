@@ -16,14 +16,20 @@ pub struct Nums {
 }
 
 #[derive(Debug, Serialize)]
+pub enum NumLine {
+    V2(f32),
+    V3(Nums),
+}
+
+#[derive(Debug, Serialize)]
 pub struct Group {
     pub areas: Vec<String>,
+    pub nums: Option<NumLine>,
     pub entries: Vec<Entry>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct CHTFile {
     pub version: u32,
-    pub nums: Nums,
     pub groups: Vec<Group>,
 }

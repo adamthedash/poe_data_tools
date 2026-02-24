@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
-    combinator::{cond, preceded as P, repeat},
+    combinator::{alt, cond, dispatch, empty, opt, preceded as P, repeat},
 };
 
 use super::types::*;
@@ -41,14 +41,30 @@ fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
         .trace("entry")
 }
 
-fn group<'a>(named: bool) -> impl SliceParser<'a, &'a str, Group> {
+fn group<'a, const NAMED: bool>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
+    let header = dispatch! {
+        empty.value(NAMED);
+        false => num_line(version).map(|nums| (vec!["Default".to_string()], Some(NumLine::V3(nums)))),
+        true => (
+                    quoted_comma_separated(),
+                    opt(P(
+                        space1,
+                        alt((
+                            num_line(version).map(NumLine::V3), //
+                            float.map(NumLine::V2),
+                        )),
+                    )),
+                ),
+    };
+
     (
-        cond(named, lift(quoted_comma_separated())), //
+        lift(header), //
         repeat(0.., lift(entry())),
     )
-        .map(|(areas, entries)| Group {
-            areas: areas.unwrap_or(vec!["Default".to_string()]),
+        .map(|((areas, nums), entries)| Group {
+            areas,
             entries,
+            nums,
         })
         .trace("group")
 }
@@ -66,17 +82,12 @@ pub fn parse_cht_str(contents: &str) -> Result<CHTFile> {
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     let mut parser = (
-        lift(num_line(version)), //
-        group(false).trace("default_group"),
-        repeat(0.., group(true)),
+        group::<false>(version).trace("default_group"),
+        repeat(0.., group::<true>(version)),
     )
-        .map(|(nums, default_group, mut groups)| {
+        .map(|(default_group, mut groups)| {
             Vec::insert(&mut groups, 0, default_group);
-            CHTFile {
-                version,
-                nums,
-                groups,
-            }
+            CHTFile { version, groups }
         });
 
     let pet_file = parser
