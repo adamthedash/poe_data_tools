@@ -3,7 +3,7 @@ use winnow::{
     Parser,
     ascii::{dec_int, dec_uint, float, space1},
     binary::length_repeat,
-    combinator::{cond, opt, preceded as P, repeat, trace},
+    combinator::{cond, dispatch, empty, fail, opt, preceded as P, repeat, trace},
     token::literal,
 };
 
@@ -11,7 +11,8 @@ use super::types::*;
 use crate::file_parsers::{
     lift_winnow::{SliceParser, lift},
     shared::winnow::{
-        TraceHelper, WinnowParser, quoted_str, separated_array, unquoted_str, version_line,
+        TraceHelper, WinnowParser, quoted_str, repeat_array, separated_array, unquoted_str,
+        version_line,
     },
 };
 
@@ -33,7 +34,7 @@ fn bone_rotation<'a>(num_coords: usize) -> impl WinnowParser<&'a str, BoneRotati
 
         let coords = repeat(
             num_coords * coord_order.len(), //
-            P(space1, dec_int::<_, i32, _>),
+            P(space1, float::<_, f32, _>),
         )
         .parse_next(input)?;
 
@@ -62,6 +63,14 @@ fn bone_rotations<'a>() -> impl SliceParser<'a, &'a str, Vec<BoneRotation>> {
     })
 }
 
+fn floats<'a>() -> impl WinnowParser<&'a str, Vec<f32>> {
+    length_repeat(
+        dec_uint::<_, u32, _>, //
+        P(space1, float::<_, f32, _>),
+    )
+    .trace("floats")
+}
+
 fn group<'a>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
     (
         lift(quoted_str),
@@ -71,12 +80,19 @@ fn group<'a>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
             lift(dec_uint::<_, u32, _>), //
             animation_stage(),
         ),
-        lift(length_repeat(
-            dec_uint::<_, u32, _>, //
-            P(space1, float::<_, f32, _>),
-        )),
+        dispatch! {
+            empty.value(version);
+            1 => empty.value(None),
+            2 => opt(lift(floats())),
+            3.. => lift(floats()).map(Some),
+            _ => fail,
+        },
         cond(version >= 4, bone_rotations()),
-        opt((lift(dec_int), lift(dec_int))),
+        opt(repeat_array(lift(dec_int.map(|i| match i {
+            -1 => None,
+            0.. => Some(i as u32),
+            _ => unreachable!("-1 or 0+ expected"),
+        })))),
     )
         .map(
             |(
