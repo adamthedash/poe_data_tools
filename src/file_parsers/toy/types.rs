@@ -10,8 +10,9 @@ pub struct Rotation {
 pub struct Entry {
     pub weight: u32,
     pub arm_file: String,
-    pub limit: Option<u32>,
-    pub flags: Vec<String>,
+    pub key_values: Vec<(String, String)>,
+    pub not_flags: Vec<String>,
+    pub add_flags: Vec<String>,
     pub rotations: Vec<Rotation>,
 }
 

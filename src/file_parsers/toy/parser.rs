@@ -2,8 +2,8 @@ use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     ascii::{dec_uint, space1},
-    combinator::{alt, opt, preceded as P, repeat},
-    token::literal,
+    combinator::{alt, opt, preceded as P, repeat, separated_pair},
+    token::{literal, take_while},
 };
 
 use super::types::*;
@@ -64,20 +64,65 @@ fn header<'a>() -> impl WinnowParser<&'a str, Header> {
 }
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
-    (
+    let primary_stuff = (
         dec_uint, //
         P(space1, quoted('"').and_then(filename("arm"))),
-        opt(P((space1, literal("limit=")), dec_uint)),
-        repeat(0.., P((space1, literal('!')), unquoted_str)),
-        repeat(0..=8, P(space1, d4_rotation())),
+    );
+
+    enum Tail {
+        KV(String, String),
+        NotFlag(String),
+        AddFlag(String),
+        Rotation(Rotation),
+    }
+
+    // Tail stuff can be in any order, so collect them with an enum then distribute them into
+    // their destinations
+    let tail_stuff = repeat(
+        0..,
+        P(
+            space1,
+            alt((
+                P("!", unquoted_str).map(Tail::NotFlag),
+                d4_rotation().map(Tail::Rotation),
+                flag().map(Tail::AddFlag),
+                separated_pair(
+                    take_while(1.., |c: char| c != '=' && !c.is_whitespace()).map(String::from),
+                    "=",
+                    unquoted_str,
+                )
+                .map(|(k, v)| Tail::KV(k, v)),
+            )),
+        ),
     )
-        .map(|(weight, arm_file, limit, flags, rotations)| Entry {
-            weight,
-            arm_file,
-            limit,
-            flags,
-            rotations,
-        })
+    .fold(
+        || (vec![], vec![], vec![], vec![]),
+        |(mut kvs, mut not_flags, mut add_flags, mut rotations), item| {
+            match item {
+                Tail::KV(k, v) => kvs.push((k, v)),
+                Tail::NotFlag(f) => not_flags.push(f),
+                Tail::Rotation(r) => rotations.push(r),
+                Tail::AddFlag(f) => add_flags.push(f),
+            };
+
+            (kvs, not_flags, add_flags, rotations)
+        },
+    );
+
+    (
+        primary_stuff, //
+        tail_stuff,
+    )
+        .map(
+            |((weight, arm_file), (key_values, not_flags, add_flags, rotations))| Entry {
+                weight,
+                arm_file,
+                key_values,
+                not_flags,
+                add_flags,
+                rotations,
+            },
+        )
         .trace("entry")
 }
 
@@ -94,7 +139,7 @@ pub fn parse_toy_str(contents: &str) -> Result<TOYFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
-        .filter(|l| !l.is_empty() && !l.starts_with("#"))
+        .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
     let mut lines = lines.as_slice();
 
@@ -102,7 +147,7 @@ pub fn parse_toy_str(contents: &str) -> Result<TOYFile> {
         .parse_next(&mut lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
-    let mut parser = repeat(1.., group()).map(|groups| TOYFile { version, groups });
+    let mut parser = repeat(0.., group()).map(|groups| TOYFile { version, groups });
 
     let file = parser
         .parse(lines)
