@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
-    ascii::{dec_uint, space1},
+    ascii::{dec_uint, space0, space1},
     combinator::{opt, preceded, repeat, terminated},
 };
 
@@ -13,7 +13,8 @@ use crate::file_parsers::{
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
     (
-        opt(terminated(dec_uint, space1)), //
+        // NOTE: Edge case: missing space between weight & filename
+        opt(terminated(dec_uint, space0)), //
         quoted('"').and_then(filename("tdt")),
         repeat(0.., preceded(space1, unquoted_str)),
     )
@@ -32,7 +33,20 @@ pub fn parse_tst_str(contents: &str) -> Result<TSTFile> {
         .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
 
-    let mut parser = repeat(0.., lift(entry())).map(|tdt_files| TSTFile { tdt_files });
+    let mut parser = (
+        repeat(
+            0..,
+            lift(preceded(
+                ("include", space1),
+                quoted('"').and_then(filename("tst")),
+            )),
+        ),
+        repeat(0.., lift(entry())),
+    )
+        .map(|(includes, tdt_files)| TSTFile {
+            includes,
+            tdt_files,
+        });
 
     let tst_file = parser
         .parse(lines.as_slice())

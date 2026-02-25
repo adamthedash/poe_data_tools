@@ -9,5 +9,6 @@ pub struct Entry {
 
 #[derive(Debug, Serialize)]
 pub struct TSTFile {
+    pub includes: Vec<String>,
     pub tdt_files: Vec<Entry>,
 }
