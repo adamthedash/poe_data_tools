@@ -1,6 +1,7 @@
 pub mod amd;
 pub mod ao;
 pub mod arm;
+pub mod bundle;
 pub mod cht;
 pub mod clt;
 pub mod dct;

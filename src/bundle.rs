@@ -1,53 +1,18 @@
 use std::{fs, path::Path};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use bytes::Bytes;
-use nom::{
-    IResult, Parser,
-    bytes::complete::take,
-    multi::count,
-    number::complete::{le_u32, le_u64},
-};
 use oozextract::Extractor;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use url::Url;
 
-use crate::bundle_loader::CDNLoader;
-
-/// Encoded as a u32
-#[derive(Debug)]
-pub enum FirstFileEncode {
-    Kraken6 = 8,
-    MermaidA = 9,
-    Bitknit = 12,
-    LeviathanC = 13,
-}
-
-impl FirstFileEncode {
-    fn from_u32(value: u32) -> Option<Self> {
-        match value {
-            8 => Some(Self::Kraken6),
-            9 => Some(Self::MermaidA),
-            12 => Some(Self::Bitknit),
-            13 => Some(Self::LeviathanC),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct HeadPayload {
-    pub first_file_encode: FirstFileEncode,
-    pub uncompressed_size: u64,
-    pub total_payload_size: u64,
-    pub uncompressed_block_granularity: u32,
-}
-
-#[derive(Debug)]
-pub struct Bundle {
-    pub head: HeadPayload,
-    pub blocks: Vec<Vec<u8>>,
-}
+use crate::{
+    bundle_loader::CDNLoader,
+    file_parsers::{
+        FileParser,
+        bundle::{BundleParser, types::BundleFile as Bundle},
+    },
+};
 
 impl Bundle {
     /// Return the entire content of the bundle
@@ -87,89 +52,15 @@ impl Bundle {
     }
 }
 
-// Parser for FirstFileEncode
-fn parse_first_file_encode(input: &[u8]) -> IResult<&[u8], FirstFileEncode> {
-    let (input, value) = le_u32(input)?;
-    match FirstFileEncode::from_u32(value) {
-        Some(encode) => Ok((input, encode)),
-        None => Err(nom::Err::Failure(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Alt,
-        ))),
-    }
-}
-
-// Parser for HeadPayload
-fn parse_head_payload(input: &[u8]) -> IResult<&[u8], (HeadPayload, Vec<u32>)> {
-    let (
-        input,
-        (
-            _,
-            first_file_encode,
-            _,
-            uncompressed_size,
-            total_payload_size,
-            block_count,
-            uncompressed_block_granularity,
-            _,
-        ),
-    ) = (
-        take(12_usize),
-        parse_first_file_encode,
-        take(4_usize),
-        le_u64,
-        le_u64,
-        le_u32,
-        le_u32,
-        take(16_usize),
-    )
-        .parse_complete(input)?;
-
-    // Read block sizes (block_count u32s)
-    let (input, block_sizes) = count(le_u32, block_count as usize).parse_complete(input)?;
-
-    Ok((
-        input,
-        (
-            HeadPayload {
-                first_file_encode,
-                uncompressed_size,
-                total_payload_size,
-                uncompressed_block_granularity,
-            },
-            block_sizes,
-        ),
-    ))
-}
-
-// Parser for blocks
-fn parse_blocks<'a>(input: &'a [u8], block_sizes: &[u32]) -> IResult<&'a [u8], Vec<Vec<u8>>> {
-    let mut remaining_input = input;
-    let mut blocks = Vec::new();
-
-    for &block_size in block_sizes {
-        let (input, block_data) = take(block_size)(remaining_input)?;
-        blocks.push(block_data.to_vec());
-        remaining_input = input;
-    }
-
-    Ok((remaining_input, blocks))
-}
-
-// Parser for Bundle
-pub fn parse_bundle(input: &[u8]) -> IResult<&[u8], Bundle> {
-    let (input, (head, block_sizes)) = parse_head_payload(input)?;
-    let (input, blocks) = parse_blocks(input, &block_sizes)?;
-    Ok((input, Bundle { head, blocks }))
-}
-
 /// Load a bundle file from disk
 pub fn load_bundle_content(path: &Path) -> Result<Bundle> {
     // todo: figure how to properly do error propogation with nom
     let bundle_content = fs::read(path).context("Failed to read bundle file")?;
 
-    let (_, bundle) =
-        parse_bundle(&bundle_content).map_err(|_| anyhow!("Failed to parse bundle"))?;
+    let bundle = BundleParser
+        .parse(&bundle_content)
+        .context("Failed to parse bundle")?;
+
     Ok(bundle)
 }
 
@@ -179,8 +70,9 @@ pub fn fetch_bundle_content(base_url: &Url, cache_dir: &Path, path: &Path) -> Re
         .load(path)
         .context("Failed to load bundle")?;
 
-    let (_, bundle) =
-        parse_bundle(&bundle_content).map_err(|_| anyhow!("Failed to parse bundle"))?;
+    let bundle = BundleParser
+        .parse(&bundle_content)
+        .context("Failed to parse bundle")?;
 
     Ok(bundle)
 }

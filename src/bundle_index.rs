@@ -11,7 +11,10 @@ use nom::{
 };
 use url::Url;
 
-use crate::bundle::{fetch_bundle_content, load_bundle_content, parse_bundle};
+use crate::{
+    bundle::{fetch_bundle_content, load_bundle_content},
+    file_parsers::{FileParser, bundle::BundleParser},
+};
 
 #[derive(Debug)]
 pub struct BundleInfo {
@@ -119,7 +122,14 @@ pub fn parse_bundle_index(input: &[u8]) -> IResult<&[u8], BundleIndex> {
     let (input, files) = parse_file_infos(input)?;
     let (input, paths) = parse_path_reps(input)?;
     let (input, path_rep_bundle) = rest(input)?;
-    let (_, path_rep_bundle) = parse_bundle(path_rep_bundle)?;
+
+    let path_rep_bundle = BundleParser.parse(path_rep_bundle).map_err(|_| {
+        // TODO: Dummy error to make compiler happy with return value
+        nom::Err::Error(nom::error::make_error(
+            [].as_slice(),
+            nom::error::ErrorKind::Fix,
+        ))
+    })?;
 
     Ok((
         input,
