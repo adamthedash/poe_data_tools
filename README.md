@@ -128,6 +128,7 @@ cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
 **TODO List**
 
 - Proper documentation for the lib crate
+- Full migration from nom over to winnow  
 - Swap image.rs version once [DDS support is merged](https://github.com/image-rs/image/pull/2258)
 
 # Testing
