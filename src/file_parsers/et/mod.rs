@@ -2,11 +2,10 @@ use anyhow::Result;
 
 use crate::file_parsers::{FileParser, shared::utf16_bom_to_string};
 
-pub mod nom_parser;
+pub mod parser;
 pub mod types;
-pub mod winnow_parser;
+use parser::parse_et_str;
 use types::*;
-use winnow_parser::parse_et_str;
 
 pub struct ETParser;
 
