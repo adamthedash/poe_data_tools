@@ -1,4 +1,4 @@
-use crate::bundle_index::PathRep;
+use crate::file_parsers::bundle_index::types::PathRep;
 
 // Pull out the path components from the bundle blob into a more usable structure
 pub fn parse_paths(path_rep_bytes: &[u8], path_rep: &PathRep) -> ParsedPathRep {

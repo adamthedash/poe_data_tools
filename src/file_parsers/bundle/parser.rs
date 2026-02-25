@@ -92,16 +92,22 @@ fn blocks<'a>(block_count: u32) -> impl WinnowParser<&'a [u8], Vec<Vec<u8>>> {
     parser.trace("blocks")
 }
 
-pub fn parse_bundle_bytes(mut contents: &[u8]) -> Result<BundleFile> {
-    let (head, block_count) = head_payload()
-        .parse_next(&mut contents)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+pub fn bundle<'a>() -> impl WinnowParser<&'a [u8], BundleFile> {
+    let parser = |input: &mut &[u8]| {
+        let (head, block_count) = head_payload().parse_next(input)?;
 
-    let blocks = blocks(block_count)
+        let blocks = blocks(block_count).parse_next(input)?;
+
+        let bundle = BundleFile { head, blocks };
+
+        Ok(bundle)
+    };
+
+    parser.trace("bundle")
+}
+
+pub fn parse_bundle_bytes(contents: &[u8]) -> Result<BundleFile> {
+    bundle()
         .parse(contents)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-    let bundle = BundleFile { head, blocks };
-
-    Ok(bundle)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
 }

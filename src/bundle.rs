@@ -10,11 +10,11 @@ use crate::{
     bundle_loader::CDNLoader,
     file_parsers::{
         FileParser,
-        bundle::{BundleParser, types::BundleFile as Bundle},
+        bundle::{BundleParser, types::BundleFile},
     },
 };
 
-impl Bundle {
+impl BundleFile {
     /// Return the entire content of the bundle
     /// todo: decode blocks in parallel
     ///     Also return a result instead of panicing
@@ -53,7 +53,7 @@ impl Bundle {
 }
 
 /// Load a bundle file from disk
-pub fn load_bundle_content(path: &Path) -> Result<Bundle> {
+pub fn load_bundle_content(path: &Path) -> Result<BundleFile> {
     // todo: figure how to properly do error propogation with nom
     let bundle_content = fs::read(path).context("Failed to read bundle file")?;
 
@@ -65,7 +65,7 @@ pub fn load_bundle_content(path: &Path) -> Result<Bundle> {
 }
 
 // Fetch a bundle file from the CDN (or cache)
-pub fn fetch_bundle_content(base_url: &Url, cache_dir: &Path, path: &Path) -> Result<Bundle> {
+pub fn fetch_bundle_content(base_url: &Url, cache_dir: &Path, path: &Path) -> Result<BundleFile> {
     let bundle_content = CDNLoader::new(base_url, cache_dir.to_str().unwrap())
         .load(path)
         .context("Failed to load bundle")?;

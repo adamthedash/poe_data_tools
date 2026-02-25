@@ -11,13 +11,14 @@ use url::Url;
 
 use crate::{
     bundle::{fetch_bundle_content, load_bundle_content},
-    bundle_index::{BundleIndex, fetch_index_file, load_index_file},
+    bundle_index::{fetch_index_file, load_index_file},
+    file_parsers::bundle_index::types::BundleIndexFile,
     hasher::BuildMurmurHash64A,
     path::parse_paths,
 };
 
 pub struct FS {
-    index: BundleIndex,
+    index: BundleIndexFile,
     lut: HashMap<u64, usize>,
     steam_folder: Option<PathBuf>,
     base_url: Option<Url>,
