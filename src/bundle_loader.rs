@@ -11,6 +11,7 @@ use bytes::Bytes;
 use reqwest::blocking::Client;
 use url::Url;
 use winnow::{
+    Parser,
     binary::{le_u8, length_repeat, length_take},
     combinator::terminated,
     token::take,
@@ -93,7 +94,7 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
         // Invalid patch
         _ => panic!("Invalid version provided"),
     }
-    .unwrap_or_else(|_| panic!("Failed to get URL for version: {}", version));
+    .with_context(|| format!("Failed to get URL for version: {}", version))?;
 
     fs::create_dir_all(&cache_dir).context("Failed to create cache directory")?;
     fs::write(&cache_file, url.as_str()).context("Failed to write URL to cache")?;
@@ -125,7 +126,7 @@ fn cur_url(host: String, send: &[u8]) -> anyhow::Result<Url> {
     let read = stream.read(&mut buf)?;
 
     // Parse the response
-    let strings = if let Ok(strings) = parse_response().parse(&buf[..read]) {
+    let strings = if let Ok(strings) = parse_response().parse_next(&mut &buf[..read]) {
         strings
     } else {
         bail!("Failed to parse URLs from CDN")
