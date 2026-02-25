@@ -8,9 +8,15 @@ use std::{
 
 use anyhow::{Context, bail};
 use bytes::Bytes;
-use nom::{IResult, Parser, bytes::complete::take, multi::count, number::complete::le_u8};
 use reqwest::blocking::Client;
 use url::Url;
+use winnow::{
+    binary::{le_u8, length_repeat, length_take},
+    combinator::terminated,
+    token::take,
+};
+
+use crate::file_parsers::shared::winnow::{TraceHelper, WinnowParser};
 
 pub struct CDNLoader {
     base_url: Url,
@@ -95,23 +101,17 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
     Ok(url)
 }
 
-fn parse_response(input: &[u8]) -> IResult<&[u8], Vec<String>> {
-    let (input, num_strings) = le_u8(input)?; // Parse the number of strings (N)
-    let (input, _) = take(33usize)(input)?; // Discard the next 33 bytes (padding)
-    count(parse_utf16_string, num_strings as usize).parse_complete(input) // Parse N strings
+fn parse_response<'a>() -> impl WinnowParser<&'a [u8], Vec<String>> {
+    length_repeat(
+        terminated(le_u8, take(33_usize)), //
+        parse_utf16_string(),
+    )
 }
 
-fn parse_utf16_string(input: &[u8]) -> IResult<&[u8], String> {
-    let (input, len) = le_u8(input)?; // Parse string length (L)
-    let (input, utf16_bytes) = take(len as usize * 2)(input)?; // Extract L * 2 bytes of UTF-16 data
-    let utf16_words: Vec<u16> = utf16_bytes
-        .chunks_exact(2)
-        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
-        .collect();
-    let string =
-        String::from_utf16(&utf16_words).expect("Failed to parse response as UTF-16 string");
-
-    Ok((input, string))
+fn parse_utf16_string<'a>() -> impl WinnowParser<&'a [u8], String> {
+    length_take(le_u8.map(|l| l * 2))
+        .try_map(String::from_utf16le)
+        .trace("parse_utf16_string")
 }
 
 /// Fetch the current latest version of the game
@@ -125,7 +125,7 @@ fn cur_url(host: String, send: &[u8]) -> anyhow::Result<Url> {
     let read = stream.read(&mut buf)?;
 
     // Parse the response
-    let strings = if let Ok((_, strings)) = parse_response(&buf[..read]) {
+    let strings = if let Ok(strings) = parse_response().parse(&buf[..read]) {
         strings
     } else {
         bail!("Failed to parse URLs from CDN")
