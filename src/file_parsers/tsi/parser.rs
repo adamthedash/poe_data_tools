@@ -9,7 +9,7 @@ use winnow::{
 
 use super::types::TSIFile;
 use crate::file_parsers::{
-    lift_winnow::lift,
+    lift::lift,
     shared::winnow::{TraceHelper, quoted_str, unquoted_str},
 };
 

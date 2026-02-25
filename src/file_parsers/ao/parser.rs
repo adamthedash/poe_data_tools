@@ -33,10 +33,10 @@ fn parse_struct<'a>() -> impl WinnowParser<&'a str, Struct> {
 }
 
 pub fn parse_ao_str(contents: &str) -> Result<AOFile> {
-    let parser = (
+    let mut parser = (
         version_line(),
         opt(P(spaces_or_comments(), literal("abstract"))),
-        repeat(
+        repeat::<_, _, Vec<_>, _, _>(
             1..,
             P(
                 (spaces_or_comments(), literal("extends"), space1),

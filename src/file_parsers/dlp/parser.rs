@@ -11,7 +11,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    lift_winnow::{SliceParser, lift},
+    lift::{SliceParser, lift},
     shared::winnow::{
         TraceHelper, WinnowParser, filename, parse_bool, quoted, unquoted, version_line,
     },

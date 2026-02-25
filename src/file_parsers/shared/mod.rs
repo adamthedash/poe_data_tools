@@ -1,8 +1,6 @@
-pub mod nom;
 pub mod winnow;
 
 use anyhow::{Context, bail};
-pub use nom::*;
 use regex::Regex;
 
 /// Parse the bytes of a UTF-16 file with BOM

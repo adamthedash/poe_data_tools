@@ -7,8 +7,8 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    lift_winnow::lift,
-    shared::winnow::{WinnowParser, parse_bool, quoted_str, unquoted_str},
+    lift::lift,
+    shared::winnow::{TraceHelper, WinnowParser, parse_bool, quoted_str, unquoted_str},
 };
 
 fn bools<'a>() -> impl WinnowParser<&'a str, (bool, bool, Option<bool>, Option<bool>, Option<bool>)>

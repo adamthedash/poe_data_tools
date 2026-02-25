@@ -7,7 +7,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    lift_winnow::lift,
+    lift::lift,
     shared::winnow::{
         TraceHelper, WinnowParser, optional_filename, quoted, separated_array, version_line,
     },

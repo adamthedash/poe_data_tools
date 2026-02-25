@@ -8,7 +8,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    lift_winnow::lift,
+    lift::lift,
     shared::winnow::{filename, quoted, version_line},
 };
 
