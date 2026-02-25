@@ -1,12 +1,21 @@
-use std::{collections::HashMap, fs::create_dir_all, path::Path};
+use std::{
+    collections::HashMap,
+    fs::{File, create_dir_all},
+    io::BufWriter,
+    path::Path,
+};
 
-use anyhow::{Context, Result, anyhow, bail, ensure};
+use anyhow::{Context, Result, anyhow, ensure};
 use glob::{MatchOptions, Pattern};
 
 use super::Patch;
 use crate::{
     VERBOSE,
     bundle_fs::FS,
+    file_parsers::{
+        FileParser,
+        psg::{PSGParser, types::PSGFile},
+    },
     tree::{
         passive_info::{PassiveSkillInfo, load_passive_info},
         psg::PassiveSkillGraph,
@@ -20,28 +29,48 @@ fn process_file(
     passive_info: &HashMap<u16, PassiveSkillInfo>,
 ) -> Result<()> {
     // Parse the PSG file
-    let (_, mut passive_tree) = match version {
-        Patch::One => PassiveSkillGraph::parse_poe1(contents),
-        Patch::Two => PassiveSkillGraph::parse_poe2(contents),
-        _ => bail!("Only patch versions 1/2 supported for table extraction."),
+    let psg_file = PSGParser {
+        version: version.major(),
     }
+    .parse(contents)
     .map_err(|e| anyhow!("Failed to parse passive skill tree: {:?}", e))?;
 
     // Add passive info - only nodes that are in the graph
     let passive_info = {
-        let ids = passive_tree
+        let ids = psg_file
             .groups
             .iter()
             .flat_map(|g| g.passives.iter().map(|p| p.id as u16));
         ids.map(|id| (id, passive_info[&id].clone())).collect()
     };
-    passive_tree.passive_info = Some(passive_info);
+
+    let passive_tree = {
+        let PSGFile {
+            version,
+            graph_type,
+            passives_per_orbit,
+            root_passives,
+            groups,
+        } = psg_file;
+
+        PassiveSkillGraph {
+            version,
+            graph_type,
+            passives_per_orbit,
+            root_passives,
+            groups,
+            passive_info,
+        }
+    };
 
     // Write to file
     create_dir_all(output_path.parent().context("No parent directory")?)
         .context("Failed to create output dirs")?;
-    let f = std::fs::File::create(output_path)
+
+    let f = File::create(output_path)
         .with_context(|| format!("Failed to create file {:?}", output_path))?;
+    let f = BufWriter::new(f);
+
     serde_json::to_writer_pretty(f, &passive_tree).context("Failed to serialise tree to JSON")
 }
 
