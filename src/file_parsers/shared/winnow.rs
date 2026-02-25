@@ -41,6 +41,18 @@ pub fn safe_u32(input: &mut &str) -> winnow::Result<u32> {
     parser.trace("safe_u32").parse_next(input)
 }
 
+/// Winnow's dec_uint has issues with leading 0's, so manual impl here
+/// "0000" => 0
+/// "0001" => 1
+/// "1000" => 1000
+/// "0010" => 10
+pub fn uint(input: &mut &str) -> winnow::Result<u32> {
+    take_while(1.., AsChar::is_dec_digit)
+        .try_map(|x: &str| x.parse::<u32>())
+        .trace("uint")
+        .parse_next(input)
+}
+
 /// -1 or 0+
 pub fn nullable_uint<'a>() -> impl WinnowParser<&'a str, Option<u32>> {
     dec_int

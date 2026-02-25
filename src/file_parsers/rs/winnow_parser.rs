@@ -1,27 +1,17 @@
 use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
-    ascii::{dec_uint, space0, space1},
+    ascii::{space0, space1},
     combinator::{opt, preceded, repeat, terminated},
 };
 
 use super::types::*;
 use crate::file_parsers::{
     lift_winnow::lift,
-    shared::winnow::{TraceHelper, WinnowParser, filename, quoted, unquoted_str, version_line},
+    shared::winnow::{
+        TraceHelper, WinnowParser, filename, quoted, uint, unquoted_str, version_line,
+    },
 };
-
-/// Winnow only parses the first 0 from "0000", so this consumes the rest
-fn uint(input: &mut &str) -> winnow::Result<u32> {
-    let num = dec_uint(input)?;
-
-    // Consume trailing 0's
-    repeat::<_, _, Vec<_>, _, _>(0.., '0')
-        .void()
-        .parse_next(input)?;
-
-    Ok(num)
-}
 
 fn room<'a>() -> impl WinnowParser<&'a str, Room> {
     (
