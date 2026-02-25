@@ -1,101 +1,114 @@
-use std::{rc::Rc, sync::Mutex};
-
 use anyhow::Result;
 use itertools::{Itertools, izip};
-use nom::{
+use winnow::{
     Parser,
-    branch::alt,
-    bytes::complete::{is_not, tag},
-    character::complete::{char as C, i32 as I, space0, space1, u32 as U},
-    combinator::{all_consuming, cond, opt, rest, verify},
-    multi::{count, length_count, many_till, separated_list1},
-    number::complete::float as F,
-    sequence::{preceded as P, separated_pair, terminated as T},
+    ascii::{dec_int as I, dec_uint, float, space0, space1 as S},
+    binary::length_repeat,
+    combinator::{
+        cond, dispatch, empty, fail, opt, preceded as P, repeat, repeat_till, separated,
+        separated_pair, terminated as T,
+    },
+    token::{any, literal, rest, take_while},
 };
 
 use super::types::*;
 use crate::file_parsers::{
-    lift_nom::{SliceParser, ToSliceParser},
-    shared::{NomParser, parse_bool, quoted_str, separated_array, unquoted_str, version_line},
-    slice::Slice,
+    lift::{SliceParser, lift},
+    shared::winnow::{
+        TraceHelper, WinnowParser, parse_bool, quoted_str, separated_array, unquoted_str,
+        version_line,
+    },
 };
 
-fn length_prefixed2<'a, T>(
-    item_parser: impl NomParser<'a, T>,
-) -> impl SliceParser<'a, &'a str, Vec<T>> {
-    length_count(U::<_, nom::error::Error<_>>.lift(), item_parser.lift())
+// ==================================
+// Some winnow funcs with explicit types to help type inference down below
+
+#[allow(non_snake_case)]
+#[inline(always)]
+fn U(input: &mut &str) -> winnow::Result<u32> {
+    dec_uint(input)
 }
 
-fn terminated2<'a, T>(
-    item_parser: impl NomParser<'a, T>,
+#[allow(non_snake_case)]
+#[inline(always)]
+fn F(input: &mut &str) -> winnow::Result<f32> {
+    float(input)
+}
+
+// ==================================
+
+fn length_prefixed<'a, T>(
+    item_parser: impl WinnowParser<&'a str, T>,
+) -> impl SliceParser<'a, &'a str, Vec<T>> {
+    length_repeat(
+        lift(U), //
+        lift(item_parser),
+    )
+    .trace("length_prefixed")
+}
+
+fn terminated<'a, T>(
+    item_parser: impl WinnowParser<&'a str, T>,
     sentinel: &str,
 ) -> impl SliceParser<'a, &'a str, Vec<T>> {
-    many_till(
-        item_parser.lift(),
-        tag::<_, _, nom::error::Error<_>>(sentinel).lift(),
+    repeat_till(
+        0.., //
+        lift(item_parser),
+        lift(literal(sentinel)),
     )
     .map(|(items, _)| items)
+    .trace("terminated")
 }
 
 /// Either length-prefixed or "-1"-terminated depending on version
-fn group<'a, const V: u32, T: 'a>(
+fn group<'a, const V: u32, T>(
     version: u32,
-    item_parser: impl NomParser<'a, T> + 'a,
+    mut item_parser: impl WinnowParser<&'a str, T>,
 ) -> impl SliceParser<'a, &'a str, Vec<T>> {
-    let item_parser = Rc::new(Mutex::new(item_parser));
-
-    let i1 = {
-        let item_parser = item_parser.clone();
-        move |input| item_parser.lock().unwrap().parse_complete(input)
-    };
-    let i2 = { move |input| item_parser.lock().unwrap().parse_complete(input) };
-
-    (
-        cond(version < V, length_prefixed2(i1)),
-        cond(version >= V, terminated2(i2, "-1")),
-    )
-        .map(|(a, b)| a.or(b).expect("One parser should always be applied"))
+    dispatch! {
+        empty.value(version);
+        v if v < V => length_prefixed(item_parser.by_ref()),
+        v if v >= V => terminated(item_parser.by_ref(), "-1"),
+        _ => fail,
+    }
+    .trace("group")
 }
 
 fn string_section<'a>() -> impl SliceParser<'a, &'a str, Vec<String>> {
-    length_count(
-        U::<_, nom::error::Error<_>>.lift(), //
-        quoted_str.lift(),
+    length_repeat(
+        lift(U), //
+        lift(quoted_str),
     )
+    .trace("string_section")
 }
 
-fn dimensions<'a>(version: u32) -> impl NomParser<'a, Dimension> {
-    (
-        U,
-        cond(version < 31, P(space1, U)),
-        cond(version >= 22, P(space1, U)),
-    )
+fn dimensions<'a>(version: u32) -> impl WinnowParser<&'a str, Dimension> {
+    (U, cond(version < 31, P(S, U)), cond(version >= 22, P(S, U)))
         .map(|(side_length, _duplicate_side_length, uint1)| Dimension { side_length, uint1 })
+        .trace("dimensions")
 }
 
 /// "k" followed by 23-24 numbers
-fn slot_k<'a>(strings: &[String]) -> impl NomParser<'a, SlotK> {
+fn slot_k<'a>(strings: &[String]) -> impl WinnowParser<&'a str, SlotK> {
     (
-        tag("k"),
-        P(space1, separated_array::<2, _, _, _>(space1, U)),
-        P(space1, separated_array::<4, _, _, _>(space1, U)),
-        P(space1, separated_array::<8, _, _, _>(space1, U)),
-        P(space1, separated_array::<4, _, _, _>(space1, U)),
-        P(space1, separated_array::<4, _, _, _>(space1, I)),
-        P(space1, U),
-        opt(P(C(' '), U)),
+        separated_array(S, U),
+        P(S, separated_array(S, U)),
+        P(S, separated_array(S, U)),
+        P(S, separated_array(S, U)),
+        P(S, separated_array(S, I)),
+        P(S, U),
+        opt(P(' ', U)),
     )
         .map(
             |(
-                _letter,
-                grid_dims,
+                grid_dims, //
                 edges,
                 exits,
                 corner_grounds,
                 corner_heights,
                 slot_tag,
                 origin_dir,
-            )| {
+            ): ([_; 2], [_; 4], [_; 8], [_; 4], [_; 4], _, _)| {
                 let edges = izip!(
                     Direction::cardinal().into_iter(),
                     edges,
@@ -137,19 +150,23 @@ fn slot_k<'a>(strings: &[String]) -> impl NomParser<'a, SlotK> {
                 }
             },
         )
+        .trace("slot_k")
 }
 
 /// k, f, s, o, n slots
-fn slot<'a>(strings: &[String]) -> impl NomParser<'a, Slot> {
-    alt((
-        C('n').map(|_| Slot::N),
-        C('s').map(|_| Slot::S),
-        C('o').map(|_| Slot::O),
-        P(tag("f "), U).map(|i| Slot::F {
+fn slot<'a>(strings: &[String]) -> impl WinnowParser<&'a str, Slot> {
+    dispatch! {
+        any;
+        'n' => empty.value(Slot::N),
+        's' => empty.value(Slot::S),
+        'o' => empty.value(Slot::O),
+        'f' => P(S, U).map(|i | Slot::F {
             fill: (i > 0).then(|| strings[i as usize - 1].clone()),
         }),
-        slot_k(strings).map(Slot::K),
-    ))
+        'k' => P(S, slot_k(strings)).map(Slot::K),
+        _ => fail,
+    }
+    .trace("slot")
 }
 
 /// Grid of Slots
@@ -158,28 +175,24 @@ fn grid<'a>(
     width: usize,
     strings: &'a [String],
 ) -> impl SliceParser<'a, &'a str, Vec<Vec<Slot>>> {
-    let line_parser = verify(
-        separated_list1(C(' '), slot(strings)),
-        move |row: &Vec<_>| {
-            let pass = row.len() == width;
-            if !pass {
-                println!("grid fail");
-            }
-            pass
-        },
-    );
-
-    count(line_parser.lift(), height)
+    repeat(
+        height, //
+        lift::<_, _, Vec<_>, _>(
+            separated(width, slot(strings), S), //
+        )
+        .trace("grid_row"),
+    )
+    .trace("grid")
 }
 
 /// Single PoI line - 3 uints & a string
-fn poi<'a>() -> impl NomParser<'a, PoI> {
+fn poi<'a>() -> impl WinnowParser<&'a str, PoI> {
     (
         U,
-        P(space1, U),
-        P(space1, F),
+        P(S, U),
+        P(S, F),
         // TODO: Remove \u0000 chars from this
-        P(space1, quoted_str),
+        P(S, quoted_str),
     )
         .map(|(x, y, rotation, tag)| PoI {
             x,
@@ -187,6 +200,7 @@ fn poi<'a>() -> impl NomParser<'a, PoI> {
             rotation,
             tag,
         })
+        .trace("poi")
 }
 
 fn poi_groups<'a>(version: u32) -> impl SliceParser<'a, &'a str, Vec<Vec<PoI>>> {
@@ -198,39 +212,49 @@ fn poi_groups<'a>(version: u32) -> impl SliceParser<'a, &'a str, Vec<Vec<PoI>>> 
         29.. => 6,
     };
 
-    count(group::<32, _>(version, poi()), group_count)
+    repeat(group_count, group::<32, _>(version, poi())).trace("poI_groups")
+}
+
+/// key=value
+fn key_value<'a>() -> impl WinnowParser<&'a str, (&'a str, &'a str)> {
+    separated_pair(
+        take_while(1.., |c| c != '='),
+        '=',
+        take_while(1.., |c| c != ' '),
+    )
+    .trace("key_value")
 }
 
 /// Single doodad string
-fn doodad<'a>(version: u32) -> impl NomParser<'a, Doodad> {
+fn doodad<'a>(version: u32) -> impl WinnowParser<&'a str, Doodad> {
     (
         U,
-        P(space1, U),
+        P(S, U),
         cond(
             version >= 34,
-            P(space1, length_count(U, (P(space1, F), P(space1, F)))),
-        ),
-        P(space1, F),
-        cond(
-            version >= 18,
-            P(space1, separated_array::<4, _, _, _>(space1, F)),
-        ),
-        P(space1, parse_bool),
-        cond(version >= 25, P(space1, parse_bool)),
-        P(space1, length_count(U, P(space1, F))),
-        P(space1, F),
-        P(space1, quoted_str),
-        P(space1, quoted_str),
-        cond(
-            version >= 36,
             P(
-                space1,
-                length_count(
-                    U,
-                    P(space1, separated_pair(is_not("="), C('='), is_not(" "))),
+                S,
+                length_repeat(
+                    U, //
+                    (P(S, F), P(S, F)),
                 ),
             ),
         ),
+        P(S, F),
+        cond(
+            version >= 18, //
+            P(S, separated_array(S, F)),
+        ),
+        P(S, parse_bool),
+        cond(
+            version >= 25, //
+            P(S, parse_bool),
+        ),
+        P(S, length_repeat(U, P(S, F))),
+        P(S, F),
+        P(S, quoted_str),
+        P(S, quoted_str),
+        cond(version >= 36, P(S, length_repeat(U, P(S, key_value())))),
     )
         .map(
             |(
@@ -253,7 +277,7 @@ fn doodad<'a>(version: u32) -> impl NomParser<'a, Doodad> {
                     [None; _]
                 };
 
-                let key_values = key_values.map(|key_values| {
+                let key_values = key_values.map(|key_values: Vec<_>| {
                     key_values
                         .into_iter()
                         .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -279,27 +303,28 @@ fn doodad<'a>(version: u32) -> impl NomParser<'a, Doodad> {
                 }
             },
         )
+        .trace("doodad")
 }
 
 fn doodad_connections<'a>(version: u32) -> impl SliceParser<'a, &'a str, Vec<DoodadConnection>> {
     let line_parser = (
         U, //
-        P(space1, U),
-        P(space1, quoted_str),
+        P(S, U),
+        P(S, quoted_str),
     )
         .map(|(from, to, tag)| DoodadConnection { from, to, tag });
 
-    group::<32, _>(version, line_parser)
+    group::<32, _>(version, line_parser).trace("doodad_connections")
 }
 
-/// Decale on a line
-fn decal<'a>(version: u32) -> impl NomParser<'a, Decal> {
+/// Decal on a line
+fn decal<'a>(version: u32) -> impl WinnowParser<&'a str, Decal> {
     (
-        separated_array::<3, _, _, _>(space1, F),
-        cond(version >= 17, P(space1, parse_bool)),
-        P(space1, F),
-        P(space1, quoted_str),
-        P(space1, quoted_str),
+        separated_array::<3, _, _, _, _, _>(S, F),
+        cond(version >= 17, P(S, parse_bool)),
+        P(S, F),
+        P(S, quoted_str),
+        P(S, quoted_str),
     )
         .map(|([x, y, rotation], bool1, scale, atlas_file, tag)| Decal {
             x,
@@ -310,62 +335,68 @@ fn decal<'a>(version: u32) -> impl NomParser<'a, Decal> {
             atlas_file,
             tag,
         })
+        .trace("decal")
 }
 
-fn boss_lines2<'a>() -> impl SliceParser<'a, &'a str, Vec<Vec<String>>> {
+fn boss_lines<'a>() -> impl SliceParser<'a, &'a str, Vec<Vec<String>>> {
     // NOTE: Boss string line is often not properly ended with a newline, causing the next
     // line to be appended on the end instead. We're accounting for this by cropping off
     // the end and prepending it to our list of lines
 
-    |lines| {
-        let line_parser = separated_pair(separated_list1(space1, quoted_str), space1, rest);
+    let parser = |lines: &mut &'a [&'a str]| -> winnow::Result<Vec<Vec<String>>> {
+        let line_parser = separated_pair(
+            separated(1.., quoted_str, S), //
+            S,
+            rest,
+        );
 
-        let mut parser = length_prefixed2(line_parser).map(|items| {
-            let (boss_lines, mut trailing) =
-                items
-                    .into_iter()
-                    .fold((vec![], vec![]), |(mut blines, mut tlines), (b, t)| {
-                        blines.push(b);
-                        tlines.push(t);
+        let mut parser = length_prefixed(line_parser).map(|items| {
+            let (boss_lines, mut trailing) = items.into_iter().fold(
+                (vec![], vec![]),
+                |(mut blines, mut tlines), (b, t): (Vec<_>, _)| {
+                    blines.push(b);
+                    tlines.push(t);
 
-                        (blines, tlines)
-                    });
+                    (blines, tlines)
+                },
+            );
 
             let trailing = trailing.pop().filter(|t| !t.is_empty());
 
             (boss_lines, trailing)
         });
 
-        let (lines, (boss_lines, extra)) = parser.parse_complete(lines)?;
+        let (boss_lines, extra) = parser.parse_next(lines)?;
 
-        let lines = if let Some(extra) = extra {
-            let mut lines = lines.to_vec();
-            lines.insert(0, extra);
+        if let Some(extra) = extra {
+            let mut box_lines = lines.to_vec();
+            box_lines.insert(0, extra);
 
             // TODO: Figure out if we can avoid this leak
-            let lines = Box::new(lines).leak();
-            Slice(&*lines)
-        } else {
-            lines
-        };
+            let box_lines = Box::new(box_lines).leak();
+            *lines = box_lines;
+        }
 
-        Ok((lines, boss_lines))
-    }
+        Ok(boss_lines)
+    };
+
+    parser.trace("boss_lines")
 }
 
-fn zone<'a>(version: u32) -> impl NomParser<'a, Zone> {
+fn zone<'a>(version: u32) -> impl WinnowParser<&'a str, Zone> {
     (
-        move |line| match version {
-            ..35 => unquoted_str(line),
-            35.. => quoted_str(line),
+        dispatch! {
+            empty.value(version);
+            ..35 => unquoted_str,
+            35.. => quoted_str,
         },
-        P(space1, separated_array::<4, _, _, _>(space1, I)),
+        P(S, separated_array::<4, _, _, _, _, _>(S, I)),
         cond(
             version >= 35,
             (
-                P(space1, quoted_str), //
-                P(space1, quoted_str),
-                P(space1, U),
+                P(S, quoted_str), //
+                P(S, quoted_str),
+                P(S, U),
             ),
         ),
     )
@@ -387,10 +418,15 @@ fn zone<'a>(version: u32) -> impl NomParser<'a, Zone> {
                 uint1,
             }
         })
+        .trace("zone")
 }
 
-fn tags<'a>() -> impl NomParser<'a, Vec<String>> {
-    length_count(U, P(space1, unquoted_str))
+fn tags<'a>() -> impl WinnowParser<&'a str, Vec<String>> {
+    length_repeat(
+        U, //
+        P(S, unquoted_str),
+    )
+    .trace("tags")
 }
 
 /// Line of space separated uints, sometimes with a space a the end
@@ -398,14 +434,12 @@ fn ground_overrides<'a>(
     strings: &[String],
     grid_height: usize,
     grid_width: usize,
-) -> impl NomParser<'a, Vec<Vec<Option<String>>>> {
+) -> impl WinnowParser<&'a str, Vec<Vec<Option<String>>>> {
     T(
-        verify(separated_list1(space1, U), move |items: &Vec<_>| {
-            items.len() == (grid_height - 1) * (grid_width - 1)
-        }),
+        separated((grid_height - 1) * (grid_width - 1), U, S),
         space0,
     )
-    .map(move |indices| {
+    .map(move |indices: Vec<_>| {
         // Chunk into 2D grid
         indices
             .into_iter()
@@ -417,46 +451,50 @@ fn ground_overrides<'a>(
             })
             .collect::<Vec<_>>()
     })
+    .trace("ground_overrides")
 }
 
-fn thingy<'a>(strings: &[String]) -> impl NomParser<'a, Thingy> {
+fn thingy<'a>(strings: &[String]) -> impl WinnowParser<&'a str, Thingy> {
     (
         U, //
-        P(space1, I),
-        count(opt(P(space1, parse_bool)), 3),
+        P(S, I),
+        opt(P(S, parse_bool)),
+        opt(P(S, parse_bool)),
+        opt(P(S, parse_bool)),
     )
-        .map(|(i, int, bools)| {
+        .map(|(i, int, bool1, bool2, bool3)| {
             let et_file = (i > 0).then(|| strings[i as usize - 1].clone());
 
             Thingy {
                 et_file,
                 int,
-                bool1: bools[0],
-                bool2: bools[1],
-                bool3: bools[2],
+                bool1,
+                bool2,
+                bool3,
             }
         })
+        .trace("thingy")
 }
 
 pub fn parse_arm_str(input: &str) -> Result<ARMFile> {
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
-    let lines = Slice(lines.as_slice());
+    let mut lines = lines.as_slice();
 
-    let (lines, (version, strings)) = (
-        version_line().lift(), //
+    let (version, strings) = (
+        lift(version_line()), //
         string_section(),
     )
-        .parse_complete(lines)
+        .parse_next(&mut lines)
         .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
 
-    let (lines, (dimensions, numbers1, tag1, bools, root_slot)) = (
-        dimensions(version).lift(),
-        separated_list1(C::<_, nom::error::Error<_>>(' '), U).lift(),
-        quoted_str.lift(),
-        separated_list1(space1, parse_bool).lift(),
-        slot(&strings).lift(),
+    let (dimensions, numbers1, tag1, bools, root_slot) = (
+        lift(dimensions(version)),
+        lift::<_, _, Vec<_>, _>(separated(1.., U, S)),
+        lift(quoted_str),
+        lift(separated(1.., parse_bool, S)),
+        lift(slot(&strings)),
     )
-        .parse_complete(lines)
+        .parse_next(&mut lines)
         .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
 
     let (grid_height, grid_width) = if let Slot::K(slot) = &root_slot {
@@ -465,40 +503,37 @@ pub fn parse_arm_str(input: &str) -> Result<ARMFile> {
         (1, 1)
     };
 
-    let parser = (
-        count(
-            thingy(&strings).lift(),
+    let mut parser = (
+        repeat(
             numbers1.iter().sum::<u32>() as usize * 2,
+            lift(thingy(&strings)),
         ),
         poi_groups(version),
-        cond(version >= 35, quoted_str.lift()),
+        cond(version >= 35, lift(quoted_str)),
         grid(grid_height, grid_width, &strings),
         group::<32, _>(version, doodad(version)),
         cond(version >= 23, doodad_connections(version)),
         group::<32, _>(version, decal(version)),
-        cond(version >= 22, boss_lines2()),
+        cond(version >= 22, boss_lines()),
         cond(version >= 27, group::<33, _>(version, zone(version))),
-        opt(tags().lift()),
-        opt(ground_overrides(&strings, grid_height, grid_width).lift()),
+        opt(lift(tags())),
+        opt(lift(ground_overrides(&strings, grid_height, grid_width))),
     );
 
     let (
-        _,
-        (
-            thingies,
-            poi_groups,
-            string1,
-            grid,
-            doodads,
-            doodad_connections,
-            decals,
-            boss_lines,
-            zones,
-            tags,
-            ground_overrides,
-        ),
-    ) = all_consuming(parser)
-        .parse_complete(lines)
+        thingies,
+        poi_groups,
+        string1,
+        grid,
+        doodads,
+        doodad_connections,
+        decals,
+        boss_lines,
+        zones,
+        tags,
+        ground_overrides,
+    ) = parser
+        .parse(lines)
         .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
 
     let arm_file = ARMFile {

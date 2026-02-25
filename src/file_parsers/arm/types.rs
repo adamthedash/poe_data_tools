@@ -26,7 +26,7 @@ impl Direction {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Edge {
     pub direction: Direction,
     pub edge: Option<String>,
@@ -34,14 +34,14 @@ pub struct Edge {
     pub virtual_exit: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Corner {
     pub direction: Direction,
     pub ground: Option<String>,
     pub height: i32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct SlotK {
     pub height: u32,
     pub width: u32,
@@ -52,7 +52,7 @@ pub struct SlotK {
 }
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Serialize, Default)]
+#[derive(Debug, Serialize, Default, Clone)]
 #[serde(tag = "kind", content = "data")]
 pub enum Slot {
     K(SlotK),

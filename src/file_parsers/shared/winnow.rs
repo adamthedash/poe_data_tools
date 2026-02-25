@@ -172,7 +172,7 @@ pub fn quoted_comma_separated<'a>() -> impl WinnowParser<&'a str, Vec<String>> {
 }
 
 /// winnow::combinator::multi::separated but exact sized
-pub fn separated_array<const N: usize, I, P, S, PO, SO>(
+pub fn separated_array<const N: usize, I, PO, S, P, SO>(
     sep: S,
     item: P,
 ) -> impl WinnowParser<I, [PO; N]>

@@ -3,17 +3,16 @@ use winnow::{
     Parser,
     ascii::space1,
     combinator::{alt, eof, repeat, separated_pair, terminated},
-    error::ContextError,
     token::rest,
 };
 
 use super::types::TSIFile;
 use crate::file_parsers::{
     lift::lift,
-    shared::winnow::{TraceHelper, quoted_str, unquoted_str},
+    shared::winnow::{TraceHelper, WinnowParser, quoted_str, unquoted_str},
 };
 
-fn key_value<'a>() -> impl Parser<&'a str, (String, String), ContextError> {
+fn key_value<'a>() -> impl WinnowParser<&'a str, (String, String)> {
     separated_pair(
         unquoted_str,
         space1,
