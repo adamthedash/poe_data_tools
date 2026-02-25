@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
-    combinator::{alt, cond, preceded as P, repeat},
+    combinator::{alt, cond, opt, preceded as P, repeat},
 };
 
 use super::types::*;
@@ -45,10 +45,13 @@ pub fn item<'a>(version: u32) -> impl WinnowParser<&'a str, Item> {
 
 pub fn group<'a>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
     (
-        lift(alt((quoted_str, unquoted_str))), //
+        lift((
+            alt((quoted_str, unquoted_str)), //
+            opt(P(space1, float)),
+        )),
         repeat(0.., lift(item(version))),
     )
-        .map(|(name, items)| Group { name, items })
+        .map(|((name, float), items)| Group { name, float, items })
         .trace("group")
 }
 

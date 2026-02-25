@@ -14,6 +14,7 @@ pub struct Item {
 #[derive(Debug, Serialize)]
 pub struct Group {
     pub name: String,
+    pub float: Option<f32>,
     pub items: Vec<Item>,
 }
 
