@@ -83,13 +83,14 @@ impl FS {
     /// Read many files at once, optimising batch loads. Does not preserve order of paths given.
     pub fn batch_read<'a>(
         &'a self,
-        paths: &[&'a str],
+        paths: &'a [impl AsRef<str>],
     ) -> impl Iterator<Item = Result<(&'a str, Bytes), (&'a str, anyhow::Error)>> {
         // Get FileInfo's
         let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let (fileinfos, errors) = paths
             .iter()
-            .map(|&path| {
+            .map(|path| {
+                let path = path.as_ref();
                 // Compute hash
                 let mut hasher = hash_builder.build_hasher();
                 hasher.write(path.to_lowercase().as_bytes());

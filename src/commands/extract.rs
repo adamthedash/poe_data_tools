@@ -24,7 +24,6 @@ pub fn extract_files(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) ->
             })
         })
         .collect::<Vec<_>>();
-    let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
 
     fs.batch_read(&filenames)
         // Print and filter out errors

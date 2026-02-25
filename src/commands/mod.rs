@@ -25,6 +25,15 @@ impl Patch {
             Specific(s) => unreachable!("Invalid major patch version {s:?}"),
         }
     }
+
+    pub fn as_str(&self) -> &str {
+        use Patch::*;
+        match self {
+            One => "1",
+            Two => "2",
+            Specific(v) => v,
+        }
+    }
 }
 
 impl std::str::FromStr for Patch {

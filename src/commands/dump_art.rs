@@ -28,7 +28,6 @@ pub fn extract_art(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> R
             })
         })
         .collect::<Vec<_>>();
-    let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
 
     fs.batch_read(&filenames)
         // Print and filter out errors

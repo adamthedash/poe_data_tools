@@ -533,7 +533,6 @@ pub fn dump_tables(
             })
         })
         .collect::<Vec<_>>();
-    let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
 
     fs.batch_read(&filenames)
         // Print and filter out errors

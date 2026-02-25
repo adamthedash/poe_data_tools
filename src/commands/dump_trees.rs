@@ -102,7 +102,6 @@ pub fn dump_trees(
             })
         })
         .collect::<Vec<_>>();
-    let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
 
     let passive_info = load_passive_info(fs, version, cache_dir)?
         .into_iter()

@@ -38,7 +38,8 @@ pub trait FileParserExt: FileParser {
 
 impl<P> FileParserExt for P where P: FileParser {}
 
-enum Parser {
+/// Parser for different file formats
+pub enum Parser {
     Tsi(TSIParser),
     Rs(RSParser),
     Arm(ARMParser),
@@ -66,7 +67,7 @@ enum Parser {
 }
 
 impl Parser {
-    fn parse_to_json_file(&self, bytes: &[u8], output_folder: &Path) -> Result<()> {
+    pub fn parse_to_json_file(&self, bytes: &[u8], output_folder: &Path) -> Result<()> {
         use Parser::*;
         match self {
             Tsi(p) => p.parse_to_json_file(bytes, output_folder),
@@ -96,7 +97,7 @@ impl Parser {
         }
     }
 
-    fn from_filename(filename: &Path, poe_version: u32) -> Option<Self> {
+    pub fn from_filename(filename: &Path, poe_version: u32) -> Option<Self> {
         let ext = filename.extension()?.to_str()?;
 
         use Parser::*;
@@ -162,8 +163,6 @@ pub fn translate(
             Parser::from_filename(Path::new(filename), poe_version.major()).is_some()
         })
         .collect::<Vec<_>>();
-
-    let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
 
     fs.batch_read(&filenames)
         // Print and filter out errors
