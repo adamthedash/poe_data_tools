@@ -1,3 +1,4 @@
+pub mod lift;
 pub mod winnow;
 
 use anyhow::{Context, bail};

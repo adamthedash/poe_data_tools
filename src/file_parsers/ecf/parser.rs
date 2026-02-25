@@ -6,11 +6,9 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::lift,
-    shared::winnow::{
-        TraceHelper, WinnowParser, optional_filename, quoted, separated_array, version_line,
-    },
+    winnow::{TraceHelper, WinnowParser, optional_filename, quoted, separated_array, version_line},
 };
 
 fn combination<'a>() -> impl WinnowParser<&'a str, EcfCombination> {

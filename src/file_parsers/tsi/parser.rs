@@ -7,9 +7,9 @@ use winnow::{
 };
 
 use super::types::TSIFile;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::lift,
-    shared::winnow::{TraceHelper, WinnowParser, quoted_str, unquoted_str},
+    winnow::{TraceHelper, WinnowParser, quoted_str, unquoted_str},
 };
 
 fn key_value<'a>() -> impl WinnowParser<&'a str, (String, String)> {

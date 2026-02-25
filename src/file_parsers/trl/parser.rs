@@ -7,9 +7,9 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    shared::winnow::{TraceHelper, unquoted_str, version_line},
+    winnow::{TraceHelper, unquoted_str, version_line},
 };
 
 fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {

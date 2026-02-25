@@ -7,9 +7,9 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::lift,
-    shared::winnow::{filename, quoted, version_line},
+    winnow::{filename, quoted, version_line},
 };
 
 pub fn parse_tmo_str(contents: &str) -> Result<TMOFile> {

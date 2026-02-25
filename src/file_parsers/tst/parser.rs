@@ -6,9 +6,9 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::lift,
-    shared::winnow::{TraceHelper, WinnowParser, filename, quoted, unquoted_str},
+    winnow::{TraceHelper, WinnowParser, filename, quoted, unquoted_str},
 };
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {

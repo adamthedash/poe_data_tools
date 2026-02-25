@@ -2,9 +2,9 @@ use anyhow::{Result, anyhow};
 use winnow::{Parser, ascii::space1, combinator::repeat};
 
 use super::types::*;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::lift,
-    shared::winnow::{TraceHelper, WinnowParser, filename, quoted, separated_array, version_line},
+    winnow::{TraceHelper, WinnowParser, filename, quoted, separated_array, version_line},
 };
 
 fn combination<'a>() -> impl WinnowParser<&'a str, GcfCombination> {

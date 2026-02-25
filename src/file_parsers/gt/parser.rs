@@ -6,9 +6,9 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::lift,
-    shared::winnow::{TraceHelper, WinnowParser, parse_bool, quoted_str, unquoted_str},
+    winnow::{TraceHelper, WinnowParser, parse_bool, quoted_str, unquoted_str},
 };
 
 fn bools<'a>() -> impl WinnowParser<&'a str, (bool, bool, Option<bool>, Option<bool>, Option<bool>)>

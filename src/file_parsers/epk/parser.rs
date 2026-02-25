@@ -12,14 +12,12 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    shared::{
-        remove_trailing,
-        winnow::{
-            TraceHelper, WinnowParser, filename, nullable_uint, quoted, quoted_comma_separated,
-            quoted_str, repeat_array, unquoted, unquoted_str,
-        },
+    remove_trailing,
+    winnow::{
+        TraceHelper, WinnowParser, filename, nullable_uint, quoted, quoted_comma_separated,
+        quoted_str, repeat_array, unquoted, unquoted_str,
     },
 };
 

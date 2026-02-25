@@ -10,11 +10,9 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    shared::winnow::{
-        TraceHelper, WinnowParser, filename, parse_bool, quoted, unquoted, version_line,
-    },
+    winnow::{TraceHelper, WinnowParser, filename, parse_bool, quoted, unquoted, version_line},
 };
 
 fn headers_v2<'a>() -> impl WinnowParser<&'a str, HeadersV2> {

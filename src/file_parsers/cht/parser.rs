@@ -6,9 +6,9 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    shared::winnow::{TraceHelper, WinnowParser, quoted_comma_separated, version_line},
+    winnow::{TraceHelper, WinnowParser, quoted_comma_separated, version_line},
 };
 
 fn num_line<'a>(version: u32) -> impl WinnowParser<&'a str, Nums> {

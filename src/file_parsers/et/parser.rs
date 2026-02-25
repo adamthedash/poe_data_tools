@@ -8,9 +8,9 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::{
+use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    shared::winnow::{
+    winnow::{
         TraceHelper, WinnowParser, filename, parse_bool, quoted, repeat_array, separated_array,
         unquoted, unquoted_str,
     },
