@@ -15,6 +15,7 @@ pub mod gt;
 pub mod mat;
 pub mod mtd;
 pub mod pet;
+pub mod psg;
 pub mod rs;
 pub mod shared;
 pub mod tmo;

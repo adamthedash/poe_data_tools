@@ -11,8 +11,8 @@ use crate::{
         FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
         dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
         et::ETParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser,
-        pet::PETParser, rs::RSParser, tmo::TMOParser, toy::TOYParser, trl::TRLParser,
-        tsi::TSIParser, tst::TSTParser,
+        pet::PETParser, psg::PSGParser, rs::RSParser, tmo::TMOParser, toy::TOYParser,
+        trl::TRLParser, tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -62,6 +62,7 @@ enum Parser {
     Toy(TOYParser),
     Tmo(TMOParser),
     Gcf(GCFParser),
+    Psg(PSGParser),
 }
 
 impl Parser {
@@ -91,10 +92,11 @@ impl Parser {
             Toy(p) => p.parse_to_json_file(bytes, output_folder),
             Tmo(p) => p.parse_to_json_file(bytes, output_folder),
             Gcf(p) => p.parse_to_json_file(bytes, output_folder),
+            Psg(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
-    fn from_filename(filename: &Path) -> Option<Self> {
+    fn from_filename(filename: &Path, poe_version: u32) -> Option<Self> {
         let ext = filename.extension()?.to_str()?;
 
         use Parser::*;
@@ -122,6 +124,9 @@ impl Parser {
             "toy" => Toy(TOYParser),
             "tmo" => Tmo(TMOParser),
             "gcf" => Gcf(GCFParser),
+            "psg" => Psg(PSGParser {
+                version: poe_version,
+            }),
             _ => return None,
         };
 
@@ -135,7 +140,7 @@ pub fn translate(
     patterns: &[Pattern],
     _cache_dir: &Path,
     output_folder: &Path,
-    _version: &Patch,
+    poe_version: &Patch,
 ) -> Result<()> {
     let filenames = fs
         .list()
@@ -153,7 +158,9 @@ pub fn translate(
         })
         // Filter out files that we can't parse
         // TODO: This might be expensive, also we might want to log skips?
-        .filter(|filename| Parser::from_filename(Path::new(filename)).is_some())
+        .filter(|filename| {
+            Parser::from_filename(Path::new(filename), poe_version.major()).is_some()
+        })
         .collect::<Vec<_>>();
 
     let filenames = filenames.iter().map(|f| f.as_str()).collect::<Vec<_>>();
@@ -170,7 +177,7 @@ pub fn translate(
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
             eprintln!("Extracting file: {filename}");
-            let parser = Parser::from_filename(Path::new(filename))
+            let parser = Parser::from_filename(Path::new(filename), poe_version.major())
                 .expect("Already verified parser exists above");
 
             let out_path = output_folder.join(filename).with_added_extension("json");
