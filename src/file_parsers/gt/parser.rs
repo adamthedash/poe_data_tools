@@ -1,19 +1,18 @@
 use anyhow::{Result, anyhow};
-use nom::{
+use winnow::{
     Parser,
-    character::complete::space1,
-    combinator::{all_consuming, opt},
-    sequence::preceded as P,
+    ascii::space1,
+    combinator::{opt, preceded as P},
 };
 
 use super::types::*;
 use crate::file_parsers::{
-    lift_nom::ToSliceParser,
-    shared::{NomParser, parse_bool, quoted_str, unquoted_str},
-    slice::Slice,
+    lift_winnow::lift,
+    shared::winnow::{WinnowParser, parse_bool, quoted_str, unquoted_str},
 };
 
-fn bools<'a>() -> impl NomParser<'a, (bool, bool, Option<bool>, Option<bool>, Option<bool>)> {
+fn bools<'a>() -> impl WinnowParser<&'a str, (bool, bool, Option<bool>, Option<bool>, Option<bool>)>
+{
     (
         parse_bool,
         P(space1, parse_bool),
@@ -21,6 +20,7 @@ fn bools<'a>() -> impl NomParser<'a, (bool, bool, Option<bool>, Option<bool>, Op
         opt(P(space1, parse_bool)),
         opt(P(space1, parse_bool)),
     )
+        .trace("bools")
 }
 
 pub fn parse_gt_str(contents: &str) -> Result<GTFile> {
@@ -29,12 +29,11 @@ pub fn parse_gt_str(contents: &str) -> Result<GTFile> {
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
         .collect::<Vec<_>>();
-    let lines = Slice(lines.as_slice());
 
-    let parser = (
-        unquoted_str.lift(), //
-        bools().lift(),
-        opt(quoted_str.lift()),
+    let mut parser = (
+        lift(unquoted_str), //
+        lift(bools()),
+        opt(lift(quoted_str)),
     )
         .map(
             |(name, (bool1, bool2, bool3, bool4, bool5), string1)| GTFile {
@@ -48,8 +47,8 @@ pub fn parse_gt_str(contents: &str) -> Result<GTFile> {
             },
         );
 
-    let (_, gt_file) = all_consuming(parser)
-        .parse_complete(lines)
+    let gt_file = parser
+        .parse(lines.as_slice())
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     Ok(gt_file)
