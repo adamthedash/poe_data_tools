@@ -23,9 +23,10 @@ use crate::{
     VERBOSE,
     bundle_fs::FS,
     commands::Patch,
-    dat::{
-        ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection, fetch_schema},
-        table_view::DatTable,
+    dat::ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection, fetch_schema},
+    file_parsers::{
+        FileParser,
+        dat::{DatParser, types::DatFile},
     },
 };
 
@@ -80,7 +81,7 @@ fn parse_bool(bytes: &[u8]) -> Result<bool> {
 
 /// Apply a schema to a single column
 fn parse_column(
-    table: &DatTable,
+    table: &DatFile,
     column: &ColumnSchema,
     cur_offset: usize,
 ) -> Result<(usize, Result<ArrayRef>)> {
@@ -355,7 +356,7 @@ fn parse_column(
 }
 
 /// Parse a table with the given schema into an Arrow RecordBatch
-pub fn parse_table(table: &DatTable, schema: &DatTableSchema) -> Result<RecordBatch> {
+pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBatch> {
     // Parse each of the columns
     let mut parsed_columns = vec![];
     let mut column_names = vec![];
@@ -448,7 +449,8 @@ fn save_to_csv(table: &RecordBatch, path: &Path) -> Result<()> {
 
 fn process_file(bytes: &Bytes, output_path: &Path, schema: &DatTableSchema) -> Result<()> {
     // Load dat file
-    let (_, table) = DatTable::from_raw_bytes(bytes)
+    let table = DatParser
+        .parse(bytes)
         .map_err(|e| anyhow!("Failed to parse table data: {:?}", e))?;
 
     ensure!(!table.rows.is_empty(), "Empty table");
@@ -480,7 +482,9 @@ pub fn load_parsed_table(
 
     // Load dat file
     let bytes = fs.read(filename)?;
-    let (_, table) = DatTable::from_raw_bytes(&bytes)
+    // Load dat file
+    let table = DatParser
+        .parse(&bytes)
         .map_err(|e| anyhow!("Failed to parse table data: {:?}", e))?;
 
     ensure!(!table.rows.is_empty(), "Empty table");

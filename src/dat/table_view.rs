@@ -1,34 +1,8 @@
 use std::fmt::Display;
 
 use anyhow::{Context, Result, ensure};
-use nom::{
-    IResult, Parser,
-    bytes::complete::{tag, take_until},
-    number::complete::le_u32,
-};
 
-/// Splits a byte slice into two parts around 16 consecutive 0xBB bytes.
-/// Returns a tuple containing the two halves.
-fn split_on_8_bb(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
-    // Define the delimiter: 16 consecutive 0xBB bytes
-    const DELIMITER: &[u8] = &[0xBB; 8];
-
-    // Parser to take until the delimiter and then consume it
-    let mut parser = (
-        take_until(DELIMITER), // Take everything up to the delimiter
-        tag(DELIMITER),        // Match the delimiter itself
-    )
-        // Apply the parser and return the remaining parts
-        .map_res(
-            |(before, _delimiter): (&[u8], &[u8])| -> Result<(&[u8], &[u8]), ()> {
-                // The rest of the input after the delimiter
-                let remaining: &[u8] = &input[before.len() + DELIMITER.len()..];
-                Ok((before, remaining))
-            },
-        );
-
-    parser.parse_complete(input)
-}
+use crate::file_parsers::dat::types::DatFile;
 
 // Take a null-terminated UTF-16 string
 fn take_utf16_string(input: &[u8]) -> String {
@@ -40,38 +14,8 @@ fn take_utf16_string(input: &[u8]) -> String {
 
     String::from_utf16(&u16_data).expect("Failed to parse UTF-16 string.")
 }
-pub struct DatTable {
-    pub rows: Vec<Vec<u8>>,
-    pub variable_data: Vec<u8>,
-}
 
-impl DatTable {
-    /// Parses a raw datc64 file
-    pub fn from_raw_bytes(bytes: &[u8]) -> IResult<&[u8], Self> {
-        let (input, num_rows) = le_u32(bytes)?;
-
-        let (input, (fixed_data, variable_data)) = split_on_8_bb(input)?;
-
-        let rows = if num_rows == 0 {
-            vec![]
-        } else {
-            let bytes_per_row = fixed_data.len() / num_rows as usize;
-
-            fixed_data
-                .chunks_exact(bytes_per_row)
-                .map(|row| row.to_vec())
-                .collect::<Vec<_>>()
-        };
-
-        Ok((
-            input,
-            Self {
-                rows,
-                variable_data: variable_data.to_vec(),
-            },
-        ))
-    }
-
+impl DatFile {
     /// Number of bytes in a row
     pub fn width(&self) -> usize {
         self.rows.first().map(|row| row.len()).unwrap_or(0)
@@ -188,7 +132,7 @@ impl DatTable {
     }
 }
 
-impl Display for DatTable {
+impl Display for DatFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Debug - print out the values as hex
         for row in self.rows.iter() {

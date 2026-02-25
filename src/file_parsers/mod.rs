@@ -5,6 +5,7 @@ pub mod bundle;
 pub mod bundle_index;
 pub mod cht;
 pub mod clt;
+pub mod dat;
 pub mod dct;
 pub mod ddt;
 pub mod dlp;
