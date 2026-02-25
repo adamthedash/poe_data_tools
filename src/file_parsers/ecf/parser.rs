@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
-    ascii::space1,
+    ascii::{dec_uint, space1},
     combinator::{opt, preceded, repeat},
 };
 
@@ -9,16 +9,16 @@ use super::types::*;
 use crate::file_parsers::{
     lift_winnow::lift,
     shared::winnow::{
-        TraceHelper, WinnowParser, optional_filename, parse_bool, separated_array, version_line,
+        TraceHelper, WinnowParser, optional_filename, quoted, separated_array, version_line,
     },
 };
 
 fn combination<'a>() -> impl WinnowParser<&'a str, EcfCombination> {
     (
-        separated_array(space1, optional_filename("et")),
-        opt(preceded(space1, parse_bool)),
+        separated_array(space1, quoted('"').and_then(optional_filename("et"))),
+        opt(preceded(space1, dec_uint)),
     )
-        .map(|(et_files, bool1)| EcfCombination { et_files, bool1 })
+        .map(|(et_files, uint1)| EcfCombination { et_files, uint1 })
         .trace("combination")
 }
 

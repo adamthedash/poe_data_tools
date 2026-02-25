@@ -8,9 +8,11 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     file_parsers::{
-        FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, clt::CLTParser, ddt::DDTParser,
-        ecf::ECFParser, epk::EPKParser, et::ETParser, gft::GFTParser, gt::GTParser, mat::MATParser,
-        mtd::MTDParser, rs::RSParser, tsi::TSIParser, tst::TSTParser,
+        FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
+        dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
+        et::ETParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser,
+        pet::PETParser, rs::RSParser, tmo::TMOParser, toy::TOYParser, trl::TRLParser,
+        tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -52,6 +54,14 @@ enum Parser {
     Clt(CLTParser),
     Amd(AMDParser),
     Epk(EPKParser),
+    Pet(PETParser),
+    Trl(TRLParser),
+    Dlp(DLPParser),
+    Cht(CHTParser),
+    Dct(DCTParser),
+    Toy(TOYParser),
+    Tmo(TMOParser),
+    Gcf(GCFParser),
 }
 
 impl Parser {
@@ -73,6 +83,14 @@ impl Parser {
             Clt(p) => p.parse_to_json_file(bytes, output_folder),
             Amd(p) => p.parse_to_json_file(bytes, output_folder),
             Epk(p) => p.parse_to_json_file(bytes, output_folder),
+            Pet(p) => p.parse_to_json_file(bytes, output_folder),
+            Trl(p) => p.parse_to_json_file(bytes, output_folder),
+            Dlp(p) => p.parse_to_json_file(bytes, output_folder),
+            Cht(p) => p.parse_to_json_file(bytes, output_folder),
+            Dct(p) => p.parse_to_json_file(bytes, output_folder),
+            Toy(p) => p.parse_to_json_file(bytes, output_folder),
+            Tmo(p) => p.parse_to_json_file(bytes, output_folder),
+            Gcf(p) => p.parse_to_json_file(bytes, output_folder),
         }
     }
 
@@ -96,6 +114,14 @@ impl Parser {
             "clt" => Clt(CLTParser),
             "amd" => Amd(AMDParser),
             "epk" => Epk(EPKParser),
+            "pet" => Pet(PETParser),
+            "trl" => Trl(TRLParser),
+            "dlp" => Dlp(DLPParser),
+            "cht" => Cht(CHTParser),
+            "dct" => Dct(DCTParser),
+            "toy" => Toy(TOYParser),
+            "tmo" => Tmo(TMOParser),
+            "gcf" => Gcf(GCFParser),
             _ => return None,
         };
 

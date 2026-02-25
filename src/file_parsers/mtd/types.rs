@@ -12,11 +12,11 @@ pub struct Group {
     pub entries: Vec<Entry>,
     pub weight_line: Option<(Vec<u32>, u32)>,
     pub extra_line: Option<(u32, bool)>,
-    pub extra_mat_files: Vec<String>,
+    pub extra_entries: Vec<Entry>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct Entry {
     pub mat_file: String,
-    pub dlp_file: Option<String>,
+    pub dlp_files: Vec<String>,
 }

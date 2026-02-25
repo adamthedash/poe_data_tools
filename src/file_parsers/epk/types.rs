@@ -1,19 +1,32 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RenderPass {
     pub filename: String,
     pub is_main: bool,
-    pub r#type: String,
+    pub r#type: Option<String>,
     pub apply_on_children: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RenderPasses {
     pub passes: Vec<RenderPass>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
+pub enum Bone {
+    Parent {
+        names: Vec<String>,
+        index: Option<u32>,
+    },
+    Child {
+        parent: String,
+        children: Vec<String>,
+        index: Option<u32>,
+    },
+}
+
+#[derive(Debug, Serialize, Clone)]
 #[serde(tag = "kind", content = "data")]
 pub enum Effect {
     ApplyToAllPasses,
@@ -33,13 +46,13 @@ pub enum Effect {
         floats: [f32; 2],
         rotations: [Option<i32>; 2],
         include_aux: bool,
-        ignore_errors: bool,
         multi_attach: bool,
+        ignore_errors: bool,
     },
     ChildAttachedObject {
         ao_file: String,
-        from_bone: String,
-        from_bone_group_index: u32,
+        from_bones: Bone,
+        to_bones: Option<Bone>,
     },
     HideFirstPassAfterDelay {
         delay: f32,
@@ -54,6 +67,11 @@ pub enum Effect {
         float2: f32,
     },
     HideFirstPassUsingTimelineParameter {
+        parameter: String,
+        float1: f32,
+        float2: f32,
+    },
+    HideFirstPassUsingDynamicParameter {
         parameter: String,
         float1: f32,
         float2: f32,

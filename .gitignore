@@ -3,3 +3,4 @@ Cargo.lock
 .aider*
 data*
 db
+le_bytes.txt

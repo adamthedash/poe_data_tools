@@ -17,7 +17,7 @@ pub struct BoneGroup {
 pub struct BoneRotation {
     pub bone: String,
     pub coord_order: String,
-    pub coords: Vec<i32>,
+    pub coords: Vec<f32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -26,9 +26,9 @@ pub struct Group {
     pub animation_type: String,
     pub animation_time: u32,
     pub animation_stages: Vec<AnimationStage>,
-    pub float_group: Vec<f32>,
+    pub float_group: Option<Vec<f32>>,
     pub bone_rotations: Option<Vec<BoneRotation>>,
-    pub extra_ints: Option<(i32, i32)>,
+    pub extra_ints: Option<[Option<u32>; 2]>,
 }
 
 #[derive(Debug, Serialize)]

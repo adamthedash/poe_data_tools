@@ -2,11 +2,17 @@ build:
 	cargo build --release --target x86_64-pc-windows-gnu
 	cargo build --release --target x86_64-unknown-linux-gnu
 
-debug FILE:
-	cargo run --release --features winnow/debug -- -p 1 translate data1 {{FILE}}
+debug VERSION FILE:
+	cargo run --release --features winnow/debug -- -p {{VERSION}} translate data{{VERSION}} {{FILE}}
 
-run FILE:
-	cargo run --release -- -p 1 translate data1 {{FILE}}
+run VERSION FILE:
+	cargo run --release -- -p {{VERSION}} translate data{{VERSION}} {{FILE}}
 
-cat FILE:
-	cargo run --release -- -p 1 cat {{FILE}}
+extract VERSION FILE:
+	cargo run --release -- -p {{VERSION}} extract data{{VERSION}} {{FILE}}
+
+cat VERSION FILE:
+	cargo run --release -- -p {{VERSION}} cat {{FILE}}
+
+list VERSION FILE:
+	cargo run --release -- -p {{VERSION}} list {{FILE}}
