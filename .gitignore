@@ -4,3 +4,5 @@ Cargo.lock
 data*
 db
 le_bytes.txt
+perf*
+flamegraph*

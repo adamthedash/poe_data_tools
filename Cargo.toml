@@ -28,19 +28,24 @@ rayon = "1.11.0"
 image = { git = "https://github.com/RunDevelopment/image", branch = "new-dds-decoder" }
 iterators_extended = "0.2.0"
 itertools = "0.14.0"
+regex = "1.12.3"
+enum_dispatch = "0.3.13"
 
 # Arrow - for dataframe stuff
 arrow-csv = "56.2.0"
 arrow-array = "56.2.0"
 arrow-cast = "56.2.0"
 arrow-schema = "56.2.0"
-regex = "1.12.3"
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
 
 [[bench]]
 name = "fs"
+harness = false
+
+[[bench]]
+name = "coverage"
 harness = false
 
 # Enable a small amount of optimization in the dev profile.

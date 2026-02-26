@@ -1,6 +1,7 @@
 use std::{io::BufWriter, path::Path};
 
 use anyhow::{Context, Result};
+use enum_dispatch::enum_dispatch;
 use glob::{MatchOptions, Pattern};
 use serde::Serialize;
 
@@ -16,11 +17,21 @@ use crate::{
     },
 };
 
-pub trait FileParserExt: FileParser {
-    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()>
-    where
-        Self::Output: Serialize,
-    {
+#[enum_dispatch]
+pub trait FileParserExt {
+    /// Parse and serialise to JSON
+    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()>;
+
+    /// Checks whether the file has been parsed successfully
+    fn validate(&self, bytes: &[u8]) -> bool;
+}
+
+impl<P> FileParserExt for P
+where
+    P: FileParser,
+    P::Output: Serialize,
+{
+    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()> {
         let parsed = self.parse(bytes)?;
 
         std::fs::create_dir_all(output_path.parent().unwrap())
@@ -34,11 +45,14 @@ pub trait FileParserExt: FileParser {
 
         Ok(())
     }
+
+    fn validate(&self, bytes: &[u8]) -> bool {
+        self.parse(bytes).is_ok()
+    }
 }
 
-impl<P> FileParserExt for P where P: FileParser {}
-
 /// Parser for different file formats
+#[enum_dispatch(FileParserExt)]
 pub enum Parser {
     Tsi(TSIParser),
     Rs(RSParser),
@@ -67,36 +81,6 @@ pub enum Parser {
 }
 
 impl Parser {
-    pub fn parse_to_json_file(&self, bytes: &[u8], output_folder: &Path) -> Result<()> {
-        use Parser::*;
-        match self {
-            Tsi(p) => p.parse_to_json_file(bytes, output_folder),
-            Rs(p) => p.parse_to_json_file(bytes, output_folder),
-            Arm(p) => p.parse_to_json_file(bytes, output_folder),
-            Ecf(p) => p.parse_to_json_file(bytes, output_folder),
-            Et(p) => p.parse_to_json_file(bytes, output_folder),
-            Gt(p) => p.parse_to_json_file(bytes, output_folder),
-            Gft(p) => p.parse_to_json_file(bytes, output_folder),
-            Ddt(p) => p.parse_to_json_file(bytes, output_folder),
-            Ao(p) => p.parse_to_json_file(bytes, output_folder),
-            Mtd(p) => p.parse_to_json_file(bytes, output_folder),
-            Mat(p) => p.parse_to_json_file(bytes, output_folder),
-            Tst(p) => p.parse_to_json_file(bytes, output_folder),
-            Clt(p) => p.parse_to_json_file(bytes, output_folder),
-            Amd(p) => p.parse_to_json_file(bytes, output_folder),
-            Epk(p) => p.parse_to_json_file(bytes, output_folder),
-            Pet(p) => p.parse_to_json_file(bytes, output_folder),
-            Trl(p) => p.parse_to_json_file(bytes, output_folder),
-            Dlp(p) => p.parse_to_json_file(bytes, output_folder),
-            Cht(p) => p.parse_to_json_file(bytes, output_folder),
-            Dct(p) => p.parse_to_json_file(bytes, output_folder),
-            Toy(p) => p.parse_to_json_file(bytes, output_folder),
-            Tmo(p) => p.parse_to_json_file(bytes, output_folder),
-            Gcf(p) => p.parse_to_json_file(bytes, output_folder),
-            Psg(p) => p.parse_to_json_file(bytes, output_folder),
-        }
-    }
-
     pub fn from_filename(filename: &Path, poe_version: u32) -> Option<Self> {
         let ext = filename.extension()?.to_str()?;
 
