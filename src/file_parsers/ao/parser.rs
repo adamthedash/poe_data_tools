@@ -4,11 +4,13 @@ use winnow::{
     ascii::space1,
     combinator::{alt, delimited, opt, preceded as P, repeat},
     token::literal,
+    trace_name,
 };
 
 use super::types::*;
 use crate::file_parsers::shared::winnow::{
-    WinnowParser, quoted_str, single_quoted_str, spaces_or_comments, unquoted_str, version_line,
+    TraceHelper, WinnowParser, quoted_str, single_quoted_str, spaces_or_comments, unquoted_str,
+    version_line,
 };
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
@@ -18,6 +20,7 @@ fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
         alt((quoted_str, single_quoted_str, unquoted_str)),
     )
         .map(|(key, _, value)| Entry { key, value })
+        .trace(trace_name!("entry"))
 }
 
 fn parse_struct<'a>() -> impl WinnowParser<&'a str, Struct> {
@@ -30,6 +33,7 @@ fn parse_struct<'a>() -> impl WinnowParser<&'a str, Struct> {
         ),
     )
         .map(|(name, entries)| Struct { name, entries })
+        .trace(trace_name!("struct"))
 }
 
 pub fn parse_ao_str(contents: &str) -> Result<AOFile> {
@@ -51,7 +55,8 @@ pub fn parse_ao_str(contents: &str) -> Result<AOFile> {
             is_abstract: is_abstract.is_some(),
             extends: extends.into_iter().filter(|e| e == "nothing").collect(),
             structs,
-        });
+        })
+        .trace(trace_name!("ao_file"));
 
     parser
         .parse(contents)

@@ -3,7 +3,7 @@ build:
 	cargo build --release --target x86_64-unknown-linux-gnu
 
 debug VERSION FILE:
-	cargo run --release --features winnow/debug -- -p {{VERSION}} translate data{{VERSION}} {{FILE}}
+	cargo run --release --features debug -- -p {{VERSION}} translate data{{VERSION}} {{FILE}}
 
 run VERSION FILE:
 	cargo run --release -- -p {{VERSION}} translate data{{VERSION}} {{FILE}}
