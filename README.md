@@ -1,4 +1,5 @@
-# Parsing tools for Path of Exile Bundle files
+# PoE Data Tools
+Parsing tools for Path of Exile game files. Available as a standalone binary (See releases), and as a rust crate.  
 
 # Commands
 
@@ -10,7 +11,6 @@
   and saves them out as CSVs where the schema was successfully applied.  
 - `dump-tree`: Extracts passive skill trees (player, atlas, ruthless, etc.) to JSON
 - `translate`: Extracts files and converts them to more accessible formats.  
-
 
 ## Usage
 
@@ -26,19 +26,26 @@ Using executable file
 poe_data_tools --help
 ```
 
-## Globs
+As a rust library. Note that due to requiring a few forked dependencies, I can't yet publish it to crates.io. Instead, it must be added as a git dependency.  
 
-Note that commands that take globs use the form that requires `**` to match across directory separators, e.g.
+```toml
+[dependencies]
+poe_data_tools = { git = "https://github.com/adamthedash/poe_data_tools.git" }
+```
+
+## Globs
+Many of the commands can take glob patterns to operate over several files at once. Note that the patterns follow the [Unix glob](https://www.man7.org/linux/man-pages/man7/glob.7.html) specification.  
+Several patterns can be provided at once.  
 
 ```bash
 # all files in all directories (the default)
-cargo run --release --bin poe_data_tools -- --patch 2 list '**'
-# all .datc64 files in all subdirectories
-cargo run --release --bin poe_data_tools -- --patch 2 list '**/*.datc64'
+poe_data_tools --patch 2 list '**'
+# all .datc64 and .dds files in all subdirectories
+poe_data_tools --patch 2 list '**/*.datc64' '**/*.dds'
 # all files in the art/ directory
-cargo run --release --bin poe_data_tools -- --patch 2 list 'art/*'
+poe_data_tools --patch 2 list 'art/*'
 # all files in the art/ directory and its subdirectories
-cargo run --release --bin poe_data_tools -- --patch 2 list 'art/**'
+poe_data_tools --patch 2 list 'art/**'
 ```
 
 # Format coverage
@@ -183,15 +190,10 @@ PoE 2 (patch 4.4.0.7.5), PoE Data Tools v1.4.1
 ## TST File Format
 ![tst format](./images/tst_spec.png)  
 
-**TODO List**
+# TODO List
 
 - Proper documentation for the lib crate
-- Full migration from nom over to winnow  
 - Swap image.rs version once [DDS support is merged](https://github.com/image-rs/image/pull/2258)
-
-# Testing
-
-Tested on linux (WSL) and Windows with the Steam version of PoE 1, and rolling latest patch from the CDN for PoE 2.
 
 # Resources
 https://gitlab.com/zao/poe-rs  
