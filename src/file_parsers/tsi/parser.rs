@@ -13,15 +13,18 @@ use crate::file_parsers::shared::{
 };
 
 fn key_value<'a>() -> impl WinnowParser<&'a str, (String, String)> {
-    winnow::trace!("key_value", separated_pair(
-        unquoted_str,
-        space1,
-        // Attempt to un-quote single quoted strings, otherwise just take the rest as-is
-        alt((
-            terminated(quoted_str, eof), //
-            rest.map(String::from),
-        )),
-    ))
+    winnow::trace!(
+        "key_value",
+        separated_pair(
+            unquoted_str,
+            space1,
+            // Attempt to un-quote single quoted strings, otherwise just take the rest as-is
+            alt((
+                terminated(quoted_str, eof), //
+                rest.map(String::from),
+            )),
+        )
+    )
 }
 
 pub fn parse_tsi_str(contents: &str) -> Result<TSIFile> {

@@ -13,20 +13,23 @@ use crate::file_parsers::shared::{
 };
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
-    winnow::trace!("entry", (
-        dec_uint, //
-        P(space1, quoted('"').and_then(filename("atlas"))),
-        P(space1, quoted_str),
-        P(space1, float),
-        opt(P(space1, float)),
+    winnow::trace!(
+        "entry",
+        (
+            dec_uint, //
+            P(space1, quoted('"').and_then(filename("atlas"))),
+            P(space1, quoted_str),
+            P(space1, float),
+            opt(P(space1, float)),
+        )
+            .map(|(weight, atlas_file, tag, float1, float2)| Entry {
+                weight,
+                atlas_file,
+                tag,
+                float1,
+                float2,
+            })
     )
-        .map(|(weight, atlas_file, tag, float1, float2)| Entry {
-            weight,
-            atlas_file,
-            tag,
-            float1,
-            float2,
-        }))
 }
 
 fn header<'a>() -> impl WinnowParser<&'a str, (String, Option<f32>)> {
@@ -37,27 +40,33 @@ fn header<'a>() -> impl WinnowParser<&'a str, (String, Option<f32>)> {
 }
 
 fn group<'a>() -> impl SliceParser<'a, &'a str, Group> {
-    winnow::trace!("group", (
-        lift(header()), //
-        repeat(0.., lift(entry())),
+    winnow::trace!(
+        "group",
+        (
+            lift(header()), //
+            repeat(0.., lift(entry())),
+        )
+            .map(|((area, float), entries)| Group {
+                area,
+                float,
+                entries,
+            })
     )
-        .map(|((area, float), entries)| Group {
-            area,
-            float,
-            entries,
-        }))
 }
 
 fn default_group<'a>() -> impl SliceParser<'a, &'a str, Group> {
-    winnow::trace!("default_group", (
-        lift(literal("Default").map(String::from)), //
-        repeat(0.., lift(entry())),
+    winnow::trace!(
+        "default_group",
+        (
+            lift(literal("Default").map(String::from)), //
+            repeat(0.., lift(entry())),
+        )
+            .map(|(area, entries)| Group {
+                area,
+                float: None,
+                entries,
+            })
     )
-        .map(|(area, entries)| Group {
-            area,
-            float: None,
-            entries,
-        }))
 }
 
 pub fn parse_dct_str(contents: &str) -> Result<DCTFile> {

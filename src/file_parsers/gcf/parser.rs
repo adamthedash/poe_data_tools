@@ -8,8 +8,11 @@ use crate::file_parsers::shared::{
 };
 
 fn combination<'a>() -> impl WinnowParser<&'a str, GcfCombination> {
-    winnow::trace!("combination", separated_array(space1, quoted('"').and_then(filename("gt")))
-        .map(|gt_files| GcfCombination { gt_files }))
+    winnow::trace!(
+        "combination",
+        separated_array(space1, quoted('"').and_then(filename("gt")))
+            .map(|gt_files| GcfCombination { gt_files })
+    )
 }
 
 pub fn parse_gcf_str(contents: &str) -> Result<GcfFile> {

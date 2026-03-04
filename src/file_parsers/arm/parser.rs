@@ -14,10 +14,7 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    winnow::{
-        TraceHelper, WinnowParser, parse_bool, quoted_str, separated_array, unquoted_str,
-        version_line,
-    },
+    winnow::{WinnowParser, parse_bool, quoted_str, separated_array, unquoted_str, version_line},
 };
 
 // ==================================
@@ -40,22 +37,28 @@ fn F(input: &mut &str) -> winnow::Result<f32> {
 fn length_prefixed<'a, T>(
     item_parser: impl WinnowParser<&'a str, T>,
 ) -> impl SliceParser<'a, &'a str, Vec<T>> {
-    winnow::trace!("length_prefixed", length_repeat(
-        lift(U), //
-        lift(item_parser),
-    ))
+    winnow::trace!(
+        "length_prefixed",
+        length_repeat(
+            lift(U), //
+            lift(item_parser),
+        )
+    )
 }
 
 fn terminated<'a, T>(
     item_parser: impl WinnowParser<&'a str, T>,
     sentinel: &str,
 ) -> impl SliceParser<'a, &'a str, Vec<T>> {
-    winnow::trace!("terminated", repeat_till(
-        0.., //
-        lift(item_parser),
-        lift(literal(sentinel)),
+    winnow::trace!(
+        "terminated",
+        repeat_till(
+            0.., //
+            lift(item_parser),
+            lift(literal(sentinel)),
+        )
+        .map(|(items, _)| items)
     )
-    .map(|(items, _)| items))
 }
 
 /// Either length-prefixed or "-1"-terminated depending on version
@@ -63,103 +66,118 @@ fn group<'a, const V: u32, T>(
     version: u32,
     mut item_parser: impl WinnowParser<&'a str, T>,
 ) -> impl SliceParser<'a, &'a str, Vec<T>> {
-    winnow::trace!("group", dispatch! {
-        empty.value(version);
-        v if v < V => length_prefixed(item_parser.by_ref()),
-        v if v >= V => terminated(item_parser.by_ref(), "-1"),
-        _ => fail,
-    })
+    winnow::trace!(
+        "group",
+        dispatch! {
+            empty.value(version);
+            v if v < V => length_prefixed(item_parser.by_ref()),
+            v if v >= V => terminated(item_parser.by_ref(), "-1"),
+            _ => fail,
+        }
+    )
 }
 
 fn string_section<'a>() -> impl SliceParser<'a, &'a str, Vec<String>> {
-    winnow::trace!("string_section", length_repeat(
-        lift(U), //
-        lift(quoted_str),
-    ))
+    winnow::trace!(
+        "string_section",
+        length_repeat(
+            lift(U), //
+            lift(quoted_str),
+        )
+    )
 }
 
 fn dimensions<'a>(version: u32) -> impl WinnowParser<&'a str, Dimension> {
-    winnow::trace!("dimensions", (U, cond(version < 31, P(S, U)), cond(version >= 22, P(S, U)))
-        .map(|(side_length, _duplicate_side_length, uint1)| Dimension { side_length, uint1 }))
+    winnow::trace!(
+        "dimensions",
+        (U, cond(version < 31, P(S, U)), cond(version >= 22, P(S, U)))
+            .map(|(side_length, _duplicate_side_length, uint1)| Dimension { side_length, uint1 })
+    )
 }
 
 /// "k" followed by 23-24 numbers
 fn slot_k<'a>(strings: &[String]) -> impl WinnowParser<&'a str, SlotK> {
-    winnow::trace!("slot_k", (
-        separated_array(S, U),
-        P(S, separated_array(S, U)),
-        P(S, separated_array(S, U)),
-        P(S, separated_array(S, U)),
-        P(S, separated_array(S, I)),
-        P(S, U),
-        opt(P(' ', U)),
-    )
-        .map(
-            |(
-                grid_dims, //
-                edges,
-                exits,
-                corner_grounds,
-                corner_heights,
-                slot_tag,
-                origin_dir,
-            ): ([_; 2], [_; 4], [_; 8], [_; 4], [_; 4], _, _)| {
-                let edges = izip!(
-                    Direction::cardinal().into_iter(),
+    winnow::trace!(
+        "slot_k",
+        (
+            separated_array(S, U),
+            P(S, separated_array(S, U)),
+            P(S, separated_array(S, U)),
+            P(S, separated_array(S, U)),
+            P(S, separated_array(S, I)),
+            P(S, U),
+            opt(P(' ', U)),
+        )
+            .map(
+                |(
+                    grid_dims, //
                     edges,
-                    exits.into_iter().tuples(),
-                )
-                .map(|(direction, edge, (exit, virtual_exit))| Edge {
-                    direction,
-                    // 0 -> None,
-                    // i -> Some(i - 1)
-                    edge: (edge > 0).then(|| strings[(edge - 1) as usize].clone()),
-                    exit,
-                    virtual_exit,
-                })
-                .collect::<Vec<_>>()
-                .try_into()
-                .expect("Parser should take care of counts");
-    
-                let corners = izip!(
-                    Direction::diagonals().into_iter(),
+                    exits,
                     corner_grounds,
                     corner_heights,
-                )
-                .map(|(direction, ground, height)| Corner {
-                    direction,
-                    ground: (ground > 0).then(|| strings[ground as usize - 1].clone()),
-                    height,
-                })
-                .collect::<Vec<_>>()
-                .try_into()
-                .expect("Parser should take care of counts");
-    
-                SlotK {
-                    width: grid_dims[0],
-                    height: grid_dims[1],
-                    edges,
-                    corners,
-                    slot_tag: (slot_tag > 0).then(|| strings[slot_tag as usize - 1].clone()),
-                    origin: Direction::diagonals()[origin_dir.unwrap_or(0) as usize],
-                }
-            },
-        ))
+                    slot_tag,
+                    origin_dir,
+                ): ([_; 2], [_; 4], [_; 8], [_; 4], [_; 4], _, _)| {
+                    let edges = izip!(
+                        Direction::cardinal().into_iter(),
+                        edges,
+                        exits.into_iter().tuples(),
+                    )
+                    .map(|(direction, edge, (exit, virtual_exit))| Edge {
+                        direction,
+                        // 0 -> None,
+                        // i -> Some(i - 1)
+                        edge: (edge > 0).then(|| strings[(edge - 1) as usize].clone()),
+                        exit,
+                        virtual_exit,
+                    })
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .expect("Parser should take care of counts");
+
+                    let corners = izip!(
+                        Direction::diagonals().into_iter(),
+                        corner_grounds,
+                        corner_heights,
+                    )
+                    .map(|(direction, ground, height)| Corner {
+                        direction,
+                        ground: (ground > 0).then(|| strings[ground as usize - 1].clone()),
+                        height,
+                    })
+                    .collect::<Vec<_>>()
+                    .try_into()
+                    .expect("Parser should take care of counts");
+
+                    SlotK {
+                        width: grid_dims[0],
+                        height: grid_dims[1],
+                        edges,
+                        corners,
+                        slot_tag: (slot_tag > 0).then(|| strings[slot_tag as usize - 1].clone()),
+                        origin: Direction::diagonals()[origin_dir.unwrap_or(0) as usize],
+                    }
+                },
+            )
+    )
 }
 
 /// k, f, s, o, n slots
 fn slot<'a>(strings: &[String]) -> impl WinnowParser<&'a str, Slot> {
-    winnow::trace!("slot", dispatch! {
-        any;
-        'n' => empty.value(Slot::N),
-        's' => empty.value(Slot::S),
-        'o' => empty.value(Slot::O),
-        'f' => P(S, U).map(|i | Slot::F {
-            fill: (i > 0).then(|| strings[i as usize - 1].clone()),
-        }),
-        'k' => P(S, slot_k(strings)).map(Slot::K),
-        _ => fail,
-    })
+    winnow::trace!(
+        "slot",
+        dispatch! {
+            any;
+            'n' => empty.value(Slot::N),
+            's' => empty.value(Slot::S),
+            'o' => empty.value(Slot::O),
+            'f' => P(S, U).map(|i | Slot::F {
+                fill: (i > 0).then(|| strings[i as usize - 1].clone()),
+            }),
+            'k' => P(S, slot_k(strings)).map(Slot::K),
+            _ => fail,
+        }
+    )
 }
 
 /// Grid of Slots
@@ -168,30 +186,38 @@ fn grid<'a>(
     width: usize,
     strings: &'a [String],
 ) -> impl SliceParser<'a, &'a str, Vec<Vec<Slot>>> {
-    winnow::trace!("grid", repeat(
-        height, //
-        lift::<_, _, Vec<_>, _>(
-            separated(width, slot(strings), S), //
+    winnow::trace!(
+        "grid",
+        repeat(
+            height, //
+            winnow::trace!(
+                "grid_row",
+                lift::<_, _, Vec<_>, _>(
+                    separated(width, slot(strings), S), //
+                )
+            ),
         )
-        .trace("grid_row"),
-    ))
+    )
 }
 
 /// Single PoI line - 3 uints & a string
 fn poi<'a>() -> impl WinnowParser<&'a str, PoI> {
-    winnow::trace!("poi", (
-        U,
-        P(S, U),
-        P(S, F),
-        // TODO: Remove \u0000 chars from this
-        P(S, quoted_str),
+    winnow::trace!(
+        "poi",
+        (
+            U,
+            P(S, U),
+            P(S, F),
+            // TODO: Remove \u0000 chars from this
+            P(S, quoted_str),
+        )
+            .map(|(x, y, rotation, tag)| PoI {
+                x,
+                y,
+                rotation,
+                tag,
+            })
     )
-        .map(|(x, y, rotation, tag)| PoI {
-            x,
-            y,
-            rotation,
-            tag,
-        }))
 }
 
 fn poi_groups<'a>(version: u32) -> impl SliceParser<'a, &'a str, Vec<Vec<PoI>>> {
@@ -203,86 +229,64 @@ fn poi_groups<'a>(version: u32) -> impl SliceParser<'a, &'a str, Vec<Vec<PoI>>> 
         29.. => 6,
     };
 
-    winnow::trace!("poI_groups", repeat(group_count, group::<32, _>(version, poi())))
+    winnow::trace!(
+        "poI_groups",
+        repeat(group_count, group::<32, _>(version, poi()))
+    )
 }
 
 /// key=value
 fn key_value<'a>() -> impl WinnowParser<&'a str, (&'a str, &'a str)> {
-    winnow::trace!("key_value", separated_pair(
-        take_while(1.., |c| c != '='),
-        '=',
-        take_while(1.., |c| c != ' '),
-    ))
+    winnow::trace!(
+        "key_value",
+        separated_pair(
+            take_while(1.., |c| c != '='),
+            '=',
+            take_while(1.., |c| c != ' '),
+        )
+    )
 }
 
 /// Single doodad string
 fn doodad<'a>(version: u32) -> impl WinnowParser<&'a str, Doodad> {
-    winnow::trace!("doodad", (
-        U,
-        P(S, U),
-        cond(
-            version >= 34,
-            P(
-                S,
-                length_repeat(
-                    U, //
-                    (P(S, F), P(S, F)),
+    winnow::trace!(
+        "doodad",
+        (
+            U,
+            P(S, U),
+            cond(
+                version >= 34,
+                P(
+                    S,
+                    length_repeat(
+                        U, //
+                        (P(S, F), P(S, F)),
+                    ),
                 ),
             ),
-        ),
-        P(S, F),
-        cond(
-            version >= 18, //
-            P(S, separated_array(S, F)),
-        ),
-        P(S, parse_bool),
-        cond(
-            version >= 25, //
+            P(S, F),
+            cond(
+                version >= 18, //
+                P(S, separated_array(S, F)),
+            ),
             P(S, parse_bool),
-        ),
-        P(S, length_repeat(U, P(S, F))),
-        P(S, F),
-        P(S, quoted_str),
-        P(S, quoted_str),
-        cond(version >= 36, P(S, length_repeat(U, P(S, key_value())))),
-    )
-        .map(
-            |(
-                x,
-                y,
-                float_pairs,
-                radians1,
-                trigs,
-                bool1,
-                bool2,
-                floats,
-                scale,
-                ao_file,
-                stub,
-                key_values,
-            )| {
-                let [trig1, trig2, trig3, trig4] = if let Some(trigs) = trigs {
-                    trigs.map(Some)
-                } else {
-                    [None; _]
-                };
-    
-                let key_values = key_values.map(|key_values: Vec<_>| {
-                    key_values
-                        .into_iter()
-                        .map(|(k, v)| (k.to_string(), v.to_string()))
-                        .collect()
-                });
-    
-                Doodad {
+            cond(
+                version >= 25, //
+                P(S, parse_bool),
+            ),
+            P(S, length_repeat(U, P(S, F))),
+            P(S, F),
+            P(S, quoted_str),
+            P(S, quoted_str),
+            cond(version >= 36, P(S, length_repeat(U, P(S, key_value())))),
+        )
+            .map(
+                |(
                     x,
                     y,
                     float_pairs,
                     radians1,
-                    trig1,
-                    trig2,
-                    trig3,
-                    trig4,
+                    trigs,
                     bool1,
                     bool2,
                     floats,
@@ -290,9 +294,40 @@ fn doodad<'a>(version: u32) -> impl WinnowParser<&'a str, Doodad> {
                     ao_file,
                     stub,
                     key_values,
-                }
-            },
-        ))
+                )| {
+                    let [trig1, trig2, trig3, trig4] = if let Some(trigs) = trigs {
+                        trigs.map(Some)
+                    } else {
+                        [None; _]
+                    };
+
+                    let key_values = key_values.map(|key_values: Vec<_>| {
+                        key_values
+                            .into_iter()
+                            .map(|(k, v)| (k.to_string(), v.to_string()))
+                            .collect()
+                    });
+
+                    Doodad {
+                        x,
+                        y,
+                        float_pairs,
+                        radians1,
+                        trig1,
+                        trig2,
+                        trig3,
+                        trig4,
+                        bool1,
+                        bool2,
+                        floats,
+                        scale,
+                        ao_file,
+                        stub,
+                        key_values,
+                    }
+                },
+            )
+    )
 }
 
 fn doodad_connections<'a>(version: u32) -> impl SliceParser<'a, &'a str, Vec<DoodadConnection>> {
@@ -308,22 +343,25 @@ fn doodad_connections<'a>(version: u32) -> impl SliceParser<'a, &'a str, Vec<Doo
 
 /// Decal on a line
 fn decal<'a>(version: u32) -> impl WinnowParser<&'a str, Decal> {
-    winnow::trace!("decal", (
-        separated_array::<3, _, _, _, _, _>(S, F),
-        cond(version >= 17, P(S, parse_bool)),
-        P(S, F),
-        P(S, quoted_str),
-        P(S, quoted_str),
+    winnow::trace!(
+        "decal",
+        (
+            separated_array::<3, _, _, _, _, _>(S, F),
+            cond(version >= 17, P(S, parse_bool)),
+            P(S, F),
+            P(S, quoted_str),
+            P(S, quoted_str),
+        )
+            .map(|([x, y, rotation], bool1, scale, atlas_file, tag)| Decal {
+                x,
+                y,
+                rotation,
+                bool1,
+                scale,
+                atlas_file,
+                tag,
+            })
     )
-        .map(|([x, y, rotation], bool1, scale, atlas_file, tag)| Decal {
-            x,
-            y,
-            rotation,
-            bool1,
-            scale,
-            atlas_file,
-            tag,
-        }))
 }
 
 fn boss_lines<'a>() -> impl SliceParser<'a, &'a str, Vec<Vec<String>>> {
@@ -372,47 +410,53 @@ fn boss_lines<'a>() -> impl SliceParser<'a, &'a str, Vec<Vec<String>>> {
 }
 
 fn zone<'a>(version: u32) -> impl WinnowParser<&'a str, Zone> {
-    winnow::trace!("zone", (
-        dispatch! {
-            empty.value(version);
-            ..35 => unquoted_str,
-            35.. => quoted_str,
-        },
-        P(S, separated_array::<4, _, _, _, _, _>(S, I)),
-        cond(
-            version >= 35,
-            (
-                P(S, quoted_str), //
-                P(S, quoted_str),
-                P(S, U),
+    winnow::trace!(
+        "zone",
+        (
+            dispatch! {
+                empty.value(version);
+                ..35 => unquoted_str,
+                35.. => quoted_str,
+            },
+            P(S, separated_array::<4, _, _, _, _, _>(S, I)),
+            cond(
+                version >= 35,
+                (
+                    P(S, quoted_str), //
+                    P(S, quoted_str),
+                    P(S, U),
+                ),
             ),
-        ),
+        )
+            .map(|(name, [x_min, y_min, x_max, y_max], optionals)| {
+                let (disable_teleports, env_file, uint1) = if let Some((d, e, u)) = optionals {
+                    (Some(d), Some(e), Some(u))
+                } else {
+                    (None, None, None)
+                };
+
+                Zone {
+                    name,
+                    x_min,
+                    y_min,
+                    x_max,
+                    y_max,
+                    disable_teleports,
+                    env_file,
+                    uint1,
+                }
+            })
     )
-        .map(|(name, [x_min, y_min, x_max, y_max], optionals)| {
-            let (disable_teleports, env_file, uint1) = if let Some((d, e, u)) = optionals {
-                (Some(d), Some(e), Some(u))
-            } else {
-                (None, None, None)
-            };
-    
-            Zone {
-                name,
-                x_min,
-                y_min,
-                x_max,
-                y_max,
-                disable_teleports,
-                env_file,
-                uint1,
-            }
-        }))
 }
 
 fn tags<'a>() -> impl WinnowParser<&'a str, Vec<String>> {
-    winnow::trace!("tags", length_repeat(
-        U, //
-        P(S, unquoted_str),
-    ))
+    winnow::trace!(
+        "tags",
+        length_repeat(
+            U, //
+            P(S, unquoted_str),
+        )
+    )
 }
 
 /// Line of space separated uints, sometimes with a space a the end
@@ -421,43 +465,49 @@ fn ground_overrides<'a>(
     grid_height: usize,
     grid_width: usize,
 ) -> impl WinnowParser<&'a str, Vec<Vec<Option<String>>>> {
-    winnow::trace!("ground_overrides", T(
-        separated((grid_height - 1) * (grid_width - 1), U, S),
-        space0,
+    winnow::trace!(
+        "ground_overrides",
+        T(
+            separated((grid_height - 1) * (grid_width - 1), U, S),
+            space0,
+        )
+        .map(move |indices: Vec<_>| {
+            // Chunk into 2D grid
+            indices
+                .into_iter()
+                .chunks(grid_width - 1)
+                .into_iter()
+                .map(|c| {
+                    c.map(|i| (i > 0).then(|| strings[i as usize - 1].clone()))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        })
     )
-    .map(move |indices: Vec<_>| {
-        // Chunk into 2D grid
-        indices
-            .into_iter()
-            .chunks(grid_width - 1)
-            .into_iter()
-            .map(|c| {
-                c.map(|i| (i > 0).then(|| strings[i as usize - 1].clone()))
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>()
-    }))
 }
 
 fn thingy<'a>(strings: &[String]) -> impl WinnowParser<&'a str, Thingy> {
-    winnow::trace!("thingy", (
-        U, //
-        P(S, I),
-        opt(P(S, parse_bool)),
-        opt(P(S, parse_bool)),
-        opt(P(S, parse_bool)),
+    winnow::trace!(
+        "thingy",
+        (
+            U, //
+            P(S, I),
+            opt(P(S, parse_bool)),
+            opt(P(S, parse_bool)),
+            opt(P(S, parse_bool)),
+        )
+            .map(|(i, int, bool1, bool2, bool3)| {
+                let et_file = (i > 0).then(|| strings[i as usize - 1].clone());
+
+                Thingy {
+                    et_file,
+                    int,
+                    bool1,
+                    bool2,
+                    bool3,
+                }
+            })
     )
-        .map(|(i, int, bool1, bool2, bool3)| {
-            let et_file = (i > 0).then(|| strings[i as usize - 1].clone());
-    
-            Thingy {
-                et_file,
-                int,
-                bool1,
-                bool2,
-                bool3,
-            }
-        }))
 }
 
 pub fn parse_arm_str(input: &str) -> Result<ARMFile> {

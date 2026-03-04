@@ -9,55 +9,61 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    winnow::{
-        WinnowParser, filename, parse_bool, quoted, unquoted, unquoted_str,
-        version_line,
-    },
+    winnow::{WinnowParser, filename, parse_bool, quoted, unquoted, unquoted_str, version_line},
 };
 
 /// One of: [I, R90, R180, R270, FI, FR90, FR180, FR270]
 fn d4_rotation<'a>() -> impl WinnowParser<&'a str, Rotation> {
-    winnow::trace!("d4_rotation", (
-        opt(literal('F')).map(|f| f.is_some()),
-        alt((
-            literal('I').value(0), //
-            P(literal('R'), dec_uint),
-        )),
+    winnow::trace!(
+        "d4_rotation",
+        (
+            opt(literal('F')).map(|f| f.is_some()),
+            alt((
+                literal('I').value(0), //
+                P(literal('R'), dec_uint),
+            )),
+        )
+            .map(|(flip, angle)| Rotation { flip, angle })
     )
-        .map(|(flip, angle)| Rotation { flip, angle }))
 }
 
 /// +/- followed by a flag name
 fn flag<'a>() -> impl WinnowParser<&'a str, String> {
-    winnow::trace!("flag", (
-        alt((
-            literal('+'), //
-            literal('-'),
-        )),
-        unquoted(),
+    winnow::trace!(
+        "flag",
+        (
+            alt((
+                literal('+'), //
+                literal('-'),
+            )),
+            unquoted(),
+        )
+            .map(|(prefix, name)| [prefix, name].concat())
     )
-        .map(|(prefix, name)| [prefix, name].concat()))
 }
 
 fn header<'a>() -> impl WinnowParser<&'a str, Header> {
-    winnow::trace!("header", (
-        parse_bool,
-        P(space1, parse_bool),
-        opt(P(
-            space1,
-            alt((
-                literal("FileOrder").value(Order::File),
-                literal("SizeOrder").value(Order::Size),
+    winnow::trace!(
+        "header",
+        (
+            parse_bool,
+            P(space1, parse_bool),
+            opt(P(
+                space1,
+                alt((
+                    literal("FileOrder").value(Order::File),
+                    literal("SizeOrder").value(Order::Size),
+                )),
             )),
-        )),
-        repeat(0.., P(space1, flag())),
+            repeat(0.., P(space1, flag())),
+        )
+            .map(|(uint1, uint2, file_order, flags)| Header {
+                bool1: uint1,
+                bool2: uint2,
+                file_order,
+                flags,
+            })
     )
-        .map(|(uint1, uint2, file_order, flags)| Header {
-            bool1: uint1,
-            bool2: uint2,
-            file_order,
-            flags,
-        }))
 }
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
@@ -106,28 +112,34 @@ fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
         },
     );
 
-    winnow::trace!("entry", (
-        primary_stuff, //
-        tail_stuff,
+    winnow::trace!(
+        "entry",
+        (
+            primary_stuff, //
+            tail_stuff,
+        )
+            .map(
+                |((weight, arm_file), (key_values, not_flags, add_flags, rotations))| Entry {
+                    weight,
+                    arm_file,
+                    key_values,
+                    not_flags,
+                    add_flags,
+                    rotations,
+                },
+            )
     )
-        .map(
-            |((weight, arm_file), (key_values, not_flags, add_flags, rotations))| Entry {
-                weight,
-                arm_file,
-                key_values,
-                not_flags,
-                add_flags,
-                rotations,
-            },
-        ))
 }
 
 fn group<'a>() -> impl SliceParser<'a, &'a str, Group> {
-    winnow::trace!("group", (
-        lift(header()), //
-        repeat(0.., lift(entry())),
+    winnow::trace!(
+        "group",
+        (
+            lift(header()), //
+            repeat(0.., lift(entry())),
+        )
+            .map(|(header, entries)| Group { header, entries })
     )
-        .map(|(header, entries)| Group { header, entries }))
 }
 
 pub fn parse_toy_str(contents: &str) -> Result<TOYFile> {

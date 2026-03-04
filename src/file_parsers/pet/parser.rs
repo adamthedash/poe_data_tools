@@ -14,21 +14,24 @@ use crate::file_parsers::shared::{
 };
 
 fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
-    winnow::trace!("emitter", (
-        lift(literal("{")), //
-        lift(unquoted_str),
-        lift(quoted('"').and_then(optional_filename("mat"))),
-        repeat_till::<_, _, Vec<_>, _, _, _, _>(
-            .., //
-            lift(rest),
-            lift(literal("}")),
-        ),
+    winnow::trace!(
+        "emitter",
+        (
+            lift(literal("{")), //
+            lift(unquoted_str),
+            lift(quoted('"').and_then(optional_filename("mat"))),
+            repeat_till::<_, _, Vec<_>, _, _, _, _>(
+                .., //
+                lift(rest),
+                lift(literal("}")),
+            ),
+        )
+            .map(|(_, emitter_type, material, (contents, _))| Emitter {
+                emitter_type,
+                material,
+                key_values: contents.join("\n"),
+            })
     )
-        .map(|(_, emitter_type, material, (contents, _))| Emitter {
-            emitter_type,
-            material,
-            key_values: contents.join("\n"),
-        }))
 }
 
 pub fn parse_pet_str(contents: &str) -> Result<PETFile> {

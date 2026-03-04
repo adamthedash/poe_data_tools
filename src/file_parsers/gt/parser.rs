@@ -13,13 +13,16 @@ use crate::file_parsers::shared::{
 
 fn bools<'a>() -> impl WinnowParser<&'a str, (bool, bool, Option<bool>, Option<bool>, Option<bool>)>
 {
-    winnow::trace!("bools", (
-        parse_bool,
-        P(space1, parse_bool),
-        opt(P(space1, parse_bool)),
-        opt(P(space1, parse_bool)),
-        opt(P(space1, parse_bool)),
-    ))
+    winnow::trace!(
+        "bools",
+        (
+            parse_bool,
+            P(space1, parse_bool),
+            opt(P(space1, parse_bool)),
+            opt(P(space1, parse_bool)),
+            opt(P(space1, parse_bool)),
+        )
+    )
 }
 
 pub fn parse_gt_str(contents: &str) -> Result<GTFile> {

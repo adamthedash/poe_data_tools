@@ -11,8 +11,8 @@ use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
     winnow::{
-        WinnowParser, filename, parse_bool, quoted, repeat_array, separated_array,
-        unquoted, unquoted_str,
+        WinnowParser, filename, parse_bool, quoted, repeat_array, separated_array, unquoted,
+        unquoted_str,
     },
 };
 
@@ -23,58 +23,70 @@ fn name_hex<'a>() -> impl WinnowParser<&'a str, (String, Option<String>)> {
 }
 
 fn gt_files<'a>() -> impl SliceParser<'a, &'a str, [GTFile; 2]> {
-    winnow::trace!("gt_files", repeat_array(lift(
-        alt((
-            quoted('"'), //
-            unquoted(),
+    winnow::trace!(
+        "gt_files",
+        repeat_array(lift(
+            alt((
+                quoted('"'), //
+                unquoted(),
+            ))
+            .and_then(alt((
+                literal("wildcard").map(|_| GTFile::Wildcard),
+                filename("gt").map(GTFile::Path),
+            ))),
         ))
-        .and_then(alt((
-            literal("wildcard").map(|_| GTFile::Wildcard),
-            filename("gt").map(GTFile::Path),
-        ))),
-    )))
+    )
 }
 
 fn num_line<'a>() -> impl WinnowParser<&'a str, NumLine> {
-    winnow::trace!("num_line", (
-        U,
-        P(space1, U),
-        P(space1, parse_bool),
-        opt(P(space1, parse_bool)),
-        opt(P(space1, parse_bool)),
-        opt(P(space1, parse_bool)),
+    winnow::trace!(
+        "num_line",
+        (
+            U,
+            P(space1, U),
+            P(space1, parse_bool),
+            opt(P(space1, parse_bool)),
+            opt(P(space1, parse_bool)),
+            opt(P(space1, parse_bool)),
+        )
+            .map(|(uint1, uint2, bool1, bool2, bool3, bool4)| NumLine {
+                uint1,
+                uint2,
+                bool1,
+                bool2,
+                bool3,
+                bool4,
+            })
     )
-        .map(|(uint1, uint2, bool1, bool2, bool3, bool4)| NumLine {
-            uint1,
-            uint2,
-            bool1,
-            bool2,
-            bool3,
-            bool4,
-        }))
 }
 
 fn virtual_et_file<'a>() -> impl WinnowParser<&'a str, VirtualETFile> {
-    winnow::trace!("virtual_et_file", separated_pair(
-        unquoted().and_then(filename("et")), //
-        space1,
-        parse_bool,
+    winnow::trace!(
+        "virtual_et_file",
+        separated_pair(
+            unquoted().and_then(filename("et")), //
+            space1,
+            parse_bool,
+        )
+        .map(|(path, bool1)| VirtualETFile { path, bool1 })
     )
-    .map(|(path, bool1)| VirtualETFile { path, bool1 }))
 }
 
 fn virtual_section<'a>() -> impl SliceParser<'a, &'a str, VirtualSection> {
-    winnow::trace!("virtual_section", (
-        lift(literal("virtual")),
-        repeat_array(lift(virtual_et_file())),
-        lift(separated_array(space1, U)),
+    winnow::trace!(
+        "virtual_section",
+        (
+            lift(literal("virtual")),
+            repeat_array(lift(virtual_et_file())),
+            lift(separated_array(space1, U)),
+        )
+            .map(
+                |(_virtual_tag, virtual_et_files, virtual_rotations)| VirtualSection {
+                    virtual_et_files,
+                    virtual_rotations,
+                },
+            )
     )
-        .map(
-            |(_virtual_tag, virtual_et_files, virtual_rotations)| VirtualSection {
-                virtual_et_files,
-                virtual_rotations,
-            },
-        ))
 }
 
 pub fn parse_et_str(contents: &str) -> Result<ETFile> {

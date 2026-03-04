@@ -13,15 +13,18 @@ use crate::file_parsers::shared::{
 };
 
 fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
-    winnow::trace!("emitter", (
-        lift(literal("{")), //
-        repeat_till::<_, _, Vec<_>, _, _, _, _>(
-            .., //
-            lift(separated_pair(unquoted_str, space1, rest.map(String::from))),
-            lift(literal("}")),
-        ),
+    winnow::trace!(
+        "emitter",
+        (
+            lift(literal("{")), //
+            repeat_till::<_, _, Vec<_>, _, _, _, _>(
+                .., //
+                lift(separated_pair(unquoted_str, space1, rest.map(String::from))),
+                lift(literal("}")),
+            ),
+        )
+            .map(|(_, (key_values, _))| Emitter::from_iter(key_values))
     )
-        .map(|(_, (key_values, _))| Emitter::from_iter(key_values)))
 }
 
 pub fn parse_trl_str(contents: &str) -> Result<TRLFile> {

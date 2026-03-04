@@ -9,65 +9,74 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    winnow::{
-        WinnowParser, filename, quoted, quoted_str, safe_u32, unquoted_str,
-        version_line,
-    },
+    winnow::{WinnowParser, filename, quoted, quoted_str, safe_u32, unquoted_str, version_line},
 };
 
 fn line1<'a>() -> impl WinnowParser<&'a str, Line1> {
-    winnow::trace!("line1", (
-        F, //
-        opt(P(space1, U)),
-        opt(P(space1, U)),
+    winnow::trace!(
+        "line1",
+        (
+            F, //
+            opt(P(space1, U)),
+            opt(P(space1, U)),
+        )
+            .map(|(scale, uint1, uint2)| Line1 {
+                scale,
+                uint1,
+                uint2,
+            })
     )
-        .map(|(scale, uint1, uint2)| Line1 {
-            scale,
-            uint1,
-            uint2,
-        }))
 }
 
 fn group_header<'a>(
     name_parser: impl WinnowParser<&'a str, String>,
 ) -> impl WinnowParser<&'a str, (String, Option<String>, Option<f32>)> {
-    winnow::trace!("group_header", (
-        name_parser, //
-        opt(P(space1, unquoted_str)),
-        opt(P(space1, F)),
-    ))
+    winnow::trace!(
+        "group_header",
+        (
+            name_parser, //
+            opt(P(space1, unquoted_str)),
+            opt(P(space1, F)),
+        )
+    )
 }
 
 fn object<'a>() -> impl WinnowParser<&'a str, Object> {
-    winnow::trace!("object", (
-        alt((literal("All").map(|_| Weight::All), F.map(Weight::Float))),
-        P(space1, quoted('"').and_then(filename("ao"))),
-        opt(P(space1, safe_u32)),
-        opt(P(space1, literal("D").map(String::from))),
-        opt(P(space1, F)),
+    winnow::trace!(
+        "object",
+        (
+            alt((literal("All").map(|_| Weight::All), F.map(Weight::Float))),
+            P(space1, quoted('"').and_then(filename("ao"))),
+            opt(P(space1, safe_u32)),
+            opt(P(space1, literal("D").map(String::from))),
+            opt(P(space1, F)),
+        )
+            .map(|(weight, ao_file, uint1, d, float1)| Object {
+                weight,
+                ao_file,
+                uint1,
+                d,
+                float1,
+            })
     )
-        .map(|(weight, ao_file, uint1, d, float1)| Object {
-            weight,
-            ao_file,
-            uint1,
-            d,
-            float1,
-        }))
 }
 
 fn group<'a>(
     name_parser: impl WinnowParser<&'a str, String>,
 ) -> impl SliceParser<'a, &'a str, Group> {
-    winnow::trace!("group", (
-        lift(group_header(name_parser)), //
-        repeat(0.., lift(object())),
+    winnow::trace!(
+        "group",
+        (
+            lift(group_header(name_parser)), //
+            repeat(0.., lift(object())),
+        )
+            .map(|((name, d, float1), objects)| Group {
+                name,
+                d,
+                float1,
+                objects,
+            })
     )
-        .map(|((name, d, float1), objects)| Group {
-            name,
-            d,
-            float1,
-            objects,
-        }))
 }
 
 pub fn parse_ddt_str(contents: &str) -> Result<DDTFile> {

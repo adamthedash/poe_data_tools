@@ -8,8 +8,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::shared::winnow::{
-    WinnowParser, quoted_str, single_quoted_str, spaces_or_comments, unquoted_str,
-    version_line,
+    WinnowParser, quoted_str, single_quoted_str, spaces_or_comments, unquoted_str, version_line,
 };
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {

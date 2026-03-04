@@ -3,7 +3,7 @@ use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
     binary::length_repeat,
-    combinator::{cond, dispatch, empty, fail, opt, preceded as P, repeat, trace},
+    combinator::{cond, dispatch, empty, fail, opt, preceded as P, repeat},
     token::literal,
 };
 
@@ -29,7 +29,7 @@ fn animation_stage<'a>() -> impl SliceParser<'a, &'a str, AnimationStage> {
 }
 
 fn bone_rotation<'a>(num_coords: usize) -> impl WinnowParser<&'a str, BoneRotation> {
-    trace("bone_rotation", move |input: &mut &str| {
+    winnow::trace!("bone_rotation", move |input: &mut &str| {
         let bone = quoted_str(input)?;
 
         let coord_order = P(space1, unquoted_str).parse_next(input)?;
@@ -51,7 +51,7 @@ fn bone_rotation<'a>(num_coords: usize) -> impl WinnowParser<&'a str, BoneRotati
 }
 
 fn bone_rotations<'a>() -> impl SliceParser<'a, &'a str, Vec<BoneRotation>> {
-    trace("bone_rotations", |input: &mut &[&str]| {
+    winnow::trace!("bone_rotations", |input: &mut &[&str]| {
         let (num_rotations, num_coords): (usize, Option<usize>) =
             lift((dec_uint, opt(P(space1, dec_uint)))).parse_next(input)?;
 

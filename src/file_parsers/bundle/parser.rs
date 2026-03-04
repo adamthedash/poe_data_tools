@@ -26,8 +26,9 @@ impl Display for BundleError {
 impl std::error::Error for BundleError {}
 
 fn first_file_encode<'a>() -> impl WinnowParser<&'a [u8], FirstFileEncode> {
-    winnow::trace!("first_file_encode", le_u32
-        .try_map(|x| {
+    winnow::trace!(
+        "first_file_encode",
+        le_u32.try_map(|x| {
             use FirstFileEncode::*;
             let ffe = match x {
                 8 => Kraken6,
@@ -38,40 +39,44 @@ fn first_file_encode<'a>() -> impl WinnowParser<&'a [u8], FirstFileEncode> {
                     return Err(BundleError::InvalidEncoding(x));
                 }
             };
-    
+
             Ok(ffe)
-        }))
+        })
+    )
 }
 
 fn head_payload<'a>() -> impl WinnowParser<&'a [u8], (HeadPayload, u32)> {
-    winnow::trace!("head_payload", seq!((
-        _: take(12_usize),
-        first_file_encode(),
-        _: take(4_usize),
-        le_u64,
-        le_u64,
-        le_u32,
-        le_u32,
-        _: take(16_usize),
-    ))
-    .map(
-        |(
-            first_file_encode,
-            uncompressed_size,
-            total_payload_size,
-            block_count,
-            uncompressed_block_granularity,
-        )| {
-            let head_payload = HeadPayload {
+    winnow::trace!(
+        "head_payload",
+        seq!((
+            _: take(12_usize),
+            first_file_encode(),
+            _: take(4_usize),
+            le_u64,
+            le_u64,
+            le_u32,
+            le_u32,
+            _: take(16_usize),
+        ))
+        .map(
+            |(
                 first_file_encode,
                 uncompressed_size,
                 total_payload_size,
+                block_count,
                 uncompressed_block_granularity,
-            };
-    
-            (head_payload, block_count)
-        },
-    ))
+            )| {
+                let head_payload = HeadPayload {
+                    first_file_encode,
+                    uncompressed_size,
+                    total_payload_size,
+                    uncompressed_block_granularity,
+                };
+
+                (head_payload, block_count)
+            },
+        )
+    )
 }
 
 fn blocks<'a>(block_count: u32) -> impl WinnowParser<&'a [u8], Vec<Vec<u8>>> {

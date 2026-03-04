@@ -12,31 +12,37 @@ use crate::file_parsers::shared::{
 };
 
 fn num_line<'a>(version: u32) -> impl WinnowParser<&'a str, Nums> {
-    winnow::trace!("num_line", (
-        float, //
-        P(space1, float),
-        P(space1, dec_uint),
-        P(space1, dec_uint),
-        cond(version >= 3, P(space1, dec_uint)),
+    winnow::trace!(
+        "num_line",
+        (
+            float, //
+            P(space1, float),
+            P(space1, dec_uint),
+            P(space1, dec_uint),
+            cond(version >= 3, P(space1, dec_uint)),
+        )
+            .map(|(float1, float2, uint1, uint2, uint3)| Nums {
+                float1,
+                float2,
+                uint1,
+                uint2,
+                uint3,
+            })
     )
-        .map(|(float1, float2, uint1, uint2, uint3)| Nums {
-            float1,
-            float2,
-            uint1,
-            uint2,
-            uint3,
-        }))
 }
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
-    winnow::trace!("entry", (
-        dec_uint, //
-        P(space1, quoted_comma_separated()),
+    winnow::trace!(
+        "entry",
+        (
+            dec_uint, //
+            P(space1, quoted_comma_separated()),
+        )
+            .map(|(weight, chest_types)| Entry {
+                weight,
+                chest_types,
+            })
     )
-        .map(|(weight, chest_types)| Entry {
-            weight,
-            chest_types,
-        }))
 }
 
 fn group<'a, const NAMED: bool>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
@@ -55,15 +61,18 @@ fn group<'a, const NAMED: bool>(version: u32) -> impl SliceParser<'a, &'a str, G
                 ),
     };
 
-    winnow::trace!("group", (
-        lift(header), //
-        repeat(0.., lift(entry())),
+    winnow::trace!(
+        "group",
+        (
+            lift(header), //
+            repeat(0.., lift(entry())),
+        )
+            .map(|((areas, nums), entries)| Group {
+                areas,
+                entries,
+                nums,
+            })
     )
-        .map(|((areas, nums), entries)| Group {
-            areas,
-            entries,
-            nums,
-        }))
 }
 
 pub fn parse_cht_str(contents: &str) -> Result<CHTFile> {

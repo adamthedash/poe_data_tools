@@ -17,7 +17,7 @@ use winnow::{
     token::take,
 };
 
-use crate::file_parsers::shared::winnow::{TraceHelper, WinnowParser};
+use crate::file_parsers::shared::winnow::WinnowParser;
 
 pub struct CDNLoader {
     base_url: Url,
@@ -110,9 +110,10 @@ fn parse_response<'a>() -> impl WinnowParser<&'a [u8], Vec<String>> {
 }
 
 fn parse_utf16_string<'a>() -> impl WinnowParser<&'a [u8], String> {
-    length_take(le_u8.map(|l| l * 2))
-        .try_map(String::from_utf16le)
-        .trace("parse_utf16_string")
+    winnow::trace!(
+        "parse_utf16_string",
+        length_take(le_u8.map(|l| l * 2)).try_map(String::from_utf16le)
+    )
 }
 
 /// Fetch the current latest version of the game

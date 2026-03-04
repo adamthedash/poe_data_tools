@@ -8,38 +8,41 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    winnow::{
-        TraceHelper, WinnowParser, filename, quoted, quoted_str, uint as U, unquoted_str,
-        version_line,
-    },
+    winnow::{WinnowParser, filename, quoted, quoted_str, uint as U, unquoted_str, version_line},
 };
 
 fn file<'a>() -> impl WinnowParser<&'a str, GenFile> {
-    winnow::trace!("file", (
-        U,
-        preceded(
-            space1,
-            quoted('"').and_then(alt((
-                filename("arm"), //
-                filename("tdt"),
-            ))),
-        ),
-        repeat(0.., preceded(space1, unquoted_str)),
+    winnow::trace!(
+        "file",
+        (
+            U,
+            preceded(
+                space1,
+                quoted('"').and_then(alt((
+                    filename("arm"), //
+                    filename("tdt"),
+                ))),
+            ),
+            repeat(0.., preceded(space1, unquoted_str)),
+        )
+            .map(|(weight, path, rotations)| GenFile {
+                weight,
+                path,
+                rotations,
+            })
     )
-        .map(|(weight, path, rotations)| GenFile {
-            weight,
-            path,
-            rotations,
-        }))
 }
 
 fn section<'a>(version: u32) -> impl SliceParser<'a, &'a str, Section> {
-    winnow::trace!("section", (
-        lift((quoted_str, opt(preceded(space1, U)))).trace("header"),
-        cond(version == 1, lift(U)).trace("file_count"),
-        repeat(0.., lift(file())).trace("files"),
+    winnow::trace!(
+        "section",
+        (
+            winnow::trace!("header", lift((quoted_str, opt(preceded(space1, U))))),
+            winnow::trace!("file_count", cond(version == 1, lift(U))),
+            winnow::trace!("files", repeat(0.., lift(file()))),
+        )
+            .map(|((name, uint1), _, files)| Section { name, files, uint1 })
     )
-        .map(|((name, uint1), _, files)| Section { name, files, uint1 }))
 }
 
 pub fn parse_gft_str(contents: &str) -> Result<GFTFile> {

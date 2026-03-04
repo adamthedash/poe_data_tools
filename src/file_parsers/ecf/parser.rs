@@ -12,11 +12,14 @@ use crate::file_parsers::shared::{
 };
 
 fn combination<'a>() -> impl WinnowParser<&'a str, EcfCombination> {
-    winnow::trace!("combination", (
-        separated_array(space1, quoted('"').and_then(optional_filename("et"))),
-        opt(preceded(space1, dec_uint)),
+    winnow::trace!(
+        "combination",
+        (
+            separated_array(space1, quoted('"').and_then(optional_filename("et"))),
+            opt(preceded(space1, dec_uint)),
+        )
+            .map(|(et_files, uint1)| EcfCombination { et_files, uint1 })
     )
-        .map(|(et_files, uint1)| EcfCombination { et_files, uint1 }))
 }
 
 pub fn parse_ecf_str(contents: &str) -> Result<EcfFile> {
