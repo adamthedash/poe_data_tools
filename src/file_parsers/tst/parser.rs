@@ -8,11 +8,11 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::lift,
-    winnow::{TraceHelper, WinnowParser, filename, quoted, unquoted_str},
+    winnow::{WinnowParser, filename, quoted, unquoted_str},
 };
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
-    (
+    winnow::trace!("entry", (
         // NOTE: Edge case: missing space between weight & filename
         opt(terminated(dec_uint, space0)), //
         quoted('"').and_then(filename("tdt")),
@@ -22,8 +22,7 @@ fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
             weight,
             tdt_file,
             rotations,
-        })
-        .trace("entry")
+        }))
 }
 
 pub fn parse_tst_str(contents: &str) -> Result<TSTFile> {

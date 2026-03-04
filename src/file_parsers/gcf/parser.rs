@@ -4,13 +4,12 @@ use winnow::{Parser, ascii::space1, combinator::repeat};
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::lift,
-    winnow::{TraceHelper, WinnowParser, filename, quoted, separated_array, version_line},
+    winnow::{WinnowParser, filename, quoted, separated_array, version_line},
 };
 
 fn combination<'a>() -> impl WinnowParser<&'a str, GcfCombination> {
-    separated_array(space1, quoted('"').and_then(filename("gt")))
-        .map(|gt_files| GcfCombination { gt_files })
-        .trace("combination")
+    winnow::trace!("combination", separated_array(space1, quoted('"').and_then(filename("gt")))
+        .map(|gt_files| GcfCombination { gt_files }))
 }
 
 pub fn parse_gcf_str(contents: &str) -> Result<GcfFile> {

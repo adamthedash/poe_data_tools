@@ -10,11 +10,11 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    winnow::{TraceHelper, optional_filename, quoted, unquoted_str, version_line},
+    winnow::{optional_filename, quoted, unquoted_str, version_line},
 };
 
 fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
-    (
+    winnow::trace!("emitter", (
         lift(literal("{")), //
         lift(unquoted_str),
         lift(quoted('"').and_then(optional_filename("mat"))),
@@ -28,8 +28,7 @@ fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
             emitter_type,
             material,
             key_values: contents.join("\n"),
-        })
-        .trace("emitter")
+        }))
 }
 
 pub fn parse_pet_str(contents: &str) -> Result<PETFile> {

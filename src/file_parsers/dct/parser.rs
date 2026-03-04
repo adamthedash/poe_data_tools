@@ -9,11 +9,11 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    winnow::{TraceHelper, WinnowParser, filename, quoted, quoted_str, version_line},
+    winnow::{WinnowParser, filename, quoted, quoted_str, version_line},
 };
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
-    (
+    winnow::trace!("entry", (
         dec_uint, //
         P(space1, quoted('"').and_then(filename("atlas"))),
         P(space1, quoted_str),
@@ -26,8 +26,7 @@ fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
             tag,
             float1,
             float2,
-        })
-        .trace("entry")
+        }))
 }
 
 fn header<'a>() -> impl WinnowParser<&'a str, (String, Option<f32>)> {
@@ -38,7 +37,7 @@ fn header<'a>() -> impl WinnowParser<&'a str, (String, Option<f32>)> {
 }
 
 fn group<'a>() -> impl SliceParser<'a, &'a str, Group> {
-    (
+    winnow::trace!("group", (
         lift(header()), //
         repeat(0.., lift(entry())),
     )
@@ -46,12 +45,11 @@ fn group<'a>() -> impl SliceParser<'a, &'a str, Group> {
             area,
             float,
             entries,
-        })
-        .trace("group")
+        }))
 }
 
 fn default_group<'a>() -> impl SliceParser<'a, &'a str, Group> {
-    (
+    winnow::trace!("default_group", (
         lift(literal("Default").map(String::from)), //
         repeat(0.., lift(entry())),
     )
@@ -59,8 +57,7 @@ fn default_group<'a>() -> impl SliceParser<'a, &'a str, Group> {
             area,
             float: None,
             entries,
-        })
-        .trace("default_group")
+        }))
 }
 
 pub fn parse_dct_str(contents: &str) -> Result<DCTFile> {

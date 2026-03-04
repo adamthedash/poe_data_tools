@@ -11,7 +11,7 @@ use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
     winnow::{
-        TraceHelper, WinnowParser, filename, parse_bool, quoted, repeat_array, separated_array,
+        WinnowParser, filename, parse_bool, quoted, repeat_array, separated_array,
         unquoted, unquoted_str,
     },
 };
@@ -19,11 +19,11 @@ use crate::file_parsers::shared::{
 fn name_hex<'a>() -> impl WinnowParser<&'a str, (String, Option<String>)> {
     let hex_parser = P(literal("#"), take_while(1.., AsChar::is_hex_digit)).map(String::from);
 
-    (unquoted_str, opt(P(space1, hex_parser))).trace("name_hex")
+    winnow::trace!("name_hex", (unquoted_str, opt(P(space1, hex_parser))))
 }
 
 fn gt_files<'a>() -> impl SliceParser<'a, &'a str, [GTFile; 2]> {
-    repeat_array(lift(
+    winnow::trace!("gt_files", repeat_array(lift(
         alt((
             quoted('"'), //
             unquoted(),
@@ -32,12 +32,11 @@ fn gt_files<'a>() -> impl SliceParser<'a, &'a str, [GTFile; 2]> {
             literal("wildcard").map(|_| GTFile::Wildcard),
             filename("gt").map(GTFile::Path),
         ))),
-    ))
-    .trace("gt_files")
+    )))
 }
 
 fn num_line<'a>() -> impl WinnowParser<&'a str, NumLine> {
-    (
+    winnow::trace!("num_line", (
         U,
         P(space1, U),
         P(space1, parse_bool),
@@ -52,22 +51,20 @@ fn num_line<'a>() -> impl WinnowParser<&'a str, NumLine> {
             bool2,
             bool3,
             bool4,
-        })
-        .trace("num_line")
+        }))
 }
 
 fn virtual_et_file<'a>() -> impl WinnowParser<&'a str, VirtualETFile> {
-    separated_pair(
+    winnow::trace!("virtual_et_file", separated_pair(
         unquoted().and_then(filename("et")), //
         space1,
         parse_bool,
     )
-    .map(|(path, bool1)| VirtualETFile { path, bool1 })
-    .trace("virtual_et_file")
+    .map(|(path, bool1)| VirtualETFile { path, bool1 }))
 }
 
 fn virtual_section<'a>() -> impl SliceParser<'a, &'a str, VirtualSection> {
-    (
+    winnow::trace!("virtual_section", (
         lift(literal("virtual")),
         repeat_array(lift(virtual_et_file())),
         lift(separated_array(space1, U)),
@@ -77,8 +74,7 @@ fn virtual_section<'a>() -> impl SliceParser<'a, &'a str, VirtualSection> {
                 virtual_et_files,
                 virtual_rotations,
             },
-        )
-        .trace("virtual_section")
+        ))
 }
 
 pub fn parse_et_str(contents: &str) -> Result<ETFile> {

@@ -16,23 +16,22 @@ use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
     remove_trailing,
     winnow::{
-        TraceHelper, WinnowParser, filename, nullable_uint, quoted, quoted_comma_separated,
+        WinnowParser, filename, nullable_uint, quoted, quoted_comma_separated,
         quoted_str, repeat_array, unquoted, unquoted_str,
     },
 };
 
 pub fn render_passes<'a>() -> impl SliceParser<'a, &'a str, Effect> {
-    let single_line = (
+    let single_line = winnow::trace!("single_line", (
         literal("RenderPasses"),
         space1,
         literal("{"),
         space0,
         literal("}"),
     )
-        .value(Effect::RenderPasses(RenderPasses { passes: vec![] }))
-        .trace("single_line");
+        .value(Effect::RenderPasses(RenderPasses { passes: vec![] })));
 
-    let multiline = P(
+    let multiline = winnow::trace!("multi_line", P(
         lift(literal("RenderPasses").map(String::from)),
         (
             lift(literal("{")),
@@ -46,18 +45,16 @@ pub fn render_passes<'a>() -> impl SliceParser<'a, &'a str, Effect> {
         let payload = remove_trailing(&payload);
         serde_json::from_str(&payload)
     })
-    .map(Effect::RenderPasses)
-    .trace("multi_line");
+    .map(Effect::RenderPasses));
 
-    alt((
+    winnow::trace!("RenderPasses", alt((
         lift(single_line), //
         multiline,
-    ))
-    .trace("RenderPasses")
+    )))
 }
 
 pub fn attached_object<'a>() -> impl WinnowParser<&'a str, Effect> {
-    (
+    winnow::trace!("AttachedObject", (
         quoted_str, //
         // NOTE: Edge case: missing space between these two strings
         P(space0, quoted('"').and_then(filename("ao"))),
@@ -69,12 +66,11 @@ pub fn attached_object<'a>() -> impl WinnowParser<&'a str, Effect> {
                 ao_file,
                 ignore_errors,
             },
-        )
-        .trace("AttachedObject")
+        ))
 }
 
 pub fn particle_effect<'a>() -> impl WinnowParser<&'a str, Effect> {
-    (
+    winnow::trace!("ParticleEffect", (
         quoted_str,
         P(space1, quoted('"').and_then(filename("pet"))),
         opt(P(
@@ -90,12 +86,11 @@ pub fn particle_effect<'a>() -> impl WinnowParser<&'a str, Effect> {
                 limit,
                 ignore_errors,
             },
-        )
-        .trace("ParticleEffect")
+        ))
 }
 
 pub fn attached_object_ex<'a>() -> impl WinnowParser<&'a str, Effect> {
-    (
+    winnow::trace!("AttachedObjectEx", (
         opt(T(quoted_str, space1)),
         length_repeat(
             dec_uint::<_, u32, _>,
@@ -140,20 +135,18 @@ pub fn attached_object_ex<'a>() -> impl WinnowParser<&'a str, Effect> {
                     multi_attach,
                 }
             },
-        )
-        .trace("AttachedObjectEx")
+        ))
 }
 
 pub fn attached_object_bone_index<'a>() -> impl WinnowParser<&'a str, Effect> {
-    (
+    winnow::trace!("AttachedObject", (
         dec_uint, //
         P(space1, quoted('"').and_then(filename("ao"))),
     )
         .map(|(bone_index, ao_file)| Effect::AttachedObjectBoneIndex {
             bone_index,
             ao_file,
-        })
-        .trace("AttachedObject")
+        }))
 }
 
 /// to/from_bone to/from_bone_index
@@ -209,11 +202,10 @@ pub fn bone<'a, const FROM: bool>() -> impl WinnowParser<&'a str, Bone> {
             }
         });
 
-    alt((
+    winnow::trace!("bone", alt((
         parent_parser, //
         child_parser,
-    ))
-    .trace("bone")
+    )))
 }
 
 pub fn child_attached_object<'a>() -> impl WinnowParser<&'a str, Effect> {
@@ -232,7 +224,7 @@ pub fn child_attached_object<'a>() -> impl WinnowParser<&'a str, Effect> {
 }
 
 pub fn trail_effect<'a>() -> impl WinnowParser<&'a str, Effect> {
-    (
+    winnow::trace!("TrailEffect", (
         quoted_str,
         P(space1, quoted('"').and_then(filename("trl"))),
         opt(P(
@@ -248,24 +240,21 @@ pub fn trail_effect<'a>() -> impl WinnowParser<&'a str, Effect> {
                 limit,
                 ignore_errors,
             },
-        )
-        .trace("TrailEffect")
+        ))
 }
 
 pub fn hide_first_pass_after_delay<'a>() -> impl WinnowParser<&'a str, Effect> {
-    float
-        .map(|delay| Effect::HideFirstPassAfterDelay { delay })
-        .trace("HideFirstPassAfterDelay")
+    winnow::trace!("HideFirstPassAfterDelay", float
+        .map(|delay| Effect::HideFirstPassAfterDelay { delay }))
 }
 
 pub fn hide_first_pass_after_delay_for_duration<'a>() -> impl WinnowParser<&'a str, Effect> {
-    separated_pair(float, space1, float)
-        .map(|(delay, duration)| Effect::HideFirstPassAfterDelayForDuration { delay, duration })
-        .trace("HideFirstPassAfterDelayForDuration")
+    winnow::trace!("HideFirstPassAfterDelayForDuration", separated_pair(float, space1, float)
+        .map(|(delay, duration)| Effect::HideFirstPassAfterDelayForDuration { delay, duration }))
 }
 
 pub fn hide_first_pass_using_epk_parameter<'a>() -> impl WinnowParser<&'a str, Effect> {
-    (
+    winnow::trace!("HideFirstPassUsingEPKParameter", (
         unquoted_str, //
         P(space1, float),
         P(space1, float),
@@ -276,12 +265,11 @@ pub fn hide_first_pass_using_epk_parameter<'a>() -> impl WinnowParser<&'a str, E
                 float1,
                 float2,
             },
-        )
-        .trace("HideFirstPassUsingEPKParameter")
+        ))
 }
 
 pub fn hide_first_pass_using_timeline_parameter<'a>() -> impl WinnowParser<&'a str, Effect> {
-    (
+    winnow::trace!("HideFirstPassUsingTimelineParameter", (
         unquoted_str, //
         P(space1, float),
         P(space1, float),
@@ -292,12 +280,11 @@ pub fn hide_first_pass_using_timeline_parameter<'a>() -> impl WinnowParser<&'a s
                 float1,
                 float2,
             },
-        )
-        .trace("HideFirstPassUsingTimelineParameter")
+        ))
 }
 
 pub fn hide_first_pass_using_dynamic_parameter<'a>() -> impl WinnowParser<&'a str, Effect> {
-    (
+    winnow::trace!("HideFirstPassUsingDynamicParameter", (
         unquoted_str, //
         P(space1, float),
         P(space1, float),
@@ -308,26 +295,23 @@ pub fn hide_first_pass_using_dynamic_parameter<'a>() -> impl WinnowParser<&'a st
                 float1,
                 float2,
             },
-        )
-        .trace("HideFirstPassUsingDynamicParameter")
+        ))
 }
 
 pub fn play_misc_effect_pack_after_delay<'a>() -> impl WinnowParser<&'a str, Effect> {
-    separated_pair(quoted_str, space1, float)
-        .map(|(effect, delay)| Effect::PlayMiscEffectPackAfterDelay { effect, delay })
-        .trace("PlayMiscEffectPackAfterDelay")
+    winnow::trace!("PlayMiscEffectPackAfterDelay", separated_pair(quoted_str, space1, float)
+        .map(|(effect, delay)| Effect::PlayMiscEffectPackAfterDelay { effect, delay }))
 }
 
 pub fn other_effect<'a>(name: &str) -> impl WinnowParser<&'a str, Effect> {
-    rest.map(|rest: &str| Effect::Other {
+    winnow::trace!("other_effect", rest.map(|rest: &str| Effect::Other {
         name: name.to_string(),
         rest: rest.to_string(),
-    })
-    .trace("other_effect")
+    }))
 }
 
 pub fn effect<'a>() -> impl SliceParser<'a, &'a str, Effect> {
-    alt((
+    winnow::trace!("effect", alt((
         render_passes(),
         lift(dispatch! {
             T(unquoted(), opt(space1));
@@ -349,8 +333,7 @@ pub fn effect<'a>() -> impl SliceParser<'a, &'a str, Effect> {
             "HideFirstPassUsingDynamicParameter" => hide_first_pass_using_dynamic_parameter(),
             name => other_effect(name),
         }),
-    ))
-    .trace("effect")
+    )))
 }
 
 pub fn parse_epk_str(contents: &str) -> Result<EPKFile> {

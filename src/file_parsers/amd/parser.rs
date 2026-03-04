@@ -11,19 +11,21 @@ use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
     winnow::{
-        TraceHelper, WinnowParser, nullable_uint, quoted_str, repeat_array, separated_array,
-        unquoted_str, version_line,
+        WinnowParser, nullable_uint, quoted_str, repeat_array, separated_array, unquoted_str,
+        version_line,
     },
 };
 
 fn animation_stage<'a>() -> impl SliceParser<'a, &'a str, AnimationStage> {
-    (
-        lift(quoted_str), //
-        lift(dec_uint),
-        lift(separated_array(space1, float)),
+    winnow::trace!(
+        "animation_stage",
+        (
+            lift(quoted_str), //
+            lift(dec_uint),
+            lift(separated_array(space1, float)),
+        )
+            .map(|(name, time, floats)| AnimationStage { name, time, floats })
     )
-        .map(|(name, time, floats)| AnimationStage { name, time, floats })
-        .trace("animation_stage")
 }
 
 fn bone_rotation<'a>(num_coords: usize) -> impl WinnowParser<&'a str, BoneRotation> {
@@ -64,43 +66,38 @@ fn bone_rotations<'a>() -> impl SliceParser<'a, &'a str, Vec<BoneRotation>> {
 }
 
 fn floats<'a>() -> impl WinnowParser<&'a str, Vec<f32>> {
-    length_repeat(
-        dec_uint::<_, u32, _>, //
-        P(space1, float::<_, f32, _>),
+    winnow::trace!(
+        "floats",
+        length_repeat(
+            dec_uint::<_, u32, _>, //
+            P(space1, float::<_, f32, _>),
+        )
     )
-    .trace("floats")
 }
 
 fn group<'a>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
-    (
-        lift(quoted_str),
-        lift(unquoted_str),
-        lift(dec_uint),
-        length_repeat(
-            lift(dec_uint::<_, u32, _>), //
-            animation_stage(),
-        ),
-        dispatch! {
-            empty.value(version);
-            1 => empty.value(None),
-            2 => opt(lift(floats())),
-            3.. => lift(floats()).map(Some),
-            _ => fail,
-        },
-        cond(version >= 4, bone_rotations()),
-        opt(repeat_array(lift(nullable_uint()))),
-    )
-        .map(
-            |(
-                name,
-                animation_type,
-                animation_time,
-                animation_stages,
-                float_group,
-                bone_rotations,
-                extra_ints,
-            )| {
-                Group {
+    winnow::trace!(
+        "group",
+        (
+            lift(quoted_str),
+            lift(unquoted_str),
+            lift(dec_uint),
+            length_repeat(
+                lift(dec_uint::<_, u32, _>), //
+                animation_stage(),
+            ),
+            dispatch! {
+                empty.value(version);
+                1 => empty.value(None),
+                2 => opt(lift(floats())),
+                3.. => lift(floats()).map(Some),
+                _ => fail,
+            },
+            cond(version >= 4, bone_rotations()),
+            opt(repeat_array(lift(nullable_uint()))),
+        )
+            .map(
+                |(
                     name,
                     animation_type,
                     animation_time,
@@ -108,36 +105,49 @@ fn group<'a>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
                     float_group,
                     bone_rotations,
                     extra_ints,
-                }
-            },
-        )
-        .trace("group")
+                )| {
+                    Group {
+                        name,
+                        animation_type,
+                        animation_time,
+                        animation_stages,
+                        float_group,
+                        bone_rotations,
+                        extra_ints,
+                    }
+                },
+            )
+    )
 }
 
 fn bone_group<'a>() -> impl WinnowParser<&'a str, BoneGroup> {
-    (
-        quoted_str, //
-        P(
-            space1,
-            length_repeat(
-                dec_uint::<_, u32, _>, //
-                P(space1, quoted_str),
+    winnow::trace!(
+        "bone_group",
+        (
+            quoted_str, //
+            P(
+                space1,
+                length_repeat(
+                    dec_uint::<_, u32, _>, //
+                    P(space1, quoted_str),
+                ),
             ),
-        ),
+        )
+            .map(|(name, bones)| BoneGroup { name, bones })
     )
-        .map(|(name, bones)| BoneGroup { name, bones })
-        .trace("bone_group")
 }
 
 fn bone_groups<'a>() -> impl SliceParser<'a, &'a str, Vec<BoneGroup>> {
-    length_repeat(
-        lift(P(
-            (literal("BoneGroups"), space1), //
-            dec_uint::<_, u32, _>,
-        )), //
-        lift(bone_group()),
+    winnow::trace!(
+        "bone_groups",
+        length_repeat(
+            lift(P(
+                (literal("BoneGroups"), space1), //
+                dec_uint::<_, u32, _>,
+            )), //
+            lift(bone_group()),
+        )
     )
-    .trace("bone_groups")
 }
 
 pub fn parse_amd_str(contents: &str) -> Result<AMDFile> {

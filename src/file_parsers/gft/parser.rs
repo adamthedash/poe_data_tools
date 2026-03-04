@@ -15,7 +15,7 @@ use crate::file_parsers::shared::{
 };
 
 fn file<'a>() -> impl WinnowParser<&'a str, GenFile> {
-    (
+    winnow::trace!("file", (
         U,
         preceded(
             space1,
@@ -30,18 +30,16 @@ fn file<'a>() -> impl WinnowParser<&'a str, GenFile> {
             weight,
             path,
             rotations,
-        })
-        .trace("file")
+        }))
 }
 
 fn section<'a>(version: u32) -> impl SliceParser<'a, &'a str, Section> {
-    (
+    winnow::trace!("section", (
         lift((quoted_str, opt(preceded(space1, U)))).trace("header"),
         cond(version == 1, lift(U)).trace("file_count"),
         repeat(0.., lift(file())).trace("files"),
     )
-        .map(|((name, uint1), _, files)| Section { name, files, uint1 })
-        .trace("section")
+        .map(|((name, uint1), _, files)| Section { name, files, uint1 }))
 }
 
 pub fn parse_gft_str(contents: &str) -> Result<GFTFile> {

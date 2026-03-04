@@ -6,22 +6,21 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::winnow::{TraceHelper, WinnowParser};
+use crate::file_parsers::shared::winnow::WinnowParser;
 
 fn connection<'a>(poe_version: u32) -> impl WinnowParser<&'a [u8], Connection> {
-    (
+    winnow::trace!("connection", (
         le_u32, //
         cond(poe_version == 2, le_i32),
     )
         .map(|(passive_id, curvature)| Connection {
             passive_id,
             curvature,
-        })
-        .trace("connection")
+        }))
 }
 
 fn passive<'a>(poe_version: u32) -> impl WinnowParser<&'a [u8], Passive> {
-    (
+    winnow::trace!("passive", (
         le_u32,
         le_i32,
         le_u32,
@@ -32,12 +31,11 @@ fn passive<'a>(poe_version: u32) -> impl WinnowParser<&'a [u8], Passive> {
             orbit,
             orbit_position,
             connections,
-        })
-        .trace("passive")
+        }))
 }
 
 fn group<'a>(poe_version: u32) -> impl WinnowParser<&'a [u8], Group> {
-    (
+    winnow::trace!("group", (
         le_f32,
         le_f32,
         le_u32,
@@ -52,8 +50,7 @@ fn group<'a>(poe_version: u32) -> impl WinnowParser<&'a [u8], Group> {
             unk1,
             unk2,
             passives,
-        })
-        .trace("group")
+        }))
 }
 
 pub fn parse_psg_bytes(contents: &[u8], poe_version: u32) -> Result<PSGFile> {

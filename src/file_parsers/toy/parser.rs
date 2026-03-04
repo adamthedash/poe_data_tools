@@ -10,39 +10,37 @@ use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
     winnow::{
-        TraceHelper, WinnowParser, filename, parse_bool, quoted, unquoted, unquoted_str,
+        WinnowParser, filename, parse_bool, quoted, unquoted, unquoted_str,
         version_line,
     },
 };
 
 /// One of: [I, R90, R180, R270, FI, FR90, FR180, FR270]
 fn d4_rotation<'a>() -> impl WinnowParser<&'a str, Rotation> {
-    (
+    winnow::trace!("d4_rotation", (
         opt(literal('F')).map(|f| f.is_some()),
         alt((
             literal('I').value(0), //
             P(literal('R'), dec_uint),
         )),
     )
-        .map(|(flip, angle)| Rotation { flip, angle })
-        .trace("d4_rotation")
+        .map(|(flip, angle)| Rotation { flip, angle }))
 }
 
 /// +/- followed by a flag name
 fn flag<'a>() -> impl WinnowParser<&'a str, String> {
-    (
+    winnow::trace!("flag", (
         alt((
             literal('+'), //
             literal('-'),
         )),
         unquoted(),
     )
-        .map(|(prefix, name)| [prefix, name].concat())
-        .trace("flag")
+        .map(|(prefix, name)| [prefix, name].concat()))
 }
 
 fn header<'a>() -> impl WinnowParser<&'a str, Header> {
-    (
+    winnow::trace!("header", (
         parse_bool,
         P(space1, parse_bool),
         opt(P(
@@ -59,8 +57,7 @@ fn header<'a>() -> impl WinnowParser<&'a str, Header> {
             bool2: uint2,
             file_order,
             flags,
-        })
-        .trace("header")
+        }))
 }
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
@@ -109,7 +106,7 @@ fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
         },
     );
 
-    (
+    winnow::trace!("entry", (
         primary_stuff, //
         tail_stuff,
     )
@@ -122,17 +119,15 @@ fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
                 add_flags,
                 rotations,
             },
-        )
-        .trace("entry")
+        ))
 }
 
 fn group<'a>() -> impl SliceParser<'a, &'a str, Group> {
-    (
+    winnow::trace!("group", (
         lift(header()), //
         repeat(0.., lift(entry())),
     )
-        .map(|(header, entries)| Group { header, entries })
-        .trace("group")
+        .map(|(header, entries)| Group { header, entries }))
 }
 
 pub fn parse_toy_str(contents: &str) -> Result<TOYFile> {
