@@ -113,7 +113,7 @@ pub fn quoted<'a>(quote: char) -> impl WinnowParser<&'a str, &'a str> {
 }
 
 pub fn unquoted<'a>() -> impl WinnowParser<&'a str, &'a str> {
-    take_till(1.., AsChar::is_space).trace("unquoted")
+    take_till(1.., char::is_whitespace).trace("unquoted")
 }
 
 pub fn quoted_str(input: &mut &str) -> winnow::Result<String> {
@@ -124,7 +124,7 @@ pub fn quoted_str(input: &mut &str) -> winnow::Result<String> {
 }
 
 pub fn single_quoted_str(input: &mut &str) -> winnow::Result<String> {
-    quoted('\"')
+    quoted('\'')
         .map(String::from)
         .trace("single_quoted_str")
         .parse_next(input)
