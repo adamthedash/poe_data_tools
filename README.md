@@ -107,16 +107,13 @@ PoE 2 (patch 4.4.0.7.5), PoE Data Tools v1.4.1
 |tst   |     0|   409|   409|100.00%|
 
 # Bundle File format
-
 ![bundle file format](./images/bundle_spec.png)
 
 # Bundle Index File format
-
 ![bundle index file format](./images/bundle_index_spec.png)
 
-# PassiveSkillGraph (PSG) File Format
-![psg file format poe1](./images/psg_spec_poe1.png)  
-![psg file format poe2](./images/psg_spec_poe2.png)  
+# Passive Skill Graph (PSG) File Format
+![psg file format](./images/psg_spec.png)  
 
 # World Area related files
 ![world areas](./images/world_areas.png)  
