@@ -51,11 +51,12 @@ fn bench_version(version: Patch) {
     let patch_version = base_url.path().trim_matches('/');
 
     println!(
-        "PoE {} (patch {}), poe_data_tools v{}",
+        "PoE {} (patch {}), PoE Data Tools v{}",
         version.major(),
         patch_version,
         env!("CARGO_PKG_VERSION")
     );
+    println!();
 
     // Print to markdown table
     println!("|Format|Fail|Success|Total|Success %|");
