@@ -1,90 +1,179 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use winnow::{
     Parser,
-    binary::{le_u16, le_u32, length_repeat, u8 as U8},
-    combinator::{alt, peek, repeat},
-    token::{rest, take},
+    binary::{le_u8, le_u16, le_u32, length_repeat},
+    combinator::{cond, dispatch, empty, repeat, terminated},
+    error::ContextError,
+    token::{any, rest, take_till},
 };
 
-use super::types::TDTFile;
-use crate::file_parsers::shared::winnow::WinnowParser;
+use super::types::*;
+use crate::file_parsers::shared::winnow::{WinnowParser, repeat_array};
 
-fn strings_section<'a>() -> impl WinnowParser<&'a [u8], Vec<String>> {
+#[derive(Debug)]
+enum Error {
+    IndexOutOfBounds { index: usize },
+}
+
+impl std::error::Error for Error {}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::IndexOutOfBounds { .. } => f.write_str("Index out of bounds"),
+        }
+    }
+}
+
+fn utf16_null_terminated<'a>() -> impl WinnowParser<&'a [u16], String> {
     winnow::trace!(
-        "string_section",
-        length_repeat(le_u32, le_u16).map(|tokens: Vec<_>| {
-            tokens
-                .split(|c| *c == 0)
-                .map(|chars| String::from_utf16(chars).expect("Invalid utf16 char"))
-                .collect::<Vec<_>>()
+        "utf16_null_terminated",
+        terminated(take_till(0.., |c| c == 0), any.verify(|c| *c == 0)) //
+            .try_map(String::from_utf16)
+    )
+}
+
+fn strings_section<'a>() -> impl WinnowParser<&'a [u8], HashMap<usize, Option<String>>> {
+    let parser = length_repeat(le_u32, le_u16)
+        .try_map(|chars: Vec<_>| {
+            repeat(1.., utf16_null_terminated())
+                .parse(&chars)
+                .map_err(|e| e.into_inner())
+        })
+        .map(|strings: Vec<_>| {
+            strings
+                .into_iter()
+                .scan(0, |offset, s| {
+                    let key_string = *offset;
+                    *offset += s.len();
+
+                    // Also include lookup location for empty strings
+                    let key_null = *offset;
+                    *offset += 1;
+
+                    let key_vals = [(key_string, Some(s)), (key_null, None)];
+
+                    Some(key_vals)
+                })
+                .flatten()
+                .collect()
+        });
+
+    winnow::trace!("string_section", parser)
+}
+
+fn string<'a>(
+    strings: &HashMap<usize, Option<String>>,
+) -> impl WinnowParser<&'a [u8], Option<String>> {
+    winnow::trace!(
+        "string",
+        le_u32.try_map(|i| {
+            let Some(string) = strings.get(&(i as usize)) else {
+                return Err(Error::IndexOutOfBounds { index: i as usize });
+            };
+
+            Ok(string.clone())
         })
     )
 }
 
-pub fn parse_tdt_bytes(mut contents: &[u8]) -> winnow::Result<TDTFile> {
-    let (version, strings) = (
-        le_u32, //
-        strings_section(),
+fn opt_string<'a>(
+    strings: &HashMap<usize, Option<String>>,
+) -> impl WinnowParser<&'a [u8], Option<String>> {
+    let parser = le_u32.try_map(|i| {
+        if i == u32::MAX {
+            return Ok(None);
+        }
+
+        // TODO: I don't think optional strings ever point to a null char, but need to verify
+
+        let Some(string) = strings.get(&(i as usize)) else {
+            return Err(Error::IndexOutOfBounds { index: i as usize });
+        };
+
+        Ok(string.clone())
+    });
+
+    winnow::trace!("opt_string", parser)
+}
+
+fn header<'a>(
+    version: u32,
+    strings: &HashMap<usize, Option<String>>,
+) -> impl WinnowParser<&'a [u8], Header> {
+    let parser = (
+        cond(version >= 7, string(strings)),
+        cond(version >= 5, string(strings)),
+        string(strings),
+        repeat_array(opt_string(strings)),
+        dispatch! {
+            empty.value(version);
+            ..4 => repeat_array(le_u32.map(|x| { assert!(x < 256); x as u8 })),
+            4.. => repeat_array(le_u8),
+        },
+        repeat_array(opt_string(strings)),
+        cond(version >= 4, repeat_array(le_u8)),
+        dispatch! {
+            empty.value(version);
+            ..4 => repeat_array(le_u32.map(|x| { assert!(x < 256); x as u8 })),
+            4.. => repeat_array(le_u8),
+        },
     )
-        .parse_next(&mut contents)?;
+        .map(
+            |(
+                unk_string,
+                common_tgt,
+                tag,
+                side_ets,
+                dimensions,
+                side_gts,
+                dimensions2,
+                side_offsets,
+            )| {
+                Header {
+                    unk_string: unk_string.flatten(),
+                    common_tgt: common_tgt.flatten(),
+                    tag,
+                    side_ets,
+                    dimensions,
+                    side_gts,
+                    dimensions2,
+                    side_offsets,
+                }
+            },
+        );
 
-    let num1 = le_u32(&mut contents)?;
+    winnow::trace!("header", parser)
+}
 
-    let peeked = peek(U8).parse_next(&mut contents)?;
-    if peeked > 0 {
-        // advance
-        take(1_usize).parse_next(&mut contents)?;
-    } else {
-        // Don't advance, throw out value
-        take(4_usize).parse_next(&mut contents)?;
-    }
+fn tdt_file<'a>() -> impl WinnowParser<&'a [u8], TDTFile> {
+    let parser = |contents: &mut &[u8]| {
+        let (version, strings) = (
+            le_u32, //
+            strings_section(),
+        )
+            .parse_next(contents)?;
 
-    let num2 = le_u32(&mut contents)?;
+        println!("{:#?}", strings);
 
-    let nums1 = vec![num1, peeked as u32, num2];
+        let header = header(version, &strings).parse_next(contents)?;
 
-    let nums3: Vec<_> =
-        repeat(4, le_u32.map(|x| (x < u32::MAX).then_some(x))).parse_next(&mut contents)?;
+        let rest = rest::<_, ContextError>.parse_next(contents)?;
 
-    let rest = alt((
-        take(128_usize), //
-        rest,
-    ))
-    .parse_next(&mut contents)?;
+        let tdt_file = TDTFile {
+            version,
+            strings,
+            header,
+            rest: rest.to_vec(),
+        };
 
-    let (_, string_offsets) = strings
-        .iter()
-        .fold((0, vec![]), |(mut offset, mut offsets), s| {
-            offsets.push(offset);
-            offset += s.len() + 1;
-
-            (offset, offsets)
-        });
-
-    let string_lut = string_offsets
-        .iter()
-        .copied()
-        .zip(strings.iter().cloned())
-        .collect::<HashMap<_, _>>();
-
-    let nums3_string = nums3
-        .iter()
-        // .map(|o| o.and_then(|o| string_lut.get(&(o as usize)).cloned()))
-        .map(|o| o.map(|o| string_lut[&(o as usize)].clone()))
-        .collect();
-
-    let tdt_file = TDTFile {
-        version,
-        strings,
-        strings_offsets: string_offsets,
-        nums1,
-        // num2,
-        nums3,
-        nums3_string,
-        // nums4,
-        rest: rest.to_vec(),
+        Ok(tdt_file)
     };
 
-    Ok(tdt_file)
+    winnow::trace!("tdt_file", parser)
+}
+
+pub fn parse_tdt_bytes(contents: &[u8]) -> winnow::Result<TDTFile> {
+    tdt_file().parse(contents).map_err(|e| e.into_inner())
 }
