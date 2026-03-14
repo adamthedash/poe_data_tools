@@ -38,8 +38,8 @@ arrow-cast = "56.2.0"
 arrow-schema = "56.2.0"
 
 # Forked version of winnow with better debugging capabilities
-# winnow = { git = "https://github.com/adamthedash/winnow.git" }
-winnow = { path = "../winnow"}
+winnow = { git = "https://github.com/adamthedash/winnow.git" }
+# winnow = { path = "../winnow"}
 
 [features]
 default = []
