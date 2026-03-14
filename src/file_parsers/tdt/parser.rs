@@ -1,11 +1,16 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    array::{self, from_fn},
+    collections::HashMap,
+    fmt::Display,
+};
 
 use winnow::{
     Parser,
-    binary::{le_u8, le_u16, le_u32, length_repeat},
-    combinator::{cond, dispatch, empty, repeat, terminated},
+    binary::{le_u8, le_u16, le_u32, length_repeat, length_take},
+    combinator::{cond, dispatch, empty, fail, peek, repeat, seq, terminated},
     error::ContextError,
-    token::{any, rest, take_till},
+    stream::Stream,
+    token::{any, rest, take, take_till},
 };
 
 use super::types::*;
@@ -102,10 +107,35 @@ fn header<'a>(
     version: u32,
     strings: &HashMap<usize, Option<String>>,
 ) -> impl WinnowParser<&'a [u8], Header> {
+    let files = move |input: &mut &[u8]| -> winnow::Result<_> {
+        let tdt_file = string(strings).parse_next(input)?;
+
+        let tdt_file = if let Some(tdt_file) = tdt_file {
+            assert!(tdt_file.ends_with(".tdt"));
+            let bytes = take(5_usize).parse_next(input)?;
+            Some((tdt_file, bytes.to_vec()))
+        } else {
+            None
+        };
+
+        let tgt_file = if tdt_file.is_some() {
+            (None, None)
+        } else {
+            let tgt_file = string(strings)
+                .parse_next(input)?
+                .expect("tgt file should not be empty");
+            let tag = string(strings).parse_next(input)?;
+            (Some(tgt_file), tag)
+        };
+
+        Ok((tdt_file, tgt_file))
+    };
+
     let parser = (
-        cond(version >= 7, string(strings)),
-        cond(version >= 5, string(strings)),
-        string(strings),
+        files,
+        // cond(version >= 7, tdt),
+        // cond(version >= 5, string(strings)),
+        // string(strings),
         repeat_array(opt_string(strings)),
         dispatch! {
             empty.value(version);
@@ -114,6 +144,7 @@ fn header<'a>(
         },
         repeat_array(opt_string(strings)),
         cond(version >= 4, repeat_array(le_u8)),
+        repeat_array(le_u8),
         dispatch! {
             empty.value(version);
             ..4 => repeat_array(le_u32.map(|x| { assert!(x < 256); x as u8 })),
@@ -122,23 +153,26 @@ fn header<'a>(
     )
         .map(
             |(
-                unk_string,
-                common_tgt,
-                tag,
+                (tdt_file, (common_tgt, tag)),
+                // unk_string,
+                // common_tgt,
+                // tag,
                 side_ets,
                 dimensions,
                 side_gts,
                 dimensions2,
+                extra_nums,
                 side_offsets,
             )| {
                 Header {
-                    unk_string: unk_string.flatten(),
-                    common_tgt: common_tgt.flatten(),
+                    tdt_file,
+                    common_tgt,
                     tag,
                     side_ets,
                     dimensions,
                     side_gts,
                     dimensions2,
+                    extra_nums,
                     side_offsets,
                 }
             },
@@ -147,25 +181,119 @@ fn header<'a>(
     winnow::trace!("header", parser)
 }
 
+fn subtile<'a>(
+    version: u32,
+    strings: &HashMap<usize, Option<String>>,
+) -> impl WinnowParser<&'a [u8], Subtile> {
+    let parser = move |input: &mut &[u8]| {
+        let (kind, value, string) = (le_u8, le_u8, le_u8).parse_next(input)?;
+
+        let fixed_block = dispatch! {
+            empty.value(kind);
+            7 | 15 | 31 | 224 | 226 | 228 | 230 | 237 => empty.value(None),
+            3 | 33 => take(1_usize).map(Vec::from).map(Some),
+            _ => fail,
+        }
+        .parse_next(input)?;
+
+        let variable_block = dispatch! {
+            empty.value(kind);
+            3 | 7 | 15 | 31 | 33 => empty.value(None),
+            224 | 226 | 228 | 230 | 237=> length_take(le_u16).map(Vec::from).map(Some),
+            _ => fail,
+        }
+        .parse_next(input)?;
+
+        Ok(Subtile {
+            kind,
+            value,
+            fixed_block,
+            variable_block,
+            // string,
+            string_index: string,
+        })
+    };
+
+    winnow::trace!("subtile", parser)
+}
+
 fn tdt_file<'a>() -> impl WinnowParser<&'a [u8], TDTFile> {
-    let parser = |contents: &mut &[u8]| {
+    let parser = |input: &mut &[u8]| {
         let (version, strings) = (
             le_u32, //
             strings_section(),
         )
-            .parse_next(contents)?;
+            .parse_next(input)?;
 
         println!("{:#?}", strings);
 
-        let header = header(version, &strings).parse_next(contents)?;
+        let header = header(version, &strings).parse_next(input)?;
+        println!("{:#?}", header);
 
-        let rest = rest::<_, ContextError>.parse_next(contents)?;
+        let flags = le_u8
+            .map(|b: u8| array::from_fn(|i| (b >> i) & 1))
+            .parse_next(input)?;
+        let bytes = repeat_array(le_u8).parse_next(input)?;
+
+        let num_subtiles = le_u16(input)?;
+
+        let mut subtiles = vec![];
+        for _ in 0..num_subtiles {
+            let checkpoint = input.checkpoint();
+            let Ok(subtile) = subtile(version, &strings).parse_next(input) else {
+                input.reset(&checkpoint);
+                break;
+            };
+
+            subtiles.push(subtile);
+        }
+
+        let mut rest = rest::<_, ContextError>.parse_next(input)?;
+
+        // parse from end
+        let trailing_uint1 = if flags[5] == 1 {
+            let trailing_uint1 = rest[rest.len() - 1];
+            rest = &rest[..rest.len() - 1];
+            Some(trailing_uint1)
+        } else {
+            None
+        };
+
+        let trailing_uint2 = if flags[4] == 1 {
+            let trailing_uint2 = rest[rest.len() - 1];
+            rest = &rest[..rest.len() - 1];
+            Some(trailing_uint2)
+        } else {
+            None
+        };
+
+        let input1 = rest
+            .get(rest.len() - (4 * 2 + 1 + 1)..)
+            .ok_or_else(ContextError::new)?;
+        let (dims3, trailing_uint3, trailing_uint4) = (
+            repeat_array(repeat_array(le_u8)), //
+            le_u8,
+            le_u8,
+        )
+            .parse(input1)
+            .map_err(|e| e.into_inner())?;
+
+        rest = &rest[..rest.len() - (4 * 2 + 1 + 1)];
 
         let tdt_file = TDTFile {
             version,
             strings,
             header,
+            flags,
+            bytes,
+            num_subtiles,
+            subtiles,
             rest: rest.to_vec(),
+            dims3,
+            trailing_uint3,
+            trailing_uint4,
+            trailing_uint2,
+            trailing_uint1,
         };
 
         Ok(tdt_file)
