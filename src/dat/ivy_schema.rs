@@ -3,12 +3,48 @@ use std::{fs, path::Path};
 use anyhow::Result;
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+use crate::commands::Patch;
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct SchemaCollection {
     pub tables: Vec<DatTableSchema>,
+    pub enumerations: Vec<Enumeration>,
 }
 
-#[derive(Deserialize, Debug)]
+impl SchemaCollection {
+    /// Filter the schemas for the given game version
+    pub fn filter_version(&self, version: &Patch) -> Self {
+        let version = version.major();
+
+        Self {
+            tables: self
+                .tables
+                .iter()
+                .filter(|t| t.valid_for == version || t.valid_for == 3)
+                .cloned()
+                .collect(),
+
+            enumerations: self
+                .enumerations
+                .iter()
+                .filter(|e| e.valid_for == version || e.valid_for == 3)
+                .cloned()
+                .collect(),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Enumeration {
+    #[serde(rename = "validFor")]
+    pub valid_for: u32,
+    /// Table name
+    pub name: String,
+    pub indexing: usize,
+    pub enumerators: Vec<Option<String>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct DatTableSchema {
     /// PoE Version
     /// 1 - PoE 1
@@ -21,7 +57,31 @@ pub struct DatTableSchema {
     pub columns: Vec<ColumnSchema>,
 }
 
-#[derive(Deserialize, Debug)]
+impl DatTableSchema {
+    /// Iterate over column names, generating names for unknown columns
+    pub fn column_names(&self) -> impl Iterator<Item = String> {
+        self.columns.iter().scan(0_usize, |num_unknowns, c| {
+            if let Some(name) = &c.name {
+                Some(name.clone())
+            } else {
+                let name = format!("unknown_{}", num_unknowns);
+                *num_unknowns += 1;
+                Some(name)
+            }
+        })
+    }
+
+    /// Iterate over all columns marked unique in the schema
+    pub fn primary_keys(&self) -> impl Iterator<Item = String> {
+        self.columns
+            .iter()
+            .zip(self.column_names())
+            .filter(|(c, _)| c.unique)
+            .map(|(_, name)| name)
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct ColumnSchema {
     pub name: Option<String>,
     pub description: Option<String>,
@@ -37,7 +97,7 @@ pub struct ColumnSchema {
     pub interval: bool,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct References {
     pub table: String,
 }

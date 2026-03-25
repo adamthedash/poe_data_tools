@@ -5,7 +5,7 @@ use anyhow::{Context, Result, ensure};
 use crate::file_parsers::dat::types::DatFile;
 
 // Take a null-terminated UTF-16 string
-fn take_utf16_string(input: &[u8]) -> String {
+pub fn take_utf16_string(input: &[u8]) -> String {
     let u16_data = input
         .chunks_exact(2)
         .map(|c| u16::from_le_bytes(c.try_into().unwrap()))

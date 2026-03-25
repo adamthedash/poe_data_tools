@@ -11,7 +11,7 @@ use crate::file_parsers::shared::winnow::WinnowParser;
 
 fn table_section<'a>() -> impl WinnowParser<&'a [u8], &'a [u8]> {
     terminated(
-        take_until(1.., [0xBB; 8].as_slice()), //
+        take_until(0.., [0xBB; 8].as_slice()), //
         [0xBB; 8].as_slice(),
     )
 }
