@@ -89,7 +89,7 @@ fn plain_column<'a>(
 ///          "...",              // Single-key target
 ///          ["...", "..."],     // Multi-key target
 ///          {"rowIndex": 123},  // Bad index / no target keys
-///          null,               // Null index (shouldn't happen in list)
+///          null,               // Null index (should only happen for scalars)
 ///      ]
 ///  }
 ///
@@ -156,12 +156,16 @@ fn ref_column<'a>(
             (true, true) => unreachable!(),
         };
 
-        let id_key = if ids.is_array() { "Ids" } else { "Id" };
+        let out = if ids.is_null() {
+            Value::Null
+        } else {
+            let id_key = if ids.is_array() { "Ids" } else { "Id" };
 
-        let out = json!({
-            "TableName": table_name,
-            id_key: ids,
-        });
+            json!({
+                "TableName": table_name,
+                id_key: ids,
+            })
+        };
 
         Ok(out)
     }
