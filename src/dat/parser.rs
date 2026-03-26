@@ -99,16 +99,8 @@ pub fn create_parser<'a>(
                 "i16" => le_i16.map(|x| serde_json::to_value(x).unwrap() ),
 
                 "bool" => le_u8
-                            .try_map(|b| {
-                                let b = match b {
-                                    0 => false,
-                                    1 => true,
-                                    _ => return Err(ContextError::new()),
-                                };
-                                Ok(b)
-                            })
-                            .map(serde_json::Value::Bool),
-
+                    .verify_map(|b| (b <= 2).then_some(b == 1))
+                    .map(serde_json::Value::Bool),
 
                 _ => fail,
 
