@@ -42,16 +42,24 @@ fn plain_column<'a>(
 
             "string" => string(variable_section).map(|x| serde_json::to_value(x).unwrap()),
 
-            "u32" => le_u32.map(|x| Value::Number(Number::from(x)) ),
-            "i32" => le_i32.map(|x| Value::Number(Number::from(x)) ),
-            "f32" => le_f32.map(|x| serde_json::to_value(x).unwrap() ),
+            "u32" => le_u32.map(|x| Value::Number(Number::from(x))),
+            "i32" => le_i32.map(|x| Value::Number(Number::from(x))),
+            "f32" => le_f32.map(|x| serde_json::to_value(x).unwrap()),
 
-            "u16" => le_u16.map(|x| Value::Number(Number::from(x)) ),
-            "i16" => le_i16.map(|x| Value::Number(Number::from(x)) ),
+            "u16" => le_u16.map(|x| Value::Number(Number::from(x))),
+            "i16" => le_i16.map(|x| Value::Number(Number::from(x))),
 
-            "bool" => le_u8
-                .verify_map(|b| (b <= 2).then_some(b == 1))
-                .map(Value::Bool),
+            "bool" => le_u8.map(|b|
+                            if b <= 2 {
+                                Some(b == 1)
+                            } else {
+                                eprintln!("WARN: Bad value for bool: {b}");
+                                None
+                            }
+                        )
+                        .map(|x| serde_json::to_value(x).unwrap()),
+
+            "array" => empty.value(Value::Null),
 
             _ => fail,
         };
@@ -61,9 +69,20 @@ fn plain_column<'a>(
             (true, false) => {
                 let (length, pointer) = (
                     le_u64,
-                    le_u64.verify(|offset| (8..variable_section.len() as u64 + 8).contains(offset)),
+                    le_u64.map(|offset| {
+                        if (8..variable_section.len() as u64 + 8).contains(&offset) {
+                            Some(offset)
+                        } else {
+                            eprintln!("WARN: Array pointer out of bounds: {offset}");
+                            None
+                        }
+                    }),
                 )
                     .parse_next(input)?;
+
+                let Some(pointer) = pointer else {
+                    return Ok(Value::Null);
+                };
 
                 let mut input = &variable_section[pointer as usize - 8..];
 
@@ -141,9 +160,20 @@ fn ref_column<'a>(
             (true, false) => {
                 let (length, pointer) = (
                     le_u64,
-                    le_u64.verify(|offset| (8..variable_section.len() as u64 + 8).contains(offset)),
+                    le_u64.map(|offset| {
+                        if (8..variable_section.len() as u64 + 8).contains(&offset) {
+                            Some(offset)
+                        } else {
+                            eprintln!("WARN: Array pointer out of bounds: {offset}");
+                            None
+                        }
+                    }),
                 )
                     .parse_next(input)?;
+
+                let Some(pointer) = pointer else {
+                    return Ok(Value::Null);
+                };
 
                 let mut input = &variable_section[pointer as usize - 8..];
 
@@ -189,14 +219,33 @@ pub fn create_parser<'a>(
 
         for (column, column_name) in schema.columns.iter().zip(schema.column_names()) {
             let column_name = &column_name;
-            let item = dispatch! {
+
+            let res = dispatch! {
                 empty.value(column.column_type.as_str());
                 "row" | "enumrow" | "foreignrow" => ref_column(column, variable_section, resolved_keys),
-                "string" | "u32" | "i32" | "f32" | "u16" | "i16" | "bool" => plain_column(column, variable_section),
+                "string" | "u32" | "i32" | "f32" | "u16" | "i16" | "bool" | "array" => plain_column(column, variable_section),
                 _ => fail,
             }
-            .parse_next(input)?;
-            out.insert(column_name.to_owned(), item);
+            .parse_next(input);
+
+            if let Ok(item) = res {
+                out.insert(column_name.to_owned(), item);
+            } else {
+                // NOTE: All the item parsers should pass with null on error, so an error here should
+                //  be unrecoverable. Return items parsed up until now instead of losing whole
+                //  row.
+                eprintln!(
+                    "WARN: Error applying schema for {:?} {:?}, bytes left: {:?}",
+                    schema.name,
+                    column,
+                    input.len(),
+                );
+                break;
+            }
+        }
+
+        if !input.is_empty() {
+            eprintln!("WARN: Extra bytes left after applying schema");
         }
 
         Ok(Value::Object(out))
