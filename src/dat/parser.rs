@@ -17,11 +17,18 @@ use crate::{
 };
 
 /// Read an index and read a string out of the variable section starting at the index
-fn string<'a>(variable_section: &[u8]) -> impl WinnowParser<&'a [u8], String> {
+/// Returns null instead of erroring if a bad offset is found
+fn string<'a>(variable_section: &[u8]) -> impl WinnowParser<&'a [u8], Option<String>> {
     let vs_len = variable_section.len();
-    le_u64
-        .verify(move |offset| (8..vs_len as u64 + 8).contains(offset))
-        .map(move |offset| take_utf16_string(&variable_section[offset as usize - 8..]))
+    le_u64.map(move |offset| {
+        if (8..vs_len as u64 + 8).contains(&offset) {
+            let string = take_utf16_string(&variable_section[offset as usize - 8..]);
+            Some(string)
+        } else {
+            eprintln!("WARN: Bad offset for string {offset}");
+            None
+        }
+    })
 }
 
 /// Basic data types & arrays of them
@@ -33,7 +40,7 @@ fn plain_column<'a>(
         let mut item_parser = dispatch! {
             empty.value(column.column_type.as_str());
 
-            "string" => string(variable_section).map(Value::String),
+            "string" => string(variable_section).map(|x| serde_json::to_value(x).unwrap()),
 
             "u32" => le_u32.map(|x| Value::Number(Number::from(x)) ),
             "i32" => le_i32.map(|x| Value::Number(Number::from(x)) ),
