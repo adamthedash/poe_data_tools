@@ -16,8 +16,8 @@ use poe_data_tools::{
 
 #[derive(Debug, Clone, ValueEnum)]
 enum DumpDatsMode {
-    CSV,
-    JSON,
+    Csv,
+    Json,
 }
 
 #[derive(Debug, Subcommand)]
@@ -48,7 +48,7 @@ enum Command {
         /// Path to write out the parsed tables to
         output_folder: PathBuf,
 
-        #[arg(long, value_enum, default_value_t = DumpDatsMode::CSV)]
+        #[arg(long, value_enum, default_value_t = DumpDatsMode::Csv)]
         mode: DumpDatsMode,
 
         /// Glob patterns to filter the list of files
@@ -195,7 +195,7 @@ fn main() -> Result<()> {
             globs,
             mode,
         } => match mode {
-            DumpDatsMode::CSV => dump_tables(
+            DumpDatsMode::Csv => dump_tables(
                 &mut fs,
                 &globs,
                 &args.cache_dir,
@@ -204,7 +204,7 @@ fn main() -> Result<()> {
             )
             .context("Dump Tables command failed")?,
 
-            DumpDatsMode::JSON => dump_tables_json::dump_tables(
+            DumpDatsMode::Json => dump_tables_json::dump_tables(
                 &mut fs,
                 &globs,
                 &args.cache_dir,
