@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use serde_json::{Number, Value, map::Map};
+use serde_json::{Number, Value, json, map::Map};
 use winnow::{
     Parser,
     binary::{le_f32, le_i16, le_i32, le_u8, le_u16, le_u32, le_u64, le_u128},
@@ -81,75 +81,55 @@ fn plain_column<'a>(
 }
 
 /// Foreign/self references, enums, and arrays of them
+///
+///  {
+///      "TableName": "...",
+///      Id: "...",              // Scalar
+///      Ids: [                  // Array / interval
+///          "...",              // Single-key target
+///          ["...", "..."],     // Multi-key target
+///          {"rowIndex": 123},  // Bad index / no target keys
+///          null,               // Null index (shouldn't happen in list)
+///      ]
+///  }
+///
 fn ref_column<'a>(
     column: &ColumnSchema,
     variable_section: &'static [u8],
     resolved_keys: &HashMap<String, Vec<Value>>,
 ) -> impl WinnowParser<&'a [u8], Value> {
     move |input: &mut &[u8]| -> winnow::Result<_> {
-        let table_name = if let Some(table_name) = &column.references {
-            table_name.table.as_str()
-        } else {
-            ""
+        let table_name = column.references.as_ref().map(|r| &r.table);
+
+        let mut item_parser = |input: &mut &[u8]| -> winnow::Result<_> {
+            let row = dispatch! {
+                empty.value(column.column_type.as_str());
+                "foreignrow" => le_u128
+                    .map(|r| (r != 0xfefefefe_fefefefe_fefefefe_fefefefe).then_some(r as usize)),
+                "row" => le_u64.map(|r| (r != 0xfefefefe_fefefefe).then_some(r as usize)),
+                // Enums are non-nullable
+                "enumrow" => le_u32.map(|r| Some(r as usize)),
+                _ => fail,
+            }
+            .parse_next(input)?;
+
+            let Some(row) = row else {
+                return Ok(Value::Null);
+            };
+
+            let value = if let Some(table_name) = table_name
+                && let Some(keys) = resolved_keys.get(&table_name.to_lowercase())
+                && let Some(key) = keys.get(row)
+            {
+                key.clone()
+            } else {
+                json!({"RowIndex": row})
+            };
+
+            Ok(value)
         };
 
-        let mut item_parser = dispatch! {
-            empty.value(column.column_type.as_str());
-
-            "foreignrow" => le_u128.map(move |row| {
-                if row == u128::from_le_bytes([0xfe; 16]) {
-                    Value::Null
-                } else {
-                    let mut value = Map::new();
-                    value.insert("TableName".to_owned(), Value::String(table_name.to_owned()));
-                    value.insert("RowIndex".to_owned(), Value::Number(Number::from_u128(row).unwrap()));
-
-                    if let Some(keys) = resolved_keys.get(&table_name.to_lowercase())
-                    && let Some(key) = keys.get(row as usize) {
-                        value.insert("Key".to_owned(), key.clone());
-                    }
-
-                    Value::Object(value)
-                }
-            }),
-
-            // NOTE: Tables with self references need to be resolved twice. Once to initialise
-            // non-reference columns, second to resolve self-references
-            "row" => le_u64.map(move |row| {
-                if row == u64::from_le_bytes([0xfe; 8]) {
-                    Value::Null
-                } else {
-                    let mut value = Map::new();
-                    value.insert("TableName".to_owned(), Value::String(table_name.to_owned()));
-                    value.insert("RowIndex".to_owned(), Value::Number(Number::from(row)));
-
-                    if let Some(keys) = resolved_keys.get(&table_name.to_lowercase())
-                    && let Some(key) = keys.get(row as usize) {
-                        value.insert("Key".to_owned(), key.clone());
-                    }
-
-                    Value::Object(value)
-                }
-            }),
-
-            "enumrow" => le_u32.map(move |row| {
-                if let Some(table) = resolved_keys.get(&table_name.to_lowercase())
-                    && let Some(e) = table.get(row as usize)
-                {
-                    e.clone()
-                } else {
-                    let mut value = Map::new();
-                    value.insert("TableName".to_owned(), Value::String(table_name.to_owned()));
-                    value.insert("RowIndex".to_owned(), Value::Number(Number::from(row)));
-                    Value::Object(value)
-                }
-            }),
-
-            _ => fail,
-
-        };
-
-        let out = match (column.array, column.interval) {
+        let ids = match (column.array, column.interval) {
             // Array
             (true, false) => {
                 let (length, pointer) = (
@@ -175,6 +155,13 @@ fn ref_column<'a>(
             (false, false) => item_parser.parse_next(input)?,
             (true, true) => unreachable!(),
         };
+
+        let id_key = if ids.is_array() { "Ids" } else { "Id" };
+
+        let out = json!({
+            "TableName": table_name,
+            id_key: ids,
+        });
 
         Ok(out)
     }
