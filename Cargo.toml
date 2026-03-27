@@ -23,7 +23,7 @@ dirs = "6.0.0"
 bytes = "1.11.0"
 glob = "0.3.3"
 serde = {version = "1.0.228", features = ["derive"]}
-serde_json = "1.0.145"
+serde_json = { version = "1.0.145", features = ["preserve_order"] }
 rayon = "1.11.0"
 image = { git = "https://github.com/RunDevelopment/image", branch = "new-dds-decoder" }
 iterators_extended = "0.2.0"

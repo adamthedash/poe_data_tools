@@ -8,19 +8,21 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::lift,
-    winnow::{TraceHelper, WinnowParser, parse_bool, quoted_str, unquoted_str},
+    winnow::{WinnowParser, parse_bool, quoted_str, unquoted_str},
 };
 
 fn bools<'a>() -> impl WinnowParser<&'a str, (bool, bool, Option<bool>, Option<bool>, Option<bool>)>
 {
-    (
-        parse_bool,
-        P(space1, parse_bool),
-        opt(P(space1, parse_bool)),
-        opt(P(space1, parse_bool)),
-        opt(P(space1, parse_bool)),
+    winnow::trace!(
+        "bools",
+        (
+            parse_bool,
+            P(space1, parse_bool),
+            opt(P(space1, parse_bool)),
+            opt(P(space1, parse_bool)),
+            opt(P(space1, parse_bool)),
+        )
     )
-        .trace("bools")
 }
 
 pub fn parse_gt_str(contents: &str) -> Result<GTFile> {

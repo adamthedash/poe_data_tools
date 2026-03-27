@@ -9,7 +9,7 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::winnow::{TraceHelper, WinnowParser};
+use crate::file_parsers::shared::winnow::WinnowParser;
 
 #[derive(Debug)]
 enum BundleError {
@@ -26,8 +26,9 @@ impl Display for BundleError {
 impl std::error::Error for BundleError {}
 
 fn first_file_encode<'a>() -> impl WinnowParser<&'a [u8], FirstFileEncode> {
-    le_u32
-        .try_map(|x| {
+    winnow::trace!(
+        "first_file_encode",
+        le_u32.try_map(|x| {
             use FirstFileEncode::*;
             let ffe = match x {
                 8 => Kraken6,
@@ -41,39 +42,41 @@ fn first_file_encode<'a>() -> impl WinnowParser<&'a [u8], FirstFileEncode> {
 
             Ok(ffe)
         })
-        .trace("first_file_encode")
+    )
 }
 
 fn head_payload<'a>() -> impl WinnowParser<&'a [u8], (HeadPayload, u32)> {
-    seq!((
-        _: take(12_usize),
-        first_file_encode(),
-        _: take(4_usize),
-        le_u64,
-        le_u64,
-        le_u32,
-        le_u32,
-        _: take(16_usize),
-    ))
-    .map(
-        |(
-            first_file_encode,
-            uncompressed_size,
-            total_payload_size,
-            block_count,
-            uncompressed_block_granularity,
-        )| {
-            let head_payload = HeadPayload {
+    winnow::trace!(
+        "head_payload",
+        seq!((
+            _: take(12_usize),
+            first_file_encode(),
+            _: take(4_usize),
+            le_u64,
+            le_u64,
+            le_u32,
+            le_u32,
+            _: take(16_usize),
+        ))
+        .map(
+            |(
                 first_file_encode,
                 uncompressed_size,
                 total_payload_size,
+                block_count,
                 uncompressed_block_granularity,
-            };
+            )| {
+                let head_payload = HeadPayload {
+                    first_file_encode,
+                    uncompressed_size,
+                    total_payload_size,
+                    uncompressed_block_granularity,
+                };
 
-            (head_payload, block_count)
-        },
+                (head_payload, block_count)
+            },
+        )
     )
-    .trace("head_payload")
 }
 
 fn blocks<'a>(block_count: u32) -> impl WinnowParser<&'a [u8], Vec<Vec<u8>>> {
@@ -89,7 +92,7 @@ fn blocks<'a>(block_count: u32) -> impl WinnowParser<&'a [u8], Vec<Vec<u8>>> {
         Ok(blocks)
     };
 
-    parser.trace("blocks")
+    winnow::trace!("blocks", parser)
 }
 
 pub fn bundle<'a>() -> impl WinnowParser<&'a [u8], BundleFile> {
@@ -103,7 +106,7 @@ pub fn bundle<'a>() -> impl WinnowParser<&'a [u8], BundleFile> {
         Ok(bundle)
     };
 
-    parser.trace("bundle")
+    winnow::trace!("bundle", parser)
 }
 
 pub fn parse_bundle_bytes(contents: &[u8]) -> Result<BundleFile> {

@@ -12,52 +12,54 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    winnow::{TraceHelper, WinnowParser, filename, parse_bool, quoted, unquoted, version_line},
+    winnow::{WinnowParser, filename, parse_bool, quoted, unquoted, version_line},
 };
 
 fn headers_v2<'a>() -> impl WinnowParser<&'a str, HeadersV2> {
-    (
-        float, //
-        P(space1, float),
-        P(space1, parse_bool),
-        P(space1, parse_bool),
-        opt(P(space1, dec_uint)),
-        opt(P(space1, dec_uint)),
-        opt(P(space1, dec_uint)),
-        opt(P(space1, float)),
-        opt(P(space1, dec_uint)),
-        opt(P(space1, float)),
-    )
-        .map(
-            |(
-                scale_min,
-                scale_max,
-                allow_waving,
-                allow_on_blocking,
-                max_rotation,
-                uint1,
-                uint2,
-                float1,
-                audio_type,
-                float2,
-            )| HeadersV2 {
-                scale_min,
-                scale_max,
-                allow_waving,
-                allow_on_blocking,
-                max_rotation,
-                uint1,
-                uint2,
-                float1,
-                audio_type,
-                float2,
-            },
+    winnow::trace!(
+        "headers_v2",
+        (
+            float, //
+            P(space1, float),
+            P(space1, parse_bool),
+            P(space1, parse_bool),
+            opt(P(space1, dec_uint)),
+            opt(P(space1, dec_uint)),
+            opt(P(space1, dec_uint)),
+            opt(P(space1, float)),
+            opt(P(space1, dec_uint)),
+            opt(P(space1, float)),
         )
-        .trace("headers_v2")
+            .map(
+                |(
+                    scale_min,
+                    scale_max,
+                    allow_waving,
+                    allow_on_blocking,
+                    max_rotation,
+                    uint1,
+                    uint2,
+                    float1,
+                    audio_type,
+                    float2,
+                )| HeadersV2 {
+                    scale_min,
+                    scale_max,
+                    allow_waving,
+                    allow_on_blocking,
+                    max_rotation,
+                    uint1,
+                    uint2,
+                    float1,
+                    audio_type,
+                    float2,
+                },
+            )
+    )
 }
 
 fn headers_v3<'a>() -> impl SliceParser<'a, &'a str, HeadersV3> {
-    repeat(
+    winnow::trace!("headers_v3", repeat(
         0..,
         lift(P(
             (literal('-'), space1),
@@ -77,39 +79,40 @@ fn headers_v3<'a>() -> impl SliceParser<'a, &'a str, HeadersV3> {
             },
         )),
     )
-    .map(HeadersV3)
-    .trace("headers_v3")
+    .map(HeadersV3))
 }
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
-    (
-        quoted('"').and_then(filename("fmt")), //
-        P(space1, float),
-        repeat(
-            0..,
-            P(
-                space1,
-                alt((
-                    delimited(
-                        literal('('),
-                        separated_pair(float, literal(','), float),
-                        literal(')'),
-                    ),
-                    delimited(
-                        literal('['),
-                        separated_pair(float, space1, float),
-                        literal(']'),
-                    ),
-                )),
+    winnow::trace!(
+        "entry",
+        (
+            quoted('"').and_then(filename("fmt")), //
+            P(space1, float),
+            repeat(
+                0..,
+                P(
+                    space1,
+                    alt((
+                        delimited(
+                            literal('('),
+                            separated_pair(float, literal(','), float),
+                            literal(')'),
+                        ),
+                        delimited(
+                            literal('['),
+                            separated_pair(float, space1, float),
+                            literal(']'),
+                        ),
+                    )),
+                ),
             ),
-        ),
+        )
+            .map(|(fmt_file, float, points)| Entry {
+                fmt_file,
+                float,
+                points,
+            })
     )
-        .map(|(fmt_file, float, points)| Entry {
-            fmt_file,
-            float,
-            points,
-        })
-        .trace("entry")
 }
 
 pub fn parse_dlp_str(contents: &str) -> Result<DLPFile> {

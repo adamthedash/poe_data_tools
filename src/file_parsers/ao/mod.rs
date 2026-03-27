@@ -5,7 +5,7 @@ use anyhow::Result;
 use parser::parse_ao_str;
 use types::*;
 
-use crate::file_parsers::{shared::utf16_bom_to_string, FileParser};
+use crate::file_parsers::{FileParser, shared::utf16_bom_to_string};
 
 pub struct AOParser;
 

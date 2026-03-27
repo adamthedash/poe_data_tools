@@ -7,45 +7,51 @@ use winnow::{
 
 use super::{super::shared::winnow::spaces_or_comments as S, types::*};
 use crate::file_parsers::shared::winnow::{
-    TraceHelper, WinnowParser, filename, parse_bool, quoted, quoted_str, version_line,
+    WinnowParser, filename, parse_bool, quoted, quoted_str, version_line,
 };
 
 fn entry(contents: &mut &str) -> winnow::Result<Entry> {
-    (
-        quoted('"').and_then(filename("mat")),
-        repeat(
-            0..,
-            P(
-                // NOTE Edge case: Missing space between strings here
-                space0, //
-                quoted('"').and_then(filename("dlp")),
+    winnow::trace!(
+        "entry",
+        (
+            quoted('"').and_then(filename("mat")),
+            repeat(
+                0..,
+                P(
+                    // NOTE Edge case: Missing space between strings here
+                    space0, //
+                    quoted('"').and_then(filename("dlp")),
+                ),
             ),
-        ),
+        )
+            .map(|(mat_file, dlp_files)| Entry {
+                mat_file,
+                dlp_files,
+            })
     )
-        .map(|(mat_file, dlp_files)| Entry {
-            mat_file,
-            dlp_files,
-        })
-        .trace("entry")
-        .parse_next(contents)
+    .parse_next(contents)
 }
 
 fn weights_line<'a>(num_weights: usize) -> impl WinnowParser<&'a str, (Vec<u32>, u32)> {
-    (
-        separated(num_weights, dec_uint::<_, u32, _>, S()), //
-        P(S(), dec_uint),
+    winnow::trace!(
+        "weights_line",
+        (
+            separated(num_weights, dec_uint::<_, u32, _>, S()), //
+            P(S(), dec_uint),
+        )
     )
-        .trace("weights_line")
 }
 
 fn group(contents: &mut &str) -> winnow::Result<Group> {
-    let (name, num_a, num_b) = (
-        opt(terminated(quoted_str, S())),
-        dec_uint,
-        P(S(), dec_uint::<_, usize, _>),
+    let (name, num_a, num_b) = winnow::trace!(
+        "group_header",
+        (
+            opt(terminated(quoted_str, S())),
+            dec_uint,
+            P(S(), dec_uint::<_, usize, _>),
+        )
     )
-        .trace("group_header")
-        .parse_next(contents)?;
+    .parse_next(contents)?;
 
     let entries = repeat(num_a, P(S(), entry)).parse_next(contents)?;
 

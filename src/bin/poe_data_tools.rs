@@ -1,17 +1,24 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result, ensure};
-use clap::{ArgGroup, Parser, Subcommand};
+use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 use glob::Pattern;
 use poe_data_tools::{
     VERBOSE,
     bundle_fs::FS,
     bundle_loader::cdn_base_url,
     commands::{
-        Patch, cat::cat_file, dump_art::extract_art, dump_tables::dump_tables,
-        dump_trees::dump_trees, extract::extract_files, list::list_files, translate::translate,
+        Patch, cat::cat_file, dump_art::extract_art, dump_tables_csv::dump_tables,
+        dump_tables_json, dump_trees::dump_trees, extract::extract_files, list::list_files,
+        translate::translate,
     },
 };
+
+#[derive(Debug, Clone, ValueEnum)]
+enum DumpDatsMode {
+    Csv,
+    Json,
+}
 
 #[derive(Debug, Subcommand)]
 enum Command {
@@ -40,6 +47,9 @@ enum Command {
     DumpTables {
         /// Path to write out the parsed tables to
         output_folder: PathBuf,
+
+        #[arg(long, value_enum, default_value_t = DumpDatsMode::Csv)]
+        mode: DumpDatsMode,
 
         /// Glob patterns to filter the list of files
         #[clap(default_value = "**/*.datc64")]
@@ -183,14 +193,26 @@ fn main() -> Result<()> {
         Command::DumpTables {
             output_folder,
             globs,
-        } => dump_tables(
-            &mut fs,
-            &globs,
-            &args.cache_dir,
-            &output_folder,
-            &args.patch,
-        )
-        .context("Dump Tables command failed")?,
+            mode,
+        } => match mode {
+            DumpDatsMode::Csv => dump_tables(
+                &mut fs,
+                &globs,
+                &args.cache_dir,
+                &output_folder,
+                &args.patch,
+            )
+            .context("Dump Tables command failed")?,
+
+            DumpDatsMode::Json => dump_tables_json::dump_tables(
+                &mut fs,
+                &globs,
+                &args.cache_dir,
+                &output_folder,
+                &args.patch,
+            )
+            .context("Dump Tables command failed")?,
+        },
         Command::DumpArt {
             output_folder,
             globs,

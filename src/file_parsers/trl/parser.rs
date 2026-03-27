@@ -9,20 +9,22 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    winnow::{TraceHelper, unquoted_str, version_line},
+    winnow::{unquoted_str, version_line},
 };
 
 fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
-    (
-        lift(literal("{")), //
-        repeat_till::<_, _, Vec<_>, _, _, _, _>(
-            .., //
-            lift(separated_pair(unquoted_str, space1, rest.map(String::from))),
-            lift(literal("}")),
-        ),
+    winnow::trace!(
+        "emitter",
+        (
+            lift(literal("{")), //
+            repeat_till::<_, _, Vec<_>, _, _, _, _>(
+                .., //
+                lift(separated_pair(unquoted_str, space1, rest.map(String::from))),
+                lift(literal("}")),
+            ),
+        )
+            .map(|(_, (key_values, _))| Emitter::from_iter(key_values))
     )
-        .map(|(_, (key_values, _))| Emitter::from_iter(key_values))
-        .trace("emitter")
 }
 
 pub fn parse_trl_str(contents: &str) -> Result<TRLFile> {

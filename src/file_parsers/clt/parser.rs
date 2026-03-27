@@ -8,49 +8,53 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    winnow::{TraceHelper, WinnowParser, filename, quoted, quoted_str, unquoted_str, version_line},
+    winnow::{WinnowParser, filename, quoted, quoted_str, unquoted_str, version_line},
 };
 
 pub fn item<'a>(version: u32) -> impl WinnowParser<&'a str, Item> {
-    (
-        dec_uint,
-        P(space1, quoted_str),
-        cond(
-            version >= 4,
-            P(space1, quoted('"').and_then(filename("ao"))),
-        ),
-        P(space1, float),
-        cond(
-            version >= 3, //
+    winnow::trace!(
+        "item",
+        (
+            dec_uint,
+            P(space1, quoted_str),
+            cond(
+                version >= 4,
+                P(space1, quoted('"').and_then(filename("ao"))),
+            ),
             P(space1, float),
-        ),
-        P(space1, dec_uint),
-        P(space1, dec_uint),
-    )
-        .map(
-            |(uint1, stub, ao_file, float1, float2, uint2, uint3)| Item {
-                uint1,
-                stub,
-                ao_file,
-                float1,
-                float2,
-                uint2,
-                uint3,
-            },
+            cond(
+                version >= 3, //
+                P(space1, float),
+            ),
+            P(space1, dec_uint),
+            P(space1, dec_uint),
         )
-        .trace("item")
+            .map(
+                |(uint1, stub, ao_file, float1, float2, uint2, uint3)| Item {
+                    uint1,
+                    stub,
+                    ao_file,
+                    float1,
+                    float2,
+                    uint2,
+                    uint3,
+                },
+            )
+    )
 }
 
 pub fn group<'a>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
-    (
-        lift((
-            alt((quoted_str, unquoted_str)), //
-            opt(P(space1, float)),
-        )),
-        repeat(0.., lift(item(version))),
+    winnow::trace!(
+        "group",
+        (
+            lift((
+                alt((quoted_str, unquoted_str)), //
+                opt(P(space1, float)),
+            )),
+            repeat(0.., lift(item(version))),
+        )
+            .map(|((name, float), items)| Group { name, float, items })
     )
-        .map(|((name, float), items)| Group { name, float, items })
-        .trace("group")
 }
 
 pub fn parse_clt_str(contents: &str) -> Result<CLTFile> {

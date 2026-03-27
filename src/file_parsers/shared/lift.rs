@@ -5,8 +5,6 @@ use winnow::{
     stream::{Stream, StreamIsPartial},
 };
 
-use crate::file_parsers::shared::winnow::TraceHelper;
-
 /// Winnow parser over `&[I]` input
 pub trait SliceParser<'a, I, O> = Parser<&'a [I], O, ContextError> where I: 'a;
 
@@ -58,7 +56,7 @@ where
     S: Stream<Token = I>,
     P: Parser<I, O, ContextError>,
 {
-    Lift::new(parser).trace("lift")
+    winnow::trace!("lift", Lift::new(parser))
 }
 
 #[cfg(test)]

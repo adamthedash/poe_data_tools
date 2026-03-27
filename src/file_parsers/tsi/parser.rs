@@ -9,20 +9,22 @@ use winnow::{
 use super::types::TSIFile;
 use crate::file_parsers::shared::{
     lift::lift,
-    winnow::{TraceHelper, WinnowParser, quoted_str, unquoted_str},
+    winnow::{WinnowParser, quoted_str, unquoted_str},
 };
 
 fn key_value<'a>() -> impl WinnowParser<&'a str, (String, String)> {
-    separated_pair(
-        unquoted_str,
-        space1,
-        // Attempt to un-quote single quoted strings, otherwise just take the rest as-is
-        alt((
-            terminated(quoted_str, eof), //
-            rest.map(String::from),
-        )),
+    winnow::trace!(
+        "key_value",
+        separated_pair(
+            unquoted_str,
+            space1,
+            // Attempt to un-quote single quoted strings, otherwise just take the rest as-is
+            alt((
+                terminated(quoted_str, eof), //
+                rest.map(String::from),
+            )),
+        )
     )
-    .trace("key_value")
 }
 
 pub fn parse_tsi_str(contents: &str) -> Result<TSIFile> {

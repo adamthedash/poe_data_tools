@@ -357,21 +357,12 @@ fn parse_column(
 
 /// Parse a table with the given schema into an Arrow RecordBatch
 pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBatch> {
+    let column_names = schema.column_names().collect::<Vec<_>>();
+
     // Parse each of the columns
     let mut parsed_columns = vec![];
-    let mut column_names = vec![];
     let mut cur_offset = 0;
-    let mut num_unknowns = 0;
     for column in &schema.columns {
-        // Parse column name
-        let col_name = if let Some(name) = column.name.clone() {
-            name
-        } else {
-            num_unknowns += 1;
-            format!("unknown_{}", num_unknowns - 1)
-        };
-        column_names.push(col_name);
-
         // Parse column data.
         // We return out on parse failure as it may impact the interpretation of followon columns
         // if the offset is incorrect.

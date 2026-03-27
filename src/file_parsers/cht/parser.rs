@@ -8,37 +8,41 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::{
     lift::{SliceParser, lift},
-    winnow::{TraceHelper, WinnowParser, quoted_comma_separated, version_line},
+    winnow::{WinnowParser, quoted_comma_separated, version_line},
 };
 
 fn num_line<'a>(version: u32) -> impl WinnowParser<&'a str, Nums> {
-    (
-        float, //
-        P(space1, float),
-        P(space1, dec_uint),
-        P(space1, dec_uint),
-        cond(version >= 3, P(space1, dec_uint)),
+    winnow::trace!(
+        "num_line",
+        (
+            float, //
+            P(space1, float),
+            P(space1, dec_uint),
+            P(space1, dec_uint),
+            cond(version >= 3, P(space1, dec_uint)),
+        )
+            .map(|(float1, float2, uint1, uint2, uint3)| Nums {
+                float1,
+                float2,
+                uint1,
+                uint2,
+                uint3,
+            })
     )
-        .map(|(float1, float2, uint1, uint2, uint3)| Nums {
-            float1,
-            float2,
-            uint1,
-            uint2,
-            uint3,
-        })
-        .trace("num_line")
 }
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
-    (
-        dec_uint, //
-        P(space1, quoted_comma_separated()),
+    winnow::trace!(
+        "entry",
+        (
+            dec_uint, //
+            P(space1, quoted_comma_separated()),
+        )
+            .map(|(weight, chest_types)| Entry {
+                weight,
+                chest_types,
+            })
     )
-        .map(|(weight, chest_types)| Entry {
-            weight,
-            chest_types,
-        })
-        .trace("entry")
 }
 
 fn group<'a, const NAMED: bool>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
@@ -57,16 +61,18 @@ fn group<'a, const NAMED: bool>(version: u32) -> impl SliceParser<'a, &'a str, G
                 ),
     };
 
-    (
-        lift(header), //
-        repeat(0.., lift(entry())),
+    winnow::trace!(
+        "group",
+        (
+            lift(header), //
+            repeat(0.., lift(entry())),
+        )
+            .map(|((areas, nums), entries)| Group {
+                areas,
+                entries,
+                nums,
+            })
     )
-        .map(|((areas, nums), entries)| Group {
-            areas,
-            entries,
-            nums,
-        })
-        .trace("group")
 }
 
 pub fn parse_cht_str(contents: &str) -> Result<CHTFile> {
@@ -82,7 +88,7 @@ pub fn parse_cht_str(contents: &str) -> Result<CHTFile> {
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     let mut parser = (
-        group::<false>(version).trace("default_group"),
+        winnow::trace!("default_group", group::<false>(version)),
         repeat(0.., group::<true>(version)),
     )
         .map(|(default_group, mut groups)| {

@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use crate::{
     bundle_fs::FS,
-    commands::{Patch, dump_tables::load_parsed_table},
+    commands::{Patch, dump_tables_csv::load_parsed_table},
     dat::ivy_schema::fetch_schema,
 };
 
