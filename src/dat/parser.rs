@@ -107,6 +107,74 @@ fn plain_column<'a>(
     }
 }
 
+enum ResolvedRef {
+    Null,
+    Valid(Value),
+    // Row index
+    Invalid(usize),
+}
+
+enum ResolvedRefColumn {
+    Scalar(ResolvedRef),
+    Multi(Vec<ResolvedRef>),
+}
+
+impl ResolvedRefColumn {
+    fn serialise(&self, table_name: Option<&str>, has_keys: bool) -> Value {
+        match self {
+            ResolvedRefColumn::Scalar(resolved_ref) => match resolved_ref {
+                ResolvedRef::Null => Value::Null,
+                ResolvedRef::Valid(value) => json!({
+                    "TableName": table_name,
+                    "Id": value
+                }),
+                ResolvedRef::Invalid(row) => json!({
+                    "TableName": table_name,
+                    "RowIndex": row
+                }),
+            },
+            ResolvedRefColumn::Multi(resolved_refs) => {
+                if resolved_refs.is_empty() {
+                    Value::Array(vec![])
+                } else if has_keys {
+                    let ids = resolved_refs
+                        .iter()
+                        .map(|r| match r {
+                            ResolvedRef::Null => {
+                                unreachable!("There shouldn't be any null references in an array")
+                            }
+                            ResolvedRef::Valid(value) => value.clone(),
+                            ResolvedRef::Invalid(row) => json!({
+                                "RowIndex": row
+                            }),
+                        })
+                        .collect::<Vec<_>>();
+
+                    json!({
+                        "TableName": table_name,
+                        "Ids": ids
+                    })
+                } else {
+                    let indices = resolved_refs
+                        .iter()
+                        .map(|r| {
+                            let ResolvedRef::Invalid(row) = r else {
+                                unreachable!("All refs should be invalid if target has no keys");
+                            };
+                            *row
+                        })
+                        .collect::<Vec<_>>();
+
+                    json!({
+                        "TableName": table_name,
+                        "RowIndices": indices
+                    })
+                }
+            }
+        }
+    }
+}
+
 /// Foreign/self references, enums, and arrays of them
 ///
 ///  Return values:
@@ -139,9 +207,10 @@ fn ref_column<'a>(
     resolved_keys: &HashMap<String, Vec<Value>>,
 ) -> impl WinnowParser<&'a [u8], Value> {
     move |input: &mut &[u8]| -> winnow::Result<_> {
-        let table_name = column.references.as_ref().map(|r| &r.table);
+        let target_table = column.references.as_ref().map(|r| r.table.as_str());
+        let target_keys = target_table.and_then(|name| resolved_keys.get(&name.to_lowercase()));
 
-        let mut item_parser = |input: &mut &[u8]| -> winnow::Result<_> {
+        let mut ref_parser = |input: &mut &[u8]| -> winnow::Result<_> {
             let row = dispatch! {
                 empty.value(column.column_type.as_str());
                 "foreignrow" => le_u128
@@ -154,27 +223,25 @@ fn ref_column<'a>(
             .parse_next(input)?;
 
             let Some(row) = row else {
-                return Ok(Value::Null);
+                return Ok(ResolvedRef::Null);
             };
 
-            // If the table it refers to is known
-            let value = if let Some(table_name) = table_name
-                // And that table exists
-                && let Some(keys) = resolved_keys.get(&table_name.to_lowercase())
+            // If the target table has keys
+            let value = if let Some(keys) = target_keys
                 // And the row it refers to exists
                 && let Some(key) = keys.get(row)
                 // And that row has a primary key
                 && !key.is_null()
             {
-                key.clone()
+                ResolvedRef::Valid(key.clone())
             } else {
-                json!({"RowIndex": row})
+                ResolvedRef::Invalid(row)
             };
 
             Ok(value)
         };
 
-        let ids = match (column.array, column.interval) {
+        let refs = match (column.array, column.interval) {
             // Array
             (true, false) => {
                 let (length, pointer) = (
@@ -196,83 +263,25 @@ fn ref_column<'a>(
 
                 let mut input = &variable_section[pointer as usize - 8..];
 
-                let items = std::iter::repeat_with(|| item_parser.parse_next(&mut input))
+                let items = std::iter::repeat_with(|| ref_parser.parse_next(&mut input))
                     .take(length as usize)
                     .collect::<winnow::Result<Vec<_>>>()?;
 
-                Value::Array(items)
+                ResolvedRefColumn::Multi(items)
             }
             // Interval
-            (false, true) => Value::Array(vec![
-                item_parser.parse_next(input)?,
-                item_parser.parse_next(input)?,
+            (false, true) => ResolvedRefColumn::Multi(vec![
+                ref_parser.parse_next(input)?,
+                ref_parser.parse_next(input)?,
             ]),
             // Scalar
-            (false, false) => item_parser.parse_next(input)?,
+            (false, false) => ResolvedRefColumn::Scalar(ref_parser.parse_next(input)?),
             (true, true) => unreachable!(),
         };
 
-        let out = match ids {
-            // For scalar null refs, collapse to null
-            Value::Null => Value::Null,
-            Value::Array(values) => {
-                if values.is_empty() {
-                    // For empty array of refs, collapse to []
-                    Value::Array(vec![])
-                } else {
-                    let mut map = Map::new();
-                    map.insert(
-                        "TableName".to_owned(),
-                        serde_json::to_value(table_name).unwrap(),
-                    );
+        let serialised = refs.serialise(target_table, target_keys.is_some());
 
-                    // Target table has key
-                    if let Some(table_name) = table_name
-                        && resolved_keys.contains_key(&table_name.to_lowercase())
-                    {
-                        let ids_key = if column.is_multi() {
-                            // Array
-                            "Ids"
-                        } else {
-                            // Scalar with multi-key
-                            "Id"
-                        };
-
-                        map.insert(ids_key.to_owned(), Value::Array(values));
-                    } else {
-                        // Row indices into unknown table
-                        let indices = values
-                            .into_iter()
-                            .map(|v| {
-                                let Value::Object(mut map) = v else {
-                                    unreachable!("Got {v:?}");
-                                };
-                                let Some(row) = map.remove("RowIndex") else {
-                                    unreachable!()
-                                };
-
-                                row
-                            })
-                            .collect::<Vec<_>>();
-
-                        map.insert("RowIndices".to_owned(), Value::Array(indices));
-                    }
-
-                    Value::Object(map)
-                }
-            }
-            Value::Bool(_) | Value::Number(_) | Value::String(_) => json!({
-                "TableName": table_name,
-                "Id": ids,
-            }),
-            Value::Object(_) => {
-                // Scalar row index or foreign ref
-
-                ids
-            }
-        };
-
-        Ok(out)
+        Ok(serialised)
     }
 }
 
