@@ -1,6 +1,8 @@
 use anyhow::Context;
 
-use crate::file_parsers::{FileParser, VersionedResult, shared::utf16_bom_to_string};
+use crate::file_parsers::{
+    FileParser, VersionedResult, VersionedResultExt, shared::utf16_bom_to_string,
+};
 
 pub mod parser;
 pub mod types;
@@ -16,6 +18,6 @@ impl FileParser for TSTParser {
         let contents = utf16_bom_to_string(bytes)
             .or_else(|_| String::from_utf16le(bytes).context("Failed to parse as UTF16-LE"))?;
 
-        Ok(parse_tst_str(&contents)?)
+        parse_tst_str(&contents).unversioned()
     }
 }

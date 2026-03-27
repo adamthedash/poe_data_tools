@@ -44,10 +44,8 @@ pub fn parse_rs_str(contents: &str) -> VersionedResult<RSFile> {
 
     let mut parser = repeat(0.., lift(room())).map(|rooms| RSFile { version, rooms });
 
-    let room_file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(room_file)
+        .with_version(Some(version))
 }

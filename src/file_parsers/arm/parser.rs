@@ -599,5 +599,5 @@ pub fn parse_arm_str(input: &str) -> VersionedResult<ARMFile> {
         ground_overrides,
     };
 
-    Ok(arm_file)
+    Ok(arm_file).with_version(Some(version))
 }

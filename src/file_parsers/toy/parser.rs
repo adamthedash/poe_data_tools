@@ -161,10 +161,8 @@ pub fn parse_toy_str(contents: &str) -> VersionedResult<TOYFile> {
 
     let mut parser = repeat(0.., group()).map(|groups| TOYFile { version, groups });
 
-    let file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(file)
+        .with_version(Some(version))
 }

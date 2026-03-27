@@ -99,10 +99,8 @@ pub fn parse_cht_str(contents: &str) -> VersionedResult<CHTFile> {
             CHTFile { version, groups }
         });
 
-    let pet_file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(pet_file)
+        .with_version(Some(version))
 }

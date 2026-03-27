@@ -67,5 +67,5 @@ pub fn parse_trl_str(contents: &str) -> VersionedResult<TRLFile> {
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
         .with_version(version)?;
 
-    Ok(pet_file)
+    Ok(pet_file).with_version(version)
 }

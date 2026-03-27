@@ -68,10 +68,8 @@ pub fn parse_ao_str(mut contents: &str) -> VersionedResult<AOFile> {
             })
     );
 
-    let file = parser
+    parser
         .parse(contents)
         .map_err(|e| anyhow!("Failed to parse ao file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(file)
+        .with_version(Some(version))
 }

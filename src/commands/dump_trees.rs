@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-use anyhow::{Context, Result, anyhow, ensure};
+use anyhow::{Context, Result, ensure};
 use glob::{MatchOptions, Pattern};
 
 use super::Patch;
@@ -33,7 +33,8 @@ fn process_file(
         version: version.major(),
     }
     .parse(contents)
-    .map_err(|e| anyhow!("Failed to parse passive skill tree: {:?}", e))?;
+    .as_anyhow()
+    .context("Failed to parse passive skill tree")?;
 
     // Add passive info - only nodes that are in the graph
     let passive_info = {

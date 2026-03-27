@@ -35,10 +35,8 @@ pub fn parse_gcf_str(contents: &str) -> VersionedResult<GcfFile> {
         combinations,
     });
 
-    let file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(file)
+        .with_version(Some(version))
 }

@@ -442,7 +442,8 @@ fn process_file(bytes: &Bytes, output_path: &Path, schema: &DatTableSchema) -> R
     // Load dat file
     let table = DatParser
         .parse(bytes)
-        .map_err(|e| anyhow!("Failed to parse table data: {:?}", e))?;
+        .as_anyhow()
+        .context("Failed to parse table data")?;
 
     ensure!(!table.rows.is_empty(), "Empty table");
 
@@ -476,7 +477,8 @@ pub fn load_parsed_table(
     // Load dat file
     let table = DatParser
         .parse(&bytes)
-        .map_err(|e| anyhow!("Failed to parse table data: {:?}", e))?;
+        .as_anyhow()
+        .context("Failed to parse table data")?;
 
     ensure!(!table.rows.is_empty(), "Empty table");
 

@@ -179,10 +179,8 @@ pub fn parse_amd_str(contents: &str) -> VersionedResult<AMDFile> {
             bone_groups,
         });
 
-    let amd_file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(amd_file)
+        .with_version(Some(version))
 }

@@ -82,10 +82,8 @@ pub fn parse_clt_str(contents: &str) -> VersionedResult<CLTFile> {
             groups,
         });
 
-    let clt_file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(clt_file)
+        .with_version(Some(version))
 }

@@ -9,21 +9,21 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     file_parsers::{
-        FileParser, VersionedResult, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser,
-        clt::CLTParser, dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser,
-        epk::EPKParser, et::ETParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser,
-        mtd::MTDParser, pet::PETParser, psg::PSGParser, rs::RSParser, tmo::TMOParser,
-        toy::TOYParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
+        FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
+        dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
+        et::ETParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser,
+        pet::PETParser, psg::PSGParser, rs::RSParser, shared::versioned_result::VersionedResult2,
+        tmo::TMOParser, toy::TOYParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
     },
 };
 
 #[enum_dispatch]
 pub trait FileParserExt {
     /// Parse and serialise to JSON
-    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> VersionedResult<()>;
+    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()>;
 
     /// Checks whether the file has been parsed successfully
-    fn validate(&self, bytes: &[u8]) -> bool;
+    fn validate(&self, bytes: &[u8]) -> VersionedResult2<(), ()>;
 }
 
 impl<P> FileParserExt for P
@@ -31,8 +31,8 @@ where
     P: FileParser,
     P::Output: Serialize,
 {
-    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> VersionedResult<()> {
-        let parsed = self.parse(bytes)?;
+    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()> {
+        let parsed = self.parse(bytes).as_anyhow()?;
 
         std::fs::create_dir_all(output_path.parent().unwrap())
             .context("Failed to create folder")?;
@@ -46,8 +46,15 @@ where
         Ok(())
     }
 
-    fn validate(&self, bytes: &[u8]) -> bool {
-        self.parse(bytes).is_ok()
+    fn validate(&self, bytes: &[u8]) -> VersionedResult2<(), ()> {
+        let res = self.parse(bytes);
+        VersionedResult2 {
+            version: res.version,
+            inner: match res.inner {
+                Ok(_) => Ok(()),
+                Err(_) => Err(()),
+            },
+        }
     }
 }
 
@@ -166,7 +173,6 @@ pub fn translate(
             let out_path = output_folder.join(filename).with_added_extension("json");
             parser
                 .parse_to_json_file(&contents, &out_path)
-                .map_err(anyhow::Error::from)
                 .with_context(|| format!("Failed to process file: {:?}", filename))?;
 
             Ok(filename)

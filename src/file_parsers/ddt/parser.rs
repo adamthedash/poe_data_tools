@@ -112,10 +112,8 @@ pub fn parse_ddt_str(contents: &str) -> VersionedResult<DDTFile> {
             }
         });
 
-    let ddt_file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(ddt_file)
+        .with_version(Some(version))
 }

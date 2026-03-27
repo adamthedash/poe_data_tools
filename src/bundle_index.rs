@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use url::Url;
 
 use crate::{
@@ -19,7 +19,8 @@ pub fn load_index_file(path: &Path) -> Result<BundleIndexFile> {
 
     BundleIndexParser
         .parse(&index_content)
-        .map_err(|_| anyhow!("Failed to parse bundle as index"))
+        .as_anyhow()
+        .context("Failed to parse bundle as index")
 }
 
 /// Fetch an index file from the CDN (or cache)
@@ -30,5 +31,6 @@ pub fn fetch_index_file(base_url: &Url, cache_dir: &Path, path: &Path) -> Result
 
     BundleIndexParser
         .parse(&index_content)
-        .map_err(|_| anyhow!("Failed to parse bundle as index"))
+        .as_anyhow()
+        .context("Failed to parse bundle as index")
 }

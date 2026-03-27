@@ -29,20 +29,26 @@ fn bench_version(version: Patch) {
             let parser = Parser::from_filename(Path::new(filename), version.major())
                 .expect("Already validated above");
 
-            let success = parser.validate(&contents);
+            let res = parser.validate(&contents);
 
             let ext = Path::new(filename).extension().unwrap().to_str().unwrap();
 
-            (ext, success)
+            (ext, res)
         })
-        .fold(HashMap::new(), |mut hm, (ext, success)| {
-            let counts = if let Some(counts) = hm.get_mut(ext) {
-                counts
+        .fold(HashMap::new(), |mut hm, (ext, res)| {
+            let version_counts = if let Some(version_counts) = hm.get_mut(ext) {
+                version_counts
             } else {
-                hm.entry(ext.to_string()).or_insert([0_usize; 2])
+                hm.entry(ext.to_string()).or_insert(HashMap::new())
             };
 
-            counts[success as usize] += 1;
+            let counts = if let Some(counts) = version_counts.get_mut(&res.version) {
+                counts
+            } else {
+                version_counts.entry(res.version).or_insert([0_usize; 2])
+            };
+
+            counts[res.inner.is_ok() as usize] += 1;
 
             hm
         });
@@ -64,11 +70,20 @@ fn bench_version(version: Patch) {
     results
         .iter()
         .sorted_unstable_by_key(|(ext, _)| ext.to_string())
+        .map(|(ext, version_counts)| {
+            let counts = version_counts
+                .iter()
+                .fold([0, 0], |[fails, successes], (_, [f, s])| {
+                    [fails + *f, successes + *s]
+                });
+
+            (ext, counts)
+        })
         .for_each(|(ext, [fails, successes])| {
             println!(
                 "|{ext:<6}|{fails:>6}|{successes:>6}|{:>6}|{:>6.2}%|",
                 fails + successes,
-                100. * (*successes as f32 / (fails + successes) as f32)
+                100. * (successes as f32 / (fails + successes) as f32)
             );
         });
 }

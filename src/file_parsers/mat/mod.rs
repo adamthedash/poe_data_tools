@@ -4,7 +4,9 @@ use anyhow::Context;
 use parser::parse_mat_str;
 use types::MATFile;
 
-use crate::file_parsers::{FileParser, VersionedResult, shared::utf16_bom_to_string};
+use crate::file_parsers::{
+    FileParser, VersionedResult, VersionedResultExt, shared::utf16_bom_to_string,
+};
 
 pub struct MATParser;
 
@@ -15,6 +17,6 @@ impl FileParser for MATParser {
         let contents = utf16_bom_to_string(bytes)
             .or_else(|_| String::from_utf16le(bytes).context("Failed to parse as UTF16-LE"))?;
 
-        Ok(parse_mat_str(&contents)?)
+        parse_mat_str(&contents).unversioned()
     }
 }

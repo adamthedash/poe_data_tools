@@ -69,10 +69,8 @@ pub fn parse_pet_str(contents: &str) -> VersionedResult<PETFile> {
             payload,
         });
 
-    let pet_file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(version)?;
-
-    Ok(pet_file)
+        .with_version(version)
 }

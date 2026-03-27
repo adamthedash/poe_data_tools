@@ -98,10 +98,8 @@ pub fn parse_dct_str(contents: &str) -> VersionedResult<DCTFile> {
             }
         });
 
-    let pet_file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(pet_file)
+        .with_version(Some(version))
 }

@@ -48,10 +48,8 @@ pub fn parse_tmo_str(contents: &str) -> VersionedResult<TMOFile> {
     )
     .map(|overrides| TMOFile { version, overrides });
 
-    let file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(file)
+        .with_version(Some(version))
 }

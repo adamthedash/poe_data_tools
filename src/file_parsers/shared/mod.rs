@@ -1,4 +1,5 @@
 pub mod lift;
+pub mod versioned_result;
 pub mod winnow;
 
 use anyhow::{Context, bail};

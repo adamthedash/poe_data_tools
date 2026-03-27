@@ -42,10 +42,8 @@ pub fn parse_ecf_str(contents: &str) -> VersionedResult<EcfFile> {
         combinations,
     });
 
-    let ecf_file = parser
+    parser
         .parse(lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))?;
-
-    Ok(ecf_file)
+        .with_version(Some(version))
 }
