@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     fs::{self, File},
     io::BufWriter,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use anyhow::{Context, Result, ensure};
@@ -10,6 +10,7 @@ use glob::{MatchOptions, Pattern};
 use winnow::Parser;
 
 use crate::{
+    VERBOSE,
     bundle_fs::FS,
     commands::Patch,
     dat::{
@@ -53,12 +54,10 @@ fn build_dependency_graph(schemas: &SchemaCollection) -> HashMap<String, Vec<Str
 
 fn resolve_enum(schema: &Enumeration) -> Vec<serde_json::Value> {
     std::iter::repeat_n(serde_json::Value::Null, schema.indexing)
-        .chain(
-            schema
-                .enumerators
-                .iter()
-                .map(|e| serde_json::to_value(e).unwrap()),
-        )
+        .chain(schema.enumerators.iter().map(|e| match e {
+            Some(value) => serde_json::Value::String(value.clone()),
+            None => serde_json::Value::Null,
+        }))
         .collect()
 }
 
@@ -71,16 +70,17 @@ fn resolve(
     deps: &HashMap<String, Vec<String>>,
     table: &str,
     version: &Patch,
-) {
+) -> anyhow::Result<()> {
     if resolved.contains_key(table) {
-        return;
+        return Ok(());
     }
 
     // Resolve children
     if let Some(table_deps) = deps.get(table) {
-        table_deps.iter().for_each(|dep| {
-            resolve(fs, schemas, resolved, resolved_keys, deps, dep, version);
-        });
+        table_deps.iter().try_for_each(|dep| {
+            resolve(fs, schemas, resolved, resolved_keys, deps, dep, version)
+                .context("Failed to resolve child table")
+        })?;
     } else {
         // NOTE: If there's no dependency entry, assume everything is a-ok (it's probably not).
         // This can happen when the schema refers to a non-existent table
@@ -88,7 +88,7 @@ fn resolve(
             "WARN: No dependency entry for table {:?}, assuming already resolved",
             table
         );
-        return;
+        return Ok(());
     }
 
     // All dependencies resolved, so resolve this one
@@ -97,17 +97,19 @@ fn resolve(
         2 => format!("data/balance/{}.datc64", table),
         _ => unreachable!("Invalid major version"),
     };
-    let bytes = fs.read(&filename).unwrap();
+    let bytes = fs.read(&filename).context("Failed to read file contents")?;
     let schema = schemas
         .tables
         .iter()
         .find(|s| s.name.eq_ignore_ascii_case(table))
-        .unwrap();
+        .context("Failed to find schema for table")?;
 
     let DatFile {
         rows,
         variable_data,
-    } = DatParser.parse(&bytes).unwrap();
+    } = DatParser
+        .parse(&bytes)
+        .context("Failed to parse dat file")?;
     // FIXME: Figure out a way to give variable section to the parser without leaking it to a
     // 'static lifetime
     let variable_section = Box::leak(Box::new(variable_data));
@@ -121,11 +123,10 @@ fn resolve(
             })
             .collect::<Vec<_>>()
     };
-    resolved.insert(table.to_owned(), parsed);
-    let parsed = &resolved[table];
+    let parsed = resolved.entry(table.to_owned()).insert_entry(parsed);
+    let parsed = parsed.get();
 
     let keys_columns = schema.primary_keys().collect::<Vec<_>>();
-
     if !keys_columns.is_empty() {
         // Try get the corresponding values for them
         let keys = parsed
@@ -140,7 +141,7 @@ fn resolve(
                 match keys.len() {
                     0 => unreachable!(),
                     1 => keys[0].clone(),
-                    _ => serde_json::to_value(keys).unwrap(),
+                    _ => serde_json::Value::Array(keys),
                 }
             })
             .collect::<Vec<_>>();
@@ -167,6 +168,8 @@ fn resolve(
 
         resolved.insert(table.to_owned(), parsed);
     }
+
+    Ok(())
 }
 
 /// Checks whether there is a cycle in the dependencies of a table
@@ -289,29 +292,46 @@ pub fn dump_tables(
         })
         .collect::<Vec<_>>();
 
-    // Resolve and extract files
-    for filename in filenames {
-        let path = PathBuf::from(filename);
-        let table_name = path.file_stem().unwrap().to_str().unwrap().to_lowercase();
+    filenames
+        .into_iter()
+        .map(|filename| -> anyhow::Result<_> {
+            let path = Path::new(&filename);
+            let table_name = path.file_stem().unwrap().to_str().unwrap().to_lowercase();
 
-        resolve(
-            fs,
-            &schemas,
-            &mut resolved,
-            &mut resolved_keys,
-            &dependencies,
-            &table_name,
-            version,
-        );
-        let json = &resolved[&table_name];
+            resolve(
+                fs,
+                &schemas,
+                &mut resolved,
+                &mut resolved_keys,
+                &dependencies,
+                &table_name,
+                version,
+            )
+            .context("Failed to resolve table")?;
+            let json = &resolved[&table_name];
 
-        // Save out
-        let output_path = output_folder.join(&path).with_added_extension("json");
-        fs::create_dir_all(output_path.parent().unwrap()).unwrap();
-        let mut out = BufWriter::new(File::create(&output_path).unwrap());
-        serde_json::to_writer_pretty(&mut out, json).unwrap();
-        eprintln!("Extracted file: {output_path:?}");
-    }
+            // Save out
+            let output_path = output_folder.join(path).with_added_extension("json");
+            fs::create_dir_all(output_path.parent().unwrap())
+                .context("Failed to create output folder")?;
+
+            let mut out =
+                BufWriter::new(File::create(&output_path).context("Failed to create output file")?);
+            serde_json::to_writer_pretty(&mut out, json).context("Failed to serialize json")?;
+
+            Ok(filename)
+        })
+        .for_each(|result| match result {
+            Ok(filename) => eprintln!("Extracted file: {}", filename),
+            Err(e) => {
+                let error_message = if *VERBOSE.get().unwrap() {
+                    format!("{e:?}")
+                } else {
+                    format!("{e}")
+                };
+                eprintln!("Failed to extract file: {error_message}");
+            }
+        });
 
     Ok(())
 }
