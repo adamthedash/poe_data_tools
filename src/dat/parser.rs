@@ -6,6 +6,7 @@ use winnow::{
     binary::{le_f32, le_i16, le_i32, le_u8, le_u16, le_u32, le_u64, le_u128},
     combinator::{dispatch, empty, fail},
     error::ContextError,
+    token::rest,
 };
 
 use crate::{
@@ -218,8 +219,6 @@ pub fn create_parser<'a>(
         let mut out = Map::new();
 
         for (column, column_name) in schema.columns.iter().zip(schema.column_names()) {
-            let column_name = &column_name;
-
             let res = dispatch! {
                 empty.value(column.column_type.as_str());
                 "row" | "enumrow" | "foreignrow" => ref_column(column, variable_section, resolved_keys),
@@ -229,7 +228,7 @@ pub fn create_parser<'a>(
             .parse_next(input);
 
             if let Ok(item) = res {
-                out.insert(column_name.to_owned(), item);
+                out.insert(column_name, item);
             } else {
                 // NOTE: All the item parsers should pass with null on error, so an error here should
                 //  be unrecoverable. Return items parsed up until now instead of losing whole
@@ -245,7 +244,12 @@ pub fn create_parser<'a>(
         }
 
         if !input.is_empty() {
-            eprintln!("WARN: Extra bytes left after applying schema");
+            eprintln!(
+                "WARN: Extra bytes left after applying schema: {:?}",
+                input.len(),
+            );
+
+            let _rest = rest(input)?;
         }
 
         Ok(Value::Object(out))
