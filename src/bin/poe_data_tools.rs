@@ -43,7 +43,7 @@ enum Command {
         /// Path to the file to extract
         path: String,
     },
-    /// Converts datc64 files into CSV files
+    /// Converts datc64 files by applying community-curated schemas
     DumpTables {
         /// Path to write out the parsed tables to
         output_folder: PathBuf,

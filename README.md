@@ -8,7 +8,7 @@ Parsing tools for Path of Exile game files. Available as a standalone binary (Se
 - `cat`: Dumps the binary contents of a file to stdout
 - `dump-art`: Extracts DirectDraw Surface (.dds) files and converts them to PNGs
 - `dump-tables`: Extracts data tables (.datc64), applies the [community-curated schemas](https://github.com/poe-tool-dev/dat-schema),
-  and saves them out as CSVs where the schema was successfully applied.  
+  and saves them out to more accessible formats.  
 - `dump-tree`: Extracts passive skill trees (player, atlas, ruthless, etc.) to JSON
 - `translate`: Extracts files and converts them to more accessible formats.  
 
@@ -49,41 +49,41 @@ poe_data_tools --patch 2 list 'art/**'
 ```
 
 # Format coverage
-PoE 1 (patch 3.27.0.10), PoE Data Tools v1.4.1  
+PoE 1 (patch 3.28.0.7), PoE Data Tools v1.5.0
 
 |Format|Fail|Success|Total|Success %|
 |-|-|-|-|-|
-|amd   |     0| 18557| 18557|100.00%|
-|ao    |     2| 59817| 59819|100.00%|
-|arm   |     0| 22429| 22429|100.00%|
+|amd   |     0| 19145| 19145|100.00%|
+|ao    | 61245|   322| 61567|  0.52%|
+|arm   |     0| 22463| 22463|100.00%|
 |cht   |     0|   602|   602|100.00%|
 |clt   |     0|   328|   328|100.00%|
 |dct   |     0|   471|   471|100.00%|
 |ddt   |     0|   652|   652|100.00%|
 |dlp   |     0|    84|    84|100.00%|
 |ecf   |     1|   588|   589| 99.83%|
-|epk   |     0|  8747|  8747|100.00%|
-|et    |     0|  1436|  1436|100.00%|
+|epk   |     0|  8973|  8973|100.00%|
+|et    |     0|  1440|  1440|100.00%|
 |gcf   |     0|     1|     1|100.00%|
-|gft   |     0|   923|   923|100.00%|
-|gt    |     0|  1095|  1095|100.00%|
-|mat   |     0|136761|136761|100.00%|
-|mtd   |     0|   883|   883|100.00%|
-|pet   |     1| 37076| 37077|100.00%|
+|gft   |     0|   931|   931|100.00%|
+|gt    |     0|  1104|  1104|100.00%|
+|mat   |     0|143681|143681|100.00%|
+|mtd   |     0|   891|   891|100.00%|
+|pet   |     1| 37752| 37753|100.00%|
 |psg   |     0|     7|     7|100.00%|
-|rs    |     0|   981|   981|100.00%|
-|tmo   |     0|   153|   153|100.00%|
+|rs    |     0|   989|   989|100.00%|
+|tmo   |     0|   155|   155|100.00%|
 |toy   |     0|    47|    47|100.00%|
-|trl   |     0|  6182|  6182|100.00%|
-|tsi   |     0|  1079|  1079|100.00%|
-|tst   |     0|   938|   938|100.00%|
+|trl   |     0|  6265|  6265|100.00%|
+|tsi   |     0|  1087|  1087|100.00%|
+|tst   |     0|   946|   946|100.00%|
 
-PoE 2 (patch 4.4.0.7.5), PoE Data Tools v1.4.1  
+PoE 2 (patch 4.4.0.10), PoE Data Tools v1.5.0
 
 |Format|Fail|Success|Total|Success %|
 |-|-|-|-|-|
-|amd   |     0| 16471| 16471|100.00%|
-|ao    |     2| 66713| 66715|100.00%|
+|amd   |     0| 16485| 16485|100.00%|
+|ao    |     2| 66844| 66846|100.00%|
 |arm   |     0| 14766| 14766|100.00%|
 |cht   |     1|   248|   249| 99.60%|
 |clt   |     0|   208|   208|100.00%|
@@ -91,13 +91,13 @@ PoE 2 (patch 4.4.0.7.5), PoE Data Tools v1.4.1
 |ddt   |     0|   217|   217|100.00%|
 |dlp   |     0|   185|   185|100.00%|
 |ecf   |     0|   258|   258|100.00%|
-|epk   |     0|  7120|  7120|100.00%|
+|epk   |     0|  7130|  7130|100.00%|
 |et    |     0|  1363|  1363|100.00%|
 |gft   |     0|   398|   398|100.00%|
 |gt    |     0|   647|   647|100.00%|
-|mat   |     0|163968|163968|100.00%|
+|mat   |     0|164096|164096|100.00%|
 |mtd   |     0|   405|   405|100.00%|
-|pet   |     0| 32432| 32432|100.00%|
+|pet   |     0| 32447| 32447|100.00%|
 |psg   |     0|     3|     3|100.00%|
 |rs    |     0|   441|   441|100.00%|
 |tmo   |     1|   396|   397| 99.75%|
