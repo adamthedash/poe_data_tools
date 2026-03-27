@@ -121,30 +121,34 @@ fn resolve(
             })
             .collect::<Vec<_>>()
     };
+    resolved.insert(table.to_owned(), parsed);
+    let parsed = &resolved[table];
 
     let keys_columns = schema.primary_keys().collect::<Vec<_>>();
 
-    // Try get the corresponding values for them
-    let keys = parsed
-        .iter()
-        .map(|row| {
-            let keys = keys_columns
-                .iter()
-                .map(|k| row.get(k).unwrap_or(&serde_json::Value::Null).clone())
-                .collect::<Vec<_>>();
+    if !keys_columns.is_empty() {
+        // Try get the corresponding values for them
+        let keys = parsed
+            .iter()
+            .map(|row| {
+                let keys = keys_columns
+                    .iter()
+                    .map(|k| row.get(k).unwrap_or(&serde_json::Value::Null).clone())
+                    .collect::<Vec<_>>();
 
-            // If there's multiple primary keys, use a list
-            match keys.len() {
-                0 => serde_json::Value::Null,
-                1 => keys[0].clone(),
-                _ => serde_json::to_value(keys).unwrap(),
-            }
-        })
-        .collect::<Vec<_>>();
+                // If there's multiple primary keys, use a list
+                match keys.len() {
+                    0 => unreachable!(),
+                    1 => keys[0].clone(),
+                    _ => serde_json::to_value(keys).unwrap(),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        resolved_keys.insert(table.to_owned(), keys);
+    }
 
     eprintln!("Resolved table: {:?}", table);
-    resolved.insert(table.to_owned(), parsed);
-    resolved_keys.insert(table.to_owned(), keys);
 
     // Tables with self-references need to be parsed twice
     let has_self_ref = schema.columns.iter().any(|c| c.column_type == "row");

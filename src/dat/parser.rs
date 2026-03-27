@@ -123,7 +123,7 @@ fn plain_column<'a>(
 ///      Ids: [                  // Array / interval
 ///          "...",              // Single-key target
 ///          ["...", "..."],     // Multi-key target
-///          {"rowIndex": 123},  // Bad index / no target keys
+///          {"rowIndex": 123},  // Bad index
 ///          null,               // Null index (technically possible but shouldn't appear in an array)
 ///      ]
 ///
@@ -220,17 +220,45 @@ fn ref_column<'a>(
                     // For empty array of refs, collapse to []
                     Value::Array(vec![])
                 } else {
-                    let ids_key = if column.is_multi() {
-                        // Array
-                        "Ids"
+                    let mut map = Map::new();
+                    map.insert(
+                        "TableName".to_owned(),
+                        serde_json::to_value(table_name).unwrap(),
+                    );
+
+                    // Target table has key
+                    if let Some(table_name) = table_name
+                        && resolved_keys.contains_key(&table_name.to_lowercase())
+                    {
+                        let ids_key = if column.is_multi() {
+                            // Array
+                            "Ids"
+                        } else {
+                            // Scalar with multi-key
+                            "Id"
+                        };
+
+                        map.insert(ids_key.to_owned(), Value::Array(values));
                     } else {
-                        // Scalar with multi-key
-                        "Id"
-                    };
-                    json!({
-                        "TableName": table_name,
-                        ids_key: values,
-                    })
+                        // Row indices into unknown table
+                        let indices = values
+                            .into_iter()
+                            .map(|v| {
+                                let Value::Object(mut map) = v else {
+                                    unreachable!("Got {v:?}");
+                                };
+                                let Some(row) = map.remove("RowIndex") else {
+                                    unreachable!()
+                                };
+
+                                row
+                            })
+                            .collect::<Vec<_>>();
+
+                        map.insert("RowIndices".to_owned(), Value::Array(indices));
+                    }
+
+                    Value::Object(map)
                 }
             }
             Value::Bool(_) | Value::Number(_) | Value::String(_) => json!({
