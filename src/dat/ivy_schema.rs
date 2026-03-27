@@ -97,6 +97,18 @@ pub struct ColumnSchema {
     pub interval: bool,
 }
 
+impl ColumnSchema {
+    /// Whether this column refers to another schema
+    pub fn is_ref(&self) -> bool {
+        matches!(self.column_type.as_str(), "row" | "foreignrow" | "enumrow")
+    }
+
+    /// Whether this column is a collection of multiple values
+    pub fn is_multi(&self) -> bool {
+        self.array || self.interval
+    }
+}
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct References {
     pub table: String,

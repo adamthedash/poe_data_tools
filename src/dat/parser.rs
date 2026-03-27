@@ -109,14 +109,27 @@ fn plain_column<'a>(
 
 /// Foreign/self references, enums, and arrays of them
 ///
+///  Return values:
+///  null   // Null scalar index
+///  []     // Empty array / interval
 ///  {
-///      "TableName": "...",
-///      Id: "...",              // Scalar
+///      "TableName": "...",     // Known target table
+///      "TableName": null,      // Unknown target table
+///
+///      Id: "...",              // Scalar with good target index, single-key target
+///      Id: ["..."],            // Scalar with good target index, multi-key target
+///      "RowIndex": 12345       // Scalar with bad index / no target table
+///
 ///      Ids: [                  // Array / interval
 ///          "...",              // Single-key target
 ///          ["...", "..."],     // Multi-key target
 ///          {"rowIndex": 123},  // Bad index / no target keys
-///          null,               // Null index (should only happen for scalars)
+///          null,               // Null index (technically possible but shouldn't appear in an array)
+///      ]
+///
+///      "RowIndices": [         // Array / interval with no target table
+///         12345,
+///         131235,
 ///      ]
 ///  }
 ///
@@ -144,9 +157,14 @@ fn ref_column<'a>(
                 return Ok(Value::Null);
             };
 
+            // If the table it refers to is known
             let value = if let Some(table_name) = table_name
+                // And that table exists
                 && let Some(keys) = resolved_keys.get(&table_name.to_lowercase())
+                // And the row it refers to exists
                 && let Some(key) = keys.get(row)
+                // And that row has a primary key
+                && !key.is_null()
             {
                 key.clone()
             } else {
@@ -194,15 +212,36 @@ fn ref_column<'a>(
             (true, true) => unreachable!(),
         };
 
-        let out = if ids.is_null() {
-            Value::Null
-        } else {
-            let id_key = if ids.is_array() { "Ids" } else { "Id" };
-
-            json!({
+        let out = match ids {
+            // For scalar null refs, collapse to null
+            Value::Null => Value::Null,
+            Value::Array(values) => {
+                if values.is_empty() {
+                    // For empty array of refs, collapse to []
+                    Value::Array(vec![])
+                } else {
+                    let ids_key = if column.is_multi() {
+                        // Array
+                        "Ids"
+                    } else {
+                        // Scalar with multi-key
+                        "Id"
+                    };
+                    json!({
+                        "TableName": table_name,
+                        ids_key: values,
+                    })
+                }
+            }
+            Value::Bool(_) | Value::Number(_) | Value::String(_) => json!({
                 "TableName": table_name,
-                id_key: ids,
-            })
+                "Id": ids,
+            }),
+            Value::Object(_) => {
+                // Scalar row index or foreign ref
+
+                ids
+            }
         };
 
         Ok(out)
@@ -219,13 +258,11 @@ pub fn create_parser<'a>(
         let mut out = Map::new();
 
         for (column, column_name) in schema.columns.iter().zip(schema.column_names()) {
-            let res = dispatch! {
-                empty.value(column.column_type.as_str());
-                "row" | "enumrow" | "foreignrow" => ref_column(column, variable_section, resolved_keys),
-                "string" | "u32" | "i32" | "f32" | "u16" | "i16" | "bool" | "array" => plain_column(column, variable_section),
-                _ => fail,
-            }
-            .parse_next(input);
+            let res = if column.is_ref() {
+                ref_column(column, variable_section, resolved_keys).parse_next(input)
+            } else {
+                plain_column(column, variable_section).parse_next(input)
+            };
 
             if let Ok(item) = res {
                 out.insert(column_name, item);

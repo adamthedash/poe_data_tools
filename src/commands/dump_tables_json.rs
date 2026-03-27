@@ -134,10 +134,10 @@ fn resolve(
                 .collect::<Vec<_>>();
 
             // If there's multiple primary keys, use a list
-            if keys.len() == 1 {
-                keys[0].clone()
-            } else {
-                serde_json::to_value(keys).unwrap()
+            match keys.len() {
+                0 => serde_json::Value::Null,
+                1 => keys[0].clone(),
+                _ => serde_json::to_value(keys).unwrap(),
             }
         })
         .collect::<Vec<_>>();
@@ -149,6 +149,7 @@ fn resolve(
     // Tables with self-references need to be parsed twice
     let has_self_ref = schema.columns.iter().any(|c| c.column_type == "row");
     if has_self_ref {
+        eprintln!("Resolving self-refs table: {:?}", table);
         let parsed = {
             let mut parser = create_parser(resolved_keys, variable_section, schema);
 
