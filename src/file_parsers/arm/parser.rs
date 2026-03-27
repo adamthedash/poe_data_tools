@@ -1,4 +1,3 @@
-use anyhow::Result;
 use itertools::{Itertools, izip};
 use winnow::{
     Parser,
@@ -12,9 +11,14 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    winnow::{WinnowParser, parse_bool, quoted_str, separated_array, unquoted_str, version_line},
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::{
+        lift::{SliceParser, lift},
+        winnow::{
+            WinnowParser, parse_bool, quoted_str, separated_array, unquoted_str, version_line,
+        },
+    },
 };
 
 // ==================================
@@ -510,16 +514,18 @@ fn thingy<'a>(strings: &[String]) -> impl WinnowParser<&'a str, Thingy> {
     )
 }
 
-pub fn parse_arm_str(input: &str) -> Result<ARMFile> {
+pub fn parse_arm_str(input: &str) -> VersionedResult<ARMFile> {
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
     let mut lines = lines.as_slice();
 
-    let (version, strings) = (
-        lift(version_line()), //
-        string_section(),
-    )
+    let version = lift(version_line())
         .parse_next(&mut lines)
         .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
+
+    let strings = string_section()
+        .parse_next(&mut lines)
+        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))
+        .with_version(Some(version))?;
 
     let (dimensions, numbers1, tag1, bools, root_slot) = (
         lift(dimensions(version)),
@@ -529,7 +535,8 @@ pub fn parse_arm_str(input: &str) -> Result<ARMFile> {
         lift(slot(&strings)),
     )
         .parse_next(&mut lines)
-        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))
+        .with_version(Some(version))?;
 
     let (grid_height, grid_width) = if let Slot::K(slot) = &root_slot {
         (slot.height as usize, slot.width as usize)
@@ -568,7 +575,8 @@ pub fn parse_arm_str(input: &str) -> Result<ARMFile> {
         ground_overrides,
     ) = parser
         .parse(lines)
-        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))
+        .with_version(Some(version))?;
 
     let arm_file = ARMFile {
         version,

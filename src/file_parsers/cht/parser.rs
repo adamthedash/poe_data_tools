@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
@@ -6,9 +6,12 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    winnow::{WinnowParser, quoted_comma_separated, version_line},
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::{
+        lift::{SliceParser, lift},
+        winnow::{WinnowParser, quoted_comma_separated, version_line},
+    },
 };
 
 fn num_line<'a>(version: u32) -> impl WinnowParser<&'a str, Nums> {
@@ -75,7 +78,7 @@ fn group<'a, const NAMED: bool>(version: u32) -> impl SliceParser<'a, &'a str, G
     )
 }
 
-pub fn parse_cht_str(contents: &str) -> Result<CHTFile> {
+pub fn parse_cht_str(contents: &str) -> VersionedResult<CHTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -98,7 +101,8 @@ pub fn parse_cht_str(contents: &str) -> Result<CHTFile> {
 
     let pet_file = parser
         .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version))?;
 
     Ok(pet_file)
 }

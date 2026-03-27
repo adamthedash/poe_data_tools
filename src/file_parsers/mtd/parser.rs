@@ -6,8 +6,9 @@ use winnow::{
 };
 
 use super::{super::shared::winnow::spaces_or_comments as S, types::*};
-use crate::file_parsers::shared::winnow::{
-    WinnowParser, filename, parse_bool, quoted, quoted_str, version_line,
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::winnow::{WinnowParser, filename, parse_bool, quoted, quoted_str, version_line},
 };
 
 fn entry(contents: &mut &str) -> winnow::Result<Entry> {
@@ -80,16 +81,18 @@ fn group(contents: &mut &str) -> winnow::Result<Group> {
     Ok(group)
 }
 
-pub fn parse_mtd_str(contents: &str) -> anyhow::Result<MTDFile> {
+pub fn parse_mtd_str(contents: &str) -> VersionedResult<MTDFile> {
     let mut contents = contents.trim();
 
-    let mut parser = (
-        version_line(), //
-        P(S(), separated(1.., group, S())),
-    );
+    let version = version_line()
+        .parse_next(&mut contents)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+
+    let mut parser = P(S(), separated(1.., group, S()));
 
     parser
         .parse_next(&mut contents)
-        .map(|(version, groups)| MTDFile { version, groups })
+        .map(|groups| MTDFile { version, groups })
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version))
 }

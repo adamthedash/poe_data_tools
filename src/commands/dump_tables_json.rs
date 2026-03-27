@@ -109,7 +109,9 @@ fn resolve(
         variable_data,
     } = DatParser
         .parse(&bytes)
+        .map_err(anyhow::Error::from)
         .context("Failed to parse dat file")?;
+
     // FIXME: Figure out a way to give variable section to the parser without leaking it to a
     // 'static lifetime
     let variable_section = Box::leak(Box::new(variable_data));

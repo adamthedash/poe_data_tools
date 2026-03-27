@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::space1,
@@ -7,8 +7,11 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::winnow::{
-    WinnowParser, quoted_str, single_quoted_str, spaces_or_comments, unquoted_str, version_line,
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::winnow::{
+        WinnowParser, quoted_str, single_quoted_str, spaces_or_comments, unquoted_str, version_line,
+    },
 };
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
@@ -38,11 +41,14 @@ fn parse_struct<'a>() -> impl WinnowParser<&'a str, Struct> {
     )
 }
 
-pub fn parse_ao_str(contents: &str) -> Result<AOFile> {
+pub fn parse_ao_str(mut contents: &str) -> VersionedResult<AOFile> {
+    let version = version_line()
+        .parse_next(&mut contents)
+        .map_err(|e| anyhow!("Failed to parse ao file: {e:?}"))?;
+
     let mut parser = winnow::trace!(
         "ao_file",
         (
-            version_line(),
             opt(P(spaces_or_comments(), literal("abstract"))),
             repeat::<_, _, Vec<_>, _, _>(
                 1..,
@@ -54,7 +60,7 @@ pub fn parse_ao_str(contents: &str) -> Result<AOFile> {
             repeat(0.., P(spaces_or_comments(), parse_struct())),
             opt(spaces_or_comments()),
         )
-            .map(|(version, is_abstract, extends, structs, _)| AOFile {
+            .map(|(is_abstract, extends, structs, _)| AOFile {
                 version,
                 is_abstract: is_abstract.is_some(),
                 extends: extends.into_iter().filter(|e| e == "nothing").collect(),
@@ -62,7 +68,10 @@ pub fn parse_ao_str(contents: &str) -> Result<AOFile> {
             })
     );
 
-    parser
+    let file = parser
         .parse(contents)
         .map_err(|e| anyhow!("Failed to parse ao file: {e:?}"))
+        .with_version(Some(version))?;
+
+    Ok(file)
 }

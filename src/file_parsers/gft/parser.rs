@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::space1,
@@ -6,9 +6,14 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    winnow::{WinnowParser, filename, quoted, quoted_str, uint as U, unquoted_str, version_line},
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::{
+        lift::{SliceParser, lift},
+        winnow::{
+            WinnowParser, filename, quoted, quoted_str, uint as U, unquoted_str, version_line,
+        },
+    },
 };
 
 fn file<'a>() -> impl WinnowParser<&'a str, GenFile> {
@@ -45,7 +50,7 @@ fn section<'a>(version: u32) -> impl SliceParser<'a, &'a str, Section> {
     )
 }
 
-pub fn parse_gft_str(contents: &str) -> Result<GFTFile> {
+pub fn parse_gft_str(contents: &str) -> VersionedResult<GFTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -53,8 +58,7 @@ pub fn parse_gft_str(contents: &str) -> Result<GFTFile> {
         .collect::<Vec<_>>();
     let mut lines = lines.as_slice();
 
-    let mut version_parser = lift(version_line());
-    let version = version_parser
+    let version = lift(version_line())
         .parse_next(&mut lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
@@ -66,7 +70,8 @@ pub fn parse_gft_str(contents: &str) -> Result<GFTFile> {
 
     let gft_file = parser
         .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version))?;
 
     Ok(gft_file)
 }

@@ -27,10 +27,43 @@ pub mod trl;
 pub mod tsi;
 pub mod tst;
 
-use anyhow::Result;
+#[derive(Debug)]
+pub struct VersionedError {
+    pub version: Option<u32>,
+    pub inner: anyhow::Error,
+}
+
+pub type VersionedResult<T> = Result<T, VersionedError>;
+
+impl From<anyhow::Error> for VersionedError {
+    fn from(value: anyhow::Error) -> Self {
+        Self {
+            version: None,
+            inner: value,
+        }
+    }
+}
+
+impl From<VersionedError> for anyhow::Error {
+    fn from(value: VersionedError) -> Self {
+        value
+            .inner
+            .context(format!("Fail for file version: {:?}", value.version))
+    }
+}
+
+trait VersionedResultExt<T> {
+    fn with_version(self, version: Option<u32>) -> VersionedResult<T>;
+}
+
+impl<T> VersionedResultExt<T> for anyhow::Result<T> {
+    fn with_version(self, version: Option<u32>) -> VersionedResult<T> {
+        self.map_err(|e| VersionedError { version, inner: e })
+    }
+}
 
 pub trait FileParser {
     type Output;
 
-    fn parse(&self, bytes: &[u8]) -> Result<Self::Output>;
+    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output>;
 }

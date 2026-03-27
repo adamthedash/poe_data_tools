@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::dec_uint,
@@ -8,9 +8,12 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    winnow::{optional_filename, quoted, unquoted_str, version_line},
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::{
+        lift::{SliceParser, lift},
+        winnow::{optional_filename, quoted, unquoted_str, version_line},
+    },
 };
 
 fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
@@ -34,15 +37,20 @@ fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
     )
 }
 
-pub fn parse_pet_str(contents: &str) -> Result<PETFile> {
+pub fn parse_pet_str(contents: &str) -> VersionedResult<PETFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
         .collect::<Vec<_>>();
 
+    let mut lines = lines.as_slice();
+
+    let version = opt(lift(version_line()))
+        .parse_next(&mut lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+
     let mut parser = (
-        opt(lift(version_line())), //
         length_repeat(
             lift(dec_uint::<_, u32, _>), //
             emitter(),
@@ -55,15 +63,16 @@ pub fn parse_pet_str(contents: &str) -> Result<PETFile> {
             }
         }),
     )
-        .map(|(version, emitters, payload)| PETFile {
+        .map(|(emitters, payload)| PETFile {
             version,
             emitters,
             payload,
         });
 
     let pet_file = parser
-        .parse(lines.as_slice())
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .parse(lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(version)?;
 
     Ok(pet_file)
 }

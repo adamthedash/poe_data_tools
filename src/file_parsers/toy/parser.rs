@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, space1},
@@ -7,9 +7,14 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    winnow::{WinnowParser, filename, parse_bool, quoted, unquoted, unquoted_str, version_line},
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::{
+        lift::{SliceParser, lift},
+        winnow::{
+            WinnowParser, filename, parse_bool, quoted, unquoted, unquoted_str, version_line,
+        },
+    },
 };
 
 /// One of: [I, R90, R180, R270, FI, FR90, FR180, FR270]
@@ -142,7 +147,7 @@ fn group<'a>() -> impl SliceParser<'a, &'a str, Group> {
     )
 }
 
-pub fn parse_toy_str(contents: &str) -> Result<TOYFile> {
+pub fn parse_toy_str(contents: &str) -> VersionedResult<TOYFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -158,7 +163,8 @@ pub fn parse_toy_str(contents: &str) -> Result<TOYFile> {
 
     let file = parser
         .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version))?;
 
     Ok(file)
 }

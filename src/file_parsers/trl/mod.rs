@@ -1,6 +1,5 @@
-use anyhow::Result;
 
-use crate::file_parsers::{FileParser, shared::utf16_bom_to_string};
+use crate::file_parsers::{FileParser, VersionedResult, shared::utf16_bom_to_string};
 
 pub mod parser;
 pub mod types;
@@ -12,7 +11,7 @@ pub struct TRLParser;
 impl FileParser for TRLParser {
     type Output = TRLFile;
 
-    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
         let contents = utf16_bom_to_string(bytes)?;
 
         parse_trl_str(&contents)

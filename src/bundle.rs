@@ -59,6 +59,7 @@ pub fn load_bundle_content(path: &Path) -> Result<BundleFile> {
 
     let bundle = BundleParser
         .parse(&bundle_content)
+        .map_err(anyhow::Error::from)
         .context("Failed to parse bundle")?;
 
     Ok(bundle)
@@ -72,6 +73,7 @@ pub fn fetch_bundle_content(base_url: &Url, cache_dir: &Path, path: &Path) -> Re
 
     let bundle = BundleParser
         .parse(&bundle_content)
+        .map_err(anyhow::Error::from)
         .context("Failed to parse bundle")?;
 
     Ok(bundle)

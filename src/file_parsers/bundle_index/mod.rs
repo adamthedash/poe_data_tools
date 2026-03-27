@@ -1,6 +1,5 @@
-use anyhow::Result;
 
-use crate::file_parsers::FileParser;
+use crate::file_parsers::{FileParser, VersionedResult};
 
 pub mod parser;
 pub mod types;
@@ -12,7 +11,7 @@ pub struct BundleIndexParser;
 impl FileParser for BundleIndexParser {
     type Output = BundleIndexFile;
 
-    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
-        parse_bundle_index_bytes(bytes)
+    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
+        Ok(parse_bundle_index_bytes(bytes)?)
     }
 }

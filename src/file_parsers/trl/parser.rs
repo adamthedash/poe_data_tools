@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, space1},
@@ -7,9 +7,12 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    winnow::{unquoted_str, version_line},
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::{
+        lift::{SliceParser, lift},
+        winnow::{unquoted_str, version_line},
+    },
 };
 
 fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
@@ -27,7 +30,7 @@ fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
     )
 }
 
-pub fn parse_trl_str(contents: &str) -> Result<TRLFile> {
+pub fn parse_trl_str(contents: &str) -> VersionedResult<TRLFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -39,8 +42,11 @@ pub fn parse_trl_str(contents: &str) -> Result<TRLFile> {
         .parse_next(&mut lines)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
+    let version = opt(lift(version_line()))
+        .parse_next(&mut lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+
     let mut parser = (
-        opt(lift(version_line())), //
         repeat(num_emitters, emitter()),
         rest.try_map(|lines: &[&str]| {
             if lines.is_empty() {
@@ -50,7 +56,7 @@ pub fn parse_trl_str(contents: &str) -> Result<TRLFile> {
             }
         }),
     )
-        .map(|(version, emitters, payload)| TRLFile {
+        .map(|(emitters, payload)| TRLFile {
             version,
             emitters,
             payload,
@@ -58,7 +64,8 @@ pub fn parse_trl_str(contents: &str) -> Result<TRLFile> {
 
     let pet_file = parser
         .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(version)?;
 
     Ok(pet_file)
 }

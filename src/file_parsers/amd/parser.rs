@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
@@ -8,11 +8,14 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    winnow::{
-        WinnowParser, nullable_uint, quoted_str, repeat_array, separated_array, unquoted_str,
-        version_line,
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::{
+        lift::{SliceParser, lift},
+        winnow::{
+            WinnowParser, nullable_uint, quoted_str, repeat_array, separated_array, unquoted_str,
+            version_line,
+        },
     },
 };
 
@@ -150,7 +153,7 @@ fn bone_groups<'a>() -> impl SliceParser<'a, &'a str, Vec<BoneGroup>> {
     )
 }
 
-pub fn parse_amd_str(contents: &str) -> Result<AMDFile> {
+pub fn parse_amd_str(contents: &str) -> VersionedResult<AMDFile> {
     // NOTE: Some files have missing newlines, so split on tabs aswell
     let lines = contents
         .split_inclusive(['\n', '\t'])
@@ -178,7 +181,8 @@ pub fn parse_amd_str(contents: &str) -> Result<AMDFile> {
 
     let amd_file = parser
         .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version))?;
 
     Ok(amd_file)
 }

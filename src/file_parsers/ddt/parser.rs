@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint as U, float as F, space1},
@@ -7,9 +7,14 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    winnow::{WinnowParser, filename, quoted, quoted_str, safe_u32, unquoted_str, version_line},
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::{
+        lift::{SliceParser, lift},
+        winnow::{
+            WinnowParser, filename, quoted, quoted_str, safe_u32, unquoted_str, version_line,
+        },
+    },
 };
 
 fn line1<'a>() -> impl WinnowParser<&'a str, Line1> {
@@ -79,21 +84,25 @@ fn group<'a>(
     )
 }
 
-pub fn parse_ddt_str(contents: &str) -> Result<DDTFile> {
+pub fn parse_ddt_str(contents: &str) -> VersionedResult<DDTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty() && !l.starts_with("//"))
         .collect::<Vec<_>>();
+    let mut lines = lines.as_slice();
+
+    let version = lift(version_line())
+        .parse_next(&mut lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
 
     let mut parser = (
-        lift(version_line()),
         lift(line1()),
         opt(lift(U)),
         group(unquoted_str),
         repeat(0.., group(quoted_str)),
     )
-        .map(|(version, line1, uint1, default_group, mut groups)| {
+        .map(|(line1, uint1, default_group, mut groups)| {
             Vec::insert(&mut groups, 0, default_group); // for type inference
             DDTFile {
                 version,
@@ -104,8 +113,9 @@ pub fn parse_ddt_str(contents: &str) -> Result<DDTFile> {
         });
 
     let ddt_file = parser
-        .parse(&lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .parse(lines)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version))?;
 
     Ok(ddt_file)
 }

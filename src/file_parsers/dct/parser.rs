@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
@@ -7,9 +7,12 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    winnow::{WinnowParser, filename, quoted, quoted_str, version_line},
+use crate::file_parsers::{
+    VersionedResult, VersionedResultExt,
+    shared::{
+        lift::{SliceParser, lift},
+        winnow::{WinnowParser, filename, quoted, quoted_str, version_line},
+    },
 };
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
@@ -69,7 +72,7 @@ fn default_group<'a>() -> impl SliceParser<'a, &'a str, Group> {
     )
 }
 
-pub fn parse_dct_str(contents: &str) -> Result<DCTFile> {
+pub fn parse_dct_str(contents: &str) -> VersionedResult<DCTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -97,7 +100,8 @@ pub fn parse_dct_str(contents: &str) -> Result<DCTFile> {
 
     let pet_file = parser
         .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version))?;
 
     Ok(pet_file)
 }

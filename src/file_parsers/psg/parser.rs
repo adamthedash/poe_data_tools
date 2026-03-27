@@ -1,12 +1,13 @@
-use anyhow::{Result, anyhow};
+use anyhow::anyhow;
 use winnow::{
     Parser,
     binary::{le_f32, le_i32, le_u8, le_u32, le_u64, length_repeat},
     combinator::{cond, dispatch, empty, fail},
+    error::ContextError,
 };
 
 use super::types::*;
-use crate::file_parsers::shared::winnow::WinnowParser;
+use crate::file_parsers::{VersionedResult, VersionedResultExt, shared::winnow::WinnowParser};
 
 fn connection<'a>(poe_version: u32) -> impl WinnowParser<&'a [u8], Connection> {
     winnow::trace!(
@@ -62,9 +63,12 @@ fn group<'a>(poe_version: u32) -> impl WinnowParser<&'a [u8], Group> {
     )
 }
 
-pub fn parse_psg_bytes(contents: &[u8], poe_version: u32) -> Result<PSGFile> {
+pub fn parse_psg_bytes(mut contents: &[u8], poe_version: u32) -> VersionedResult<PSGFile> {
+    let version = le_u8
+        .parse_next(&mut contents)
+        .map_err(|e: ContextError| anyhow!("Failed to parse file: {e:?}"))?;
+
     let mut parser = (
-        le_u8,
         le_u8,
         length_repeat(le_u8, le_u8),
         length_repeat(
@@ -79,7 +83,7 @@ pub fn parse_psg_bytes(contents: &[u8], poe_version: u32) -> Result<PSGFile> {
         length_repeat(le_u32, group(poe_version)),
     )
         .map(
-            |(version, graph_type, passives_per_orbit, root_passives, groups)| PSGFile {
+            |(graph_type, passives_per_orbit, root_passives, groups)| PSGFile {
                 version,
                 root_passives,
                 groups,
@@ -91,4 +95,5 @@ pub fn parse_psg_bytes(contents: &[u8], poe_version: u32) -> Result<PSGFile> {
     parser
         .parse(contents)
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version as u32))
 }

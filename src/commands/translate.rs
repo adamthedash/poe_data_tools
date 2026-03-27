@@ -9,18 +9,18 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     file_parsers::{
-        FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
-        dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
-        et::ETParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser,
-        pet::PETParser, psg::PSGParser, rs::RSParser, tmo::TMOParser, toy::TOYParser,
-        trl::TRLParser, tsi::TSIParser, tst::TSTParser,
+        FileParser, VersionedResult, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser,
+        clt::CLTParser, dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser,
+        epk::EPKParser, et::ETParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser,
+        mtd::MTDParser, pet::PETParser, psg::PSGParser, rs::RSParser, tmo::TMOParser,
+        toy::TOYParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
     },
 };
 
 #[enum_dispatch]
 pub trait FileParserExt {
     /// Parse and serialise to JSON
-    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()>;
+    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> VersionedResult<()>;
 
     /// Checks whether the file has been parsed successfully
     fn validate(&self, bytes: &[u8]) -> bool;
@@ -31,7 +31,7 @@ where
     P: FileParser,
     P::Output: Serialize,
 {
-    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()> {
+    fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> VersionedResult<()> {
         let parsed = self.parse(bytes)?;
 
         std::fs::create_dir_all(output_path.parent().unwrap())
@@ -166,6 +166,7 @@ pub fn translate(
             let out_path = output_folder.join(filename).with_added_extension("json");
             parser
                 .parse_to_json_file(&contents, &out_path)
+                .map_err(anyhow::Error::from)
                 .with_context(|| format!("Failed to process file: {:?}", filename))?;
 
             Ok(filename)
