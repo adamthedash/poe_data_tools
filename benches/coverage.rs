@@ -86,6 +86,48 @@ fn bench_version(version: Patch) {
                 100. * (successes as f32 / (fails + successes) as f32)
             );
         });
+    println!();
+
+    // Print by version number
+    let max_version = results
+        .values()
+        .flat_map(|versions| versions.keys().flatten().copied().collect::<Vec<_>>())
+        .max();
+
+    let mut header = "||Unknown|".to_owned();
+    for i in 0..max_version.unwrap() {
+        header.push_str(&format!("{i}|"));
+    }
+    println!("By file format version (fails:successes)");
+    println!("{header}");
+    println!(
+        "|{}",
+        "-|".repeat(max_version.unwrap_or_default() as usize + 2)
+    );
+
+    results
+        .iter()
+        .sorted_unstable_by_key(|(ext, _)| ext.to_string())
+        .for_each(|(ext, version_counts)| {
+            let mut counts = vec!["".to_owned(); max_version.unwrap_or_default() as usize + 2];
+            for (version, [fails, successes]) in version_counts {
+                let index = if let Some(v) = version {
+                    *v as usize + 1
+                } else {
+                    0
+                };
+
+                counts[index] = format!("{fails} : {successes}");
+            }
+
+            let mut row = format!("|{ext}|");
+            for c in counts {
+                row.push_str(&c);
+                row.push('|');
+            }
+
+            println!("{row}");
+        });
 }
 
 fn main() {
