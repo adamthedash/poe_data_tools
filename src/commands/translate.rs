@@ -13,7 +13,8 @@ use crate::{
         dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
         et::ETParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser,
         pet::PETParser, psg::PSGParser, rs::RSParser, shared::versioned_result::VersionedResult2,
-        tmo::TMOParser, toy::TOYParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
+        tdt::TDTParser, tmo::TMOParser, toy::TOYParser, trl::TRLParser, tsi::TSIParser,
+        tst::TSTParser,
     },
 };
 
