@@ -1,15 +1,10 @@
-use std::{
-    array::{self, from_fn},
-    collections::HashMap,
-    fmt::Display,
-};
+use std::{collections::HashMap, fmt::Display};
 
 use winnow::{
     Parser,
     binary::{le_u8, le_u16, le_u32, length_repeat, length_take},
-    combinator::{cond, dispatch, empty, fail, peek, repeat, seq, terminated},
+    combinator::{cond, dispatch, empty, fail, repeat, terminated},
     error::ContextError,
-    stream::Stream,
     token::{any, rest, take, take_till},
 };
 
@@ -190,8 +185,8 @@ fn header<'a>(
 }
 
 fn subtile<'a>(
-    version: u32,
-    strings: &HashMap<usize, Option<String>>,
+    _version: u32,
+    _strings: &HashMap<usize, Option<String>>,
 ) -> impl WinnowParser<&'a [u8], Subtile> {
     let parser = move |input: &mut &[u8]| {
         let (kind, value, string) = (le_u8, le_u8, le_u8).parse_next(input)?;
@@ -253,7 +248,7 @@ fn tdt_file<'a>() -> impl WinnowParser<&'a [u8], TDTFile> {
         //     subtiles.push(subtile);
         // }
 
-        let mut rest = rest::<_, ContextError>.parse_next(input)?;
+        let rest = rest::<_, ContextError>.parse_next(input)?;
 
         let dims = header.dimensions.iter().map(|x| *x as u16).product::<u16>();
         let offset = rest
