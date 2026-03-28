@@ -18,4 +18,5 @@ pub struct AOFile {
     pub is_abstract: bool,
     pub extends: Vec<String>,
     pub structs: Vec<Struct>,
+    pub client_structs: Vec<Struct>,
 }
