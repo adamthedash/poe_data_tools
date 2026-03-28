@@ -98,7 +98,7 @@ fn bench_version(version: Patch) {
     for i in 0..max_version.unwrap() {
         header.push_str(&format!("{i}|"));
     }
-    println!("By file format version (fails:successes)");
+    println!("By file format version (fails : successes)");
     println!("{header}");
     println!(
         "|{}",
