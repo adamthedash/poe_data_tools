@@ -1,6 +1,6 @@
 [package]
 name = "poe_data_tools"
-version = "1.5.2"
+version = "1.6.0"
 edition = "2024"
 
 [lib]
