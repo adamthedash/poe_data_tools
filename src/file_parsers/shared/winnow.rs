@@ -3,11 +3,17 @@ use winnow::{
     ascii::{dec_int, dec_uint},
     combinator::{alt, delimited, eof, preceded, repeat, separated, trace},
     error::ContextError,
-    stream::{AsChar, Stream},
-    token::{literal, rest, take_till, take_until, take_while},
+    stream::{AsChar, Stream, StreamIsPartial},
+    token::{literal, rest, take, take_till, take_until, take_while},
 };
 
 pub trait WinnowParser<I, T> = Parser<I, T, ContextError>;
+
+pub fn le_f16(input: &mut &[u8]) -> winnow::Result<f16> {
+    let parser = take_array().map(|bytes: [u8; 2]| f16::from_le_bytes(bytes));
+
+    winnow::trace!("le_f16", parser).parse_next(input)
+}
 
 /// Parses a 0/1 as a bool
 pub fn parse_bool(input: &mut &str) -> winnow::Result<bool> {
@@ -217,6 +223,20 @@ where
             x.try_into()
                 .unwrap_or_else(|_| unreachable!("Parser should take care of length"))
         })
+    )
+}
+
+/// winnow::token::take but exact sized
+pub fn take_array<const N: usize, I>() -> impl WinnowParser<I, [I::Token; N]>
+where
+    I: Stream + StreamIsPartial,
+    I::Slice: TryInto<[I::Token; N]>,
+{
+    winnow::trace!(
+        "repeat_array",
+        take(N).map(|x: I::Slice| x
+            .try_into()
+            .unwrap_or_else(|_| unreachable!("Parser should take care of length")))
     )
 }
 

@@ -11,9 +11,10 @@ use crate::{
     file_parsers::{
         FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
         dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
-        et::ETParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser, mtd::MTDParser,
-        pet::PETParser, psg::PSGParser, rs::RSParser, shared::versioned_result::VersionedResult2,
-        tmo::TMOParser, toy::TOYParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
+        et::ETParser, fmt::FMTParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser,
+        mtd::MTDParser, pet::PETParser, psg::PSGParser, rs::RSParser,
+        shared::versioned_result::VersionedResult2, tmo::TMOParser, toy::TOYParser, trl::TRLParser,
+        tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -85,6 +86,7 @@ pub enum Parser {
     Tmo(TMOParser),
     Gcf(GCFParser),
     Psg(PSGParser),
+    Fmt(FMTParser),
 }
 
 impl Parser {
@@ -116,6 +118,7 @@ impl Parser {
             "toy" => Toy(TOYParser),
             "tmo" => Tmo(TMOParser),
             "gcf" => Gcf(GCFParser),
+            "fmt" => Fmt(FMTParser),
             "psg" => Psg(PSGParser {
                 version: poe_version,
             }),

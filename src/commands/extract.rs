@@ -37,10 +37,15 @@ pub fn extract_files(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) ->
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
             let out_filename = output_folder.join(filename);
-            fs::create_dir_all(out_filename.parent().unwrap())
-                .context("Failed to create folder")?;
+            fs::create_dir_all(out_filename.parent().unwrap()).with_context(|| {
+                format!(
+                    "Failed to create folder: {:?}",
+                    out_filename.parent().unwrap()
+                )
+            })?;
 
-            fs::write(out_filename, &contents).context("Failed to write file")?;
+            fs::write(&out_filename, &contents)
+                .with_context(|| format!("Failed to write file: {:?}", out_filename))?;
 
             Ok(filename)
         })

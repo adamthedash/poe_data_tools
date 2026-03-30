@@ -206,6 +206,9 @@ By file format version (fails : successes)
 ## EPK File Format
 ![epk format](./images/epk_spec.png)  
 
+## FMT File Format
+![fmt format](./images/fmt_spec.png)  
+
 ## GCF File Format
 ![gcf format](./images/gcf_spec.png)  
 
