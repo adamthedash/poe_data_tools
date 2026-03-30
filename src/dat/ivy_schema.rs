@@ -114,6 +114,12 @@ pub struct References {
     pub table: String,
 }
 
+/// Load a schema from a local path
+pub fn load_schema(path: &Path) -> Result<SchemaCollection> {
+    eprintln!("Loading schema from: {:?}", path);
+    Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
+}
+
 pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
     const SCHEMA_URL: &str =
         "https://github.com/poe-tool-dev/dat-schema/releases/download/latest/schema.min.json";

@@ -23,7 +23,7 @@ use crate::{
     VERBOSE,
     bundle_fs::FS,
     commands::Patch,
-    dat::ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection, fetch_schema},
+    dat::ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection, fetch_schema, load_schema},
     file_parsers::{
         FileParser,
         dat::{DatParser, types::DatFile},
@@ -495,6 +495,7 @@ pub fn dump_tables(
     cache_dir: &Path,
     output_folder: &Path,
     version: &Patch,
+    schema: Option<impl AsRef<Path>>,
 ) -> Result<()> {
     for pattern in patterns {
         ensure!(
@@ -510,7 +511,11 @@ pub fn dump_tables(
     };
 
     // Load schema: todo: Get this from Ivy's CDN / cache it
-    let schemas = fetch_schema(cache_dir).context("Failed to fetch schema file")?;
+    let schemas = if let Some(path) = schema {
+        load_schema(path.as_ref()).context("Failed to load schema file")?
+    } else {
+        fetch_schema(cache_dir).context("Failed to fetch schema file")?
+    };
 
     let filenames = fs
         .list()

@@ -14,7 +14,7 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     dat::{
-        ivy_schema::{Enumeration, SchemaCollection, fetch_schema},
+        ivy_schema::{Enumeration, SchemaCollection, fetch_schema, load_schema},
         parser::create_parser,
     },
     file_parsers::{
@@ -201,6 +201,7 @@ pub fn dump_tables(
     cache_dir: &Path,
     output_folder: &Path,
     version: &Patch,
+    schema: Option<impl AsRef<Path>>,
 ) -> Result<()> {
     for pattern in patterns {
         ensure!(
@@ -209,9 +210,13 @@ pub fn dump_tables(
         );
     }
 
-    let schemas = fetch_schema(cache_dir)
-        .context("Failed to fetch schema file")?
-        .filter_version(version);
+    // Load schema: todo: Get this from Ivy's CDN / cache it
+    let schemas = if let Some(path) = schema {
+        load_schema(path.as_ref()).context("Failed to load schema file")?
+    } else {
+        fetch_schema(cache_dir).context("Failed to fetch schema file")?
+    }
+    .filter_version(version);
 
     // Remove tables that don't exist in the index
     // This happens when the schema is out of sync

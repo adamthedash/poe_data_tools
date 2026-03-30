@@ -48,8 +48,13 @@ enum Command {
         /// Path to write out the parsed tables to
         output_folder: PathBuf,
 
+        /// The format to output tables as
         #[arg(long, value_enum, default_value_t = DumpDatsMode::Csv)]
         mode: DumpDatsMode,
+
+        /// Specifify a local schema rather than fetching from github
+        #[arg(long)]
+        schema: Option<PathBuf>,
 
         /// Glob patterns to filter the list of files
         #[clap(default_value = "**/*.datc64")]
@@ -194,6 +199,7 @@ fn main() -> Result<()> {
             output_folder,
             globs,
             mode,
+            schema,
         } => match mode {
             DumpDatsMode::Csv => dump_tables(
                 &mut fs,
@@ -201,6 +207,7 @@ fn main() -> Result<()> {
                 &args.cache_dir,
                 &output_folder,
                 &args.patch,
+                schema.as_ref(),
             )
             .context("Dump Tables command failed")?,
 
@@ -210,6 +217,7 @@ fn main() -> Result<()> {
                 &args.cache_dir,
                 &output_folder,
                 &args.patch,
+                schema.as_ref(),
             )
             .context("Dump Tables command failed")?,
         },
