@@ -20,7 +20,7 @@ struct UnresolvedShape {
     triangle_index: u32,
 }
 
-fn index_buffer<'a>(
+pub(super) fn index_buffer<'a>(
     num_vertices: u32,
     num_triangles: u32,
 ) -> impl WinnowParser<&'a [u8], IndexBuffer> {
@@ -172,8 +172,8 @@ pub fn parse_fmt(mut contents: &[u8]) -> VersionedResult<FMTFile> {
             let header = &header;
             dispatch! {
                 empty.value(version);
-                ..9 => v8_section(version, &header),
-                9.. => v9_section(&header),
+                ..9 => v8_section(version, header),
+                9.. => v9_section(header),
             }
         },
         repeat(header.num_d1s as usize, take_array::<12, _>()), //

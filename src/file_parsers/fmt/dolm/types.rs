@@ -6,11 +6,8 @@ use super::super::types::*;
 #[serde_as]
 #[derive(Debug, Serialize)]
 pub struct Dolm {
-    pub magic: [u8; 4],
     pub c0h: u16,
-    pub lod_count: u8,
-    pub shape_count: u16,
-    pub vertex_format_id: u32,
+    pub vertex_format: u32,
     pub lod_extents: Vec<[u32; 2]>,
     pub lods: Vec<Mesh>,
 
@@ -47,5 +44,5 @@ pub struct DolmVertex {
     pub skin_extra: Option<[u8; 4]>,
     #[serde_as(as = "Option<[SerF16; _]>")]
     pub tex_coord1: Option<[f16; 2]>,
-    pub extra_bit6: Option<[u8; 4]>,
+    pub extra_vformat_6: Option<[u8; 4]>,
 }
