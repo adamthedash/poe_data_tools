@@ -16,6 +16,13 @@ impl SerializeAs<f16> for SerF16 {
 }
 
 #[derive(Debug, Serialize)]
+pub struct Subcomponent {
+    pub unk1: u8,
+    pub d1s: Vec<[u8; 12]>,
+    pub tag: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct FMTFile {
     pub version: u8,
     pub bbox: [f32; 6],
@@ -23,8 +30,7 @@ pub struct FMTFile {
     pub section: Section,
     pub shapes: Vec<Shape>,
 
-    pub d0s: Vec<[u8; 6]>,
-    pub d1s: Vec<[u8; 12]>,
+    pub subcomponents: Vec<Subcomponent>,
     pub d3s: Vec<Vec<u8>>,
     pub string_table: String,
 }

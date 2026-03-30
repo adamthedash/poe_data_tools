@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use winnow::{
     Parser,
     binary::{le_f32, le_u8, le_u16, le_u32, length_repeat},
-    combinator::{cond, dispatch, empty, repeat},
+    combinator::{cond, dispatch, empty, repeat, seq},
     error::ContextError,
     token::take,
 };
@@ -41,10 +41,16 @@ fn v8_vertex<'a>(vertex_format: Option<u32>) -> impl WinnowParser<&'a [u8], Vert
         .map(|(pos, unk, uv, uv2)| Vertex { pos, unk, uv, uv2 })
 }
 
+struct UnresolvedSubcomponent {
+    unk1: u8,
+    num_d1s: u8,
+    tag: u32,
+}
+
 fn v8_section<'a>(
     version: u8,
     header: &Header,
-) -> impl WinnowParser<&'a [u8], (Section, Vec<UnresolvedShape>, Vec<[u8; 6]>)> {
+) -> impl WinnowParser<&'a [u8], (Section, Vec<UnresolvedShape>, Vec<UnresolvedSubcomponent>)> {
     let (num_triangles, num_vertices) = header.num_t_v.expect("V8 should always have these counts");
 
     let parser = move |input: &mut &[u8]| {
@@ -59,7 +65,14 @@ fn v8_section<'a>(
                     triangle_index,
                 }),
             ),
-            repeat(header.num_d0s as usize, take_array::<6, _>()),
+            repeat(
+                header.num_sucomponents as usize,
+                seq!(UnresolvedSubcomponent {
+                    unk1: le_u8,
+                    num_d1s: le_u8,
+                    tag: le_u32,
+                }),
+            ),
             index_buffer(num_vertices, num_triangles),
             repeat(num_vertices as usize, v8_vertex(vertex_format)),
         )
@@ -81,7 +94,7 @@ fn v8_section<'a>(
 
 fn v9_section<'a>(
     header: &Header,
-) -> impl WinnowParser<&'a [u8], (Section, Vec<UnresolvedShape>, Vec<[u8; 6]>)> {
+) -> impl WinnowParser<&'a [u8], (Section, Vec<UnresolvedShape>, Vec<UnresolvedSubcomponent>)> {
     let parser = (
         dolm().map(Section::V9),
         repeat(
@@ -92,7 +105,14 @@ fn v9_section<'a>(
                 triangle_index: 0,
             }),
         ),
-        repeat(header.num_d0s as usize, take_array::<6, _>()),
+        repeat(
+            header.num_sucomponents as usize,
+            seq!(UnresolvedSubcomponent {
+                unk1: le_u8,
+                num_d1s: le_u8,
+                tag: le_u32,
+            }),
+        ),
     );
 
     winnow::trace!("v9_section", parser)
@@ -127,8 +147,8 @@ fn read_string(table: &str, offset: usize) -> Result<String, String> {
 struct Header {
     num_t_v: Option<(u32, u32)>,
     num_shapes: u16,
-    num_d0s: u8,
-    num_d1s: u16,
+    num_sucomponents: u8,
+    _num_d1s: u16,
     num_d3s: u8,
 }
 
@@ -140,11 +160,11 @@ fn header<'a>(version: u8) -> impl WinnowParser<&'a [u8], Header> {
         le_u16,
         le_u8,
     )
-        .map(|(num_t_v, num_shapes, num_d0s, num_d1s, num_d3s)| Header {
+        .map(|(num_t_v, num_shapes, num_d0s, _num_d1s, num_d3s)| Header {
             num_t_v,
             num_shapes,
-            num_d0s,
-            num_d1s,
+            num_sucomponents: num_d0s,
+            _num_d1s,
             num_d3s,
         })
 }
@@ -158,16 +178,8 @@ pub fn parse_fmt(mut contents: &[u8]) -> VersionedResult<FMTFile> {
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
         .with_version(Some(version as u32))?;
 
-    let d3_width = match version {
-        ..1 => 45_usize,
-        1..3 => 45,
-        3..4 => 70,
-        4..6 => 78,
-        6..7 => 83,
-        7.. => 87,
-    };
-    let (bbox, (section, shapes, d0s), d1s, d3s, string_table) = (
-        repeat_array(le_f32),
+    let (bbox, (section, shapes, subcomponents)) = (
+        repeat_array(le_f32), //
         {
             let header = &header;
             dispatch! {
@@ -176,7 +188,27 @@ pub fn parse_fmt(mut contents: &[u8]) -> VersionedResult<FMTFile> {
                 9.. => v9_section(header),
             }
         },
-        repeat(header.num_d1s as usize, take_array::<12, _>()), //
+    )
+        .parse_next(&mut contents)
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version as u32))?;
+
+    let d1s: Vec<_> = subcomponents
+        .iter()
+        .map(|s| repeat(s.num_d1s as usize, take_array::<12, _>()).parse_next(&mut contents))
+        .collect::<winnow::Result<Vec<_>>>()
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version as u32))?;
+
+    let d3_width = match version {
+        ..1 => 45_usize,
+        1..3 => 45,
+        3..4 => 70,
+        4..6 => 78,
+        6..7 => 83,
+        7.. => 87,
+    };
+    let (d3s, string_table) = (
         repeat(
             header.num_d3s as usize,
             take(d3_width).map(|b: &[u8]| b.to_vec()),
@@ -203,13 +235,28 @@ pub fn parse_fmt(mut contents: &[u8]) -> VersionedResult<FMTFile> {
         .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
         .with_version(Some(version as u32))?;
 
+    // Resolve subcomponents
+    let subcomponents = subcomponents
+        .into_iter()
+        .zip(d1s)
+        .map(|(s, d1s)| {
+            let s = Subcomponent {
+                unk1: s.unk1,
+                d1s,
+                tag: read_string(&string_table, s.tag as usize)?,
+            };
+            Ok(s)
+        })
+        .collect::<Result<Vec<_>, String>>()
+        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
+        .with_version(Some(version as u32))?;
+
     let fmt_file = FMTFile {
         version,
         bbox,
         section,
         shapes,
-        d0s,
-        d1s,
+        subcomponents,
         d3s,
         string_table,
     };

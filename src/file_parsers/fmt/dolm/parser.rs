@@ -91,12 +91,16 @@ pub fn dolm<'a>() -> impl WinnowParser<&'a [u8], Dolm> {
             })
             .collect();
 
-        let (extra_vformat_6, extra_c0h_4) = (
+        let (extra_vformat_6, extra_vformat_6_c0h_2, extra_c0h_4) = (
             cond(
                 (header.vertex_format >> 6) & 1 == 1,
                 repeat(header.num_shapes as usize, take_array::<36, _>()),
             ),
-            cond(header.c0h == 4, take_array::<4, _>()),
+            cond(
+                header.c0h == 2 && (header.vertex_format >> 6) & 1 == 1,
+                repeat(header.num_shapes as usize, take_array::<4, _>()),
+            ),
+            cond(header.c0h == 4 && header.num_lods > 0, take_array::<4, _>()),
         )
             .parse_next(input)?;
 
@@ -106,6 +110,7 @@ pub fn dolm<'a>() -> impl WinnowParser<&'a [u8], Dolm> {
             lod_extents,
             lods,
             extra_vformat_6,
+            extra_vformat_6_c0h_2,
             extra_c0h_4,
         })
     };

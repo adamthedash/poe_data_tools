@@ -13,6 +13,7 @@ pub struct Dolm {
 
     #[serde_as(as = "Option<Vec<[_; _]>>")]
     pub extra_vformat_6: Option<Vec<[u8; 36]>>,
+    pub extra_vformat_6_c0h_2: Option<Vec<[u8; 4]>>,
     pub extra_c0h_4: Option<[u8; 4]>,
 }
 
