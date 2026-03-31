@@ -1,15 +1,12 @@
 use winnow::{
     Parser,
     binary::{le_f32, le_i8, le_u8, le_u16, le_u32},
-    combinator::{cond, repeat, seq},
+    combinator::{cond, dispatch, empty, repeat, seq},
     token::literal,
 };
 
 use super::types::*;
-use crate::file_parsers::{
-    fmt::parser::index_buffer,
-    shared::winnow::{WinnowParser, le_f16, repeat_array, take_array},
-};
+use crate::file_parsers::shared::winnow::{WinnowParser, le_f16, repeat_array, take_array};
 
 struct Header {
     c0h: u16,
@@ -28,6 +25,17 @@ fn header<'a>() -> impl WinnowParser<&'a [u8], Header> {
     });
 
     winnow::trace!("dolm_header", parser)
+}
+
+pub fn index_buffer<'a>(
+    num_vertices: u32,
+    num_triangles: u32,
+) -> impl WinnowParser<&'a [u8], IndexBuffer> {
+    dispatch! {
+        empty.value(num_vertices);
+        ..0x10000 => repeat(num_triangles as usize * 3, le_u16).map(IndexBuffer::U16),
+        0x10000.. => repeat(num_triangles as usize * 3, le_u32).map(IndexBuffer::U32),
+    }
 }
 
 fn vertex<'a>(vertex_format: u32) -> impl WinnowParser<&'a [u8], DolmVertex> {

@@ -1,7 +1,13 @@
 use serde::Serialize;
 use serde_with::serde_as;
 
-use super::super::types::*;
+use crate::file_parsers::shared::serialise::SerF16;
+
+#[derive(Debug, Serialize)]
+pub enum IndexBuffer {
+    U16(Vec<u16>),
+    U32(Vec<u32>),
+}
 
 #[serde_as]
 #[derive(Debug, Serialize)]

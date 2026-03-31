@@ -1,4 +1,3 @@
-pub mod dolm;
 pub mod parser;
 pub mod types;
 use parser::parse_fmt;

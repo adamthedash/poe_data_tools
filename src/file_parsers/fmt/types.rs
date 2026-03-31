@@ -1,19 +1,10 @@
-use serde::{Serialize, Serializer};
-use serde_with::{SerializeAs, serde_as};
+use serde::Serialize;
+use serde_with::serde_as;
 
-use super::dolm::types::*;
-
-/// For serlializing f16 types since serde doesn't implement it natively
-pub(super) struct SerF16;
-
-impl SerializeAs<f16> for SerF16 {
-    fn serialize_as<S>(source: &f16, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_f32(*source as f32)
-    }
-}
+use crate::file_parsers::{
+    dolm::types::{Dolm, IndexBuffer},
+    shared::serialise::SerF16,
+};
 
 #[derive(Debug, Serialize)]
 pub struct Subcomponent {
@@ -57,12 +48,6 @@ pub struct Vertex {
     pub uv: [f16; 2],
     #[serde_as(as = "Option<[SerF16; _]>")]
     pub uv2: Option<[f16; 2]>,
-}
-
-#[derive(Debug, Serialize)]
-pub enum IndexBuffer {
-    U16(Vec<u16>),
-    U32(Vec<u32>),
 }
 
 #[derive(Debug, Serialize)]

@@ -10,7 +10,7 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::{
     VersionedResult, VersionedResultExt,
-    fmt::dolm::parser::dolm,
+    dolm::parser::{dolm, index_buffer},
     shared::winnow::{WinnowParser, le_f16, repeat_array, take_array},
 };
 
@@ -18,17 +18,6 @@ struct UnresolvedShape {
     name: u32,
     material: u32,
     triangle_index: u32,
-}
-
-pub(super) fn index_buffer<'a>(
-    num_vertices: u32,
-    num_triangles: u32,
-) -> impl WinnowParser<&'a [u8], IndexBuffer> {
-    dispatch! {
-        empty.value(num_vertices);
-        ..0x10000 => repeat(num_triangles as usize * 3, le_u16).map(IndexBuffer::U16),
-        0x10000.. => repeat(num_triangles as usize * 3, le_u32).map(IndexBuffer::U32),
-    }
 }
 
 fn v8_vertex<'a>(vertex_format: Option<u32>) -> impl WinnowParser<&'a [u8], Vertex> {

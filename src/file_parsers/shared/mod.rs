@@ -1,4 +1,5 @@
 pub mod lift;
+pub mod serialise;
 pub mod versioned_result;
 pub mod winnow;
 

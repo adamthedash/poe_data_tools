@@ -9,6 +9,7 @@ pub mod dat;
 pub mod dct;
 pub mod ddt;
 pub mod dlp;
+pub mod dolm;
 pub mod ecf;
 pub mod epk;
 pub mod et;
