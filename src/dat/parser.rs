@@ -27,7 +27,7 @@ fn string<'a>(variable_section: &[u8]) -> impl WinnowParser<&'a [u8], Option<Str
             let string = take_utf16_string(&variable_section[offset as usize - 8..]);
             Some(string)
         } else {
-            log::debug!("Bad offset for string {offset}");
+            log::trace!("Bad offset for string {offset}");
             None
         }
     })
@@ -44,7 +44,7 @@ fn array<'a, T>(
         if length == 0 {
             // NOTE: Empty array is expected to have pointer to end of variable data section. Add this as extra validation step?
             if pointer != variable_section.len() as u64 + 8 {
-                log::debug!(
+                log::trace!(
                     "Array pointer didn't point to variable data section end. Expected: {}, got: {}",
                     variable_section.len() + 8,
                     pointer
@@ -53,7 +53,7 @@ fn array<'a, T>(
 
             return Ok(Some(vec![]));
         } else if !(8..variable_section.len() as u64 + 8).contains(&pointer) {
-            log::debug!("Array pointer out of bounds: {pointer}");
+            log::trace!("Array pointer out of bounds: {pointer}");
             return Ok(None);
         }
 
@@ -90,7 +90,7 @@ fn plain_column<'a>(
                             if b <= 2 {
                                 Some(b == 1)
                             } else {
-                                log::debug!("Bad value for bool: {b}");
+                                log::trace!("Bad value for bool: {b}");
                                 None
                             }
                         )
@@ -320,7 +320,7 @@ pub fn create_parser<'a>(
         }
 
         if !input.is_empty() {
-            log::debug!("Extra bytes left after applying schema: {:?}", input.len(),);
+            log::trace!("Extra bytes left after applying schema: {:?}", input.len(),);
 
             let _rest = rest(input)?;
         }
