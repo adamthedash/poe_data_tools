@@ -81,6 +81,22 @@ fn try_resolve_table(
     // Extract keys, this should be valid in most cases, but if key column is a reference, it may
     // or may not be resolved yet. This might be a problem. Ideally all keys should be plain types
     let keys_columns = schema.primary_keys().collect::<Vec<_>>();
+    let keys_columns = if keys_columns.is_empty() {
+        if let Some(col_name) = schema.column_names().next() {
+            // Fall back to first column as key for tables without any key
+            log::debug!(
+                "No keys for table {:?}, falling back to first column: {:?}",
+                schema.name,
+                col_name
+            );
+            vec![col_name]
+        } else {
+            // Table has 0 columns, so can't fall back to anything
+            vec![]
+        }
+    } else {
+        keys_columns
+    };
     let keys = (!keys_columns.is_empty()).then(|| {
         // Try get the corresponding values for them
         parsed

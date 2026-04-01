@@ -372,6 +372,12 @@ pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBat
         // If we successfully parse the data, add it to the table
         match series {
             Ok(series) => {
+                log::trace!(
+                    "Successfully parsed column at bytes {}-{}: {:?}",
+                    cur_offset,
+                    cur_offset + bytes_taken,
+                    column
+                );
                 parsed_columns.push(series);
             }
             Err(e) => {
