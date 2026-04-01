@@ -113,7 +113,7 @@ pub fn dump_trees(
         // Print and filter out errors
         .filter_map(|f| {
             f.inspect_err(|(path, e)| {
-                eprintln!("Failed to extract file: {:?}: {:?}", path, e);
+                log::error!("Failed to extract file: {:?}: {:?}", path, e);
             })
             .ok()
         })
@@ -128,14 +128,14 @@ pub fn dump_trees(
         })
         // Report results
         .for_each(|result| match result {
-            Ok(filename) => eprintln!("Extracted tree: {}", filename),
+            Ok(filename) => log::info!("Extracted tree: {}", filename),
             Err(e) => {
                 let error_message = if *VERBOSE.get().unwrap() {
                     format!("{e:?}")
                 } else {
                     format!("{e}")
                 };
-                eprintln!("Failed to extract tree: {error_message}");
+                log::error!("Failed to extract tree: {error_message}");
             }
         });
 

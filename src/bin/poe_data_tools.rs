@@ -171,7 +171,16 @@ fn parse_args() -> Result<Args> {
     })
 }
 
+fn init_logger() {
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("poe_data_tools=info"),
+    )
+    .init();
+}
+
 fn main() -> Result<()> {
+    init_logger();
+
     let args = parse_args()?;
     VERBOSE.set(args.verbose).unwrap();
 

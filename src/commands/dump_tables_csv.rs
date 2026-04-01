@@ -380,7 +380,7 @@ pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBat
                 } else {
                     format!("{e}")
                 };
-                eprintln!(
+                log::error!(
                     "Failed to parse column {:?}, skipping: {error_message}",
                     column.name
                 );
@@ -536,7 +536,7 @@ pub fn dump_tables(
         // Print and filter out errors
         .filter_map(|f| {
             f.inspect_err(|(path, e)| {
-                eprintln!("Failed to extract file: {:?}: {:?}", path, e);
+                log::error!("Failed to extract file: {:?}: {:?}", path, e);
             })
             .ok()
         })
@@ -560,14 +560,14 @@ pub fn dump_tables(
         })
         // Report results
         .for_each(|result| match result {
-            Ok(filename) => eprintln!("Extracted table: {}", filename),
+            Ok(filename) => log::info!("Extracted table: {}", filename),
             Err(e) => {
                 let error_message = if *VERBOSE.get().unwrap() {
                     format!("{e:?}")
                 } else {
                     format!("{e}")
                 };
-                eprintln!("Failed to extract table: {error_message}");
+                log::error!("Failed to extract table: {error_message}");
             }
         });
 

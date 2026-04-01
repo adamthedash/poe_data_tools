@@ -39,7 +39,7 @@ pub fn parse_tmo_str(contents: &str) -> VersionedResult<TMOFile> {
             // NOTE: Edge case: Sometimes some extra crap at the end
             rest.verify(|crap: &str| {
                 if !crap.is_empty() {
-                    eprintln!("WARN: Extra crap found: {crap:?}");
+                    log::debug!("Extra crap found: {crap:?}");
                 }
                 true
             }),

@@ -116,7 +116,7 @@ pub struct References {
 
 /// Load a schema from a local path
 pub fn load_schema(path: &Path) -> Result<SchemaCollection> {
-    eprintln!("Loading schema from: {:?}", path);
+    log::info!("Loading schema from: {:?}", path);
     Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
 }
 
@@ -132,13 +132,13 @@ pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
     if let Ok(metadata) = fs::metadata(&schema_path)
         && metadata.modified()?.elapsed()?.as_secs() < 3600
     {
-        eprintln!("Using cached schema");
+        log::info!("Using cached schema");
         return Ok(serde_json::from_str(
             fs::read_to_string(schema_path)?.as_str(),
         )?);
     }
 
-    eprintln!("Fetching schema from github");
+    log::info!("Fetching schema from github");
     let client = reqwest::blocking::Client::new();
     let mut req = client.get(SCHEMA_URL);
 

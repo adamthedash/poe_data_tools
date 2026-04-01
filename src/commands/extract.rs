@@ -30,7 +30,7 @@ pub fn extract_files(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) ->
         .filter_map(|f| match f {
             Ok(x) => Some(x),
             Err((path, e)) => {
-                eprintln!("Failed to extract file: {:?}: {:?}", path, e);
+                log::error!("Failed to extract file: {:?}: {:?}", path, e);
                 None
             }
         })
@@ -51,8 +51,8 @@ pub fn extract_files(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) ->
         })
         // Report results
         .for_each(|result| match result {
-            Ok(filename) => eprintln!("Extracted file: {}", filename),
-            Err(e) => eprintln!("Failed to extract file: {:?}", e),
+            Ok(filename) => log::info!("Extracted file: {}", filename),
+            Err(e) => log::error!("Failed to extract file: {:?}", e),
         });
 
     Ok(())

@@ -84,8 +84,8 @@ fn resolve(
     } else {
         // NOTE: If there's no dependency entry, assume everything is a-ok (it's probably not).
         // This can happen when the schema refers to a non-existent table
-        eprintln!(
-            "WARN: No dependency entry for table {:?}, assuming already resolved",
+        log::debug!(
+            "No dependency entry for table {:?}, assuming already resolved",
             table
         );
         return Ok(());
@@ -151,12 +151,12 @@ fn resolve(
         resolved_keys.insert(table.to_owned(), keys);
     }
 
-    eprintln!("Resolved table: {:?}", table);
+    log::info!("Resolved table: {:?}", table);
 
     // Tables with self-references need to be parsed twice
     let has_self_ref = schema.columns.iter().any(|c| c.column_type == "row");
     if has_self_ref {
-        eprintln!("Resolving self-refs table: {:?}", table);
+        log::info!("Resolving self-refs table: {:?}", table);
         let parsed = {
             let mut parser = create_parser(resolved_keys, variable_section, schema);
 
@@ -234,7 +234,7 @@ pub fn dump_tables(
                 // Check that this file can be read
                 let res = fs.read(&filename);
                 if res.is_err() {
-                    eprintln!("WARN: File not in index: {}", filename);
+                    log::debug!("File not in index: {}", filename);
                 }
 
                 res.is_ok()
@@ -255,7 +255,7 @@ pub fn dump_tables(
         .collect::<Vec<_>>();
     for t in cycles {
         dependencies.remove(&t);
-        eprintln!("Skipping table due to cycle: {:?}", t);
+        log::warn!("Skipping table due to cycle: {:?}", t);
     }
 
     let mut resolved = HashMap::new();
@@ -292,7 +292,7 @@ pub fn dump_tables(
             let keep = dependencies.contains_key(&table_name);
 
             if !keep {
-                eprintln!("Skipping {:?}, schema not found", path);
+                log::warn!("Skipping {:?}, schema not found", path);
             }
 
             keep
@@ -329,14 +329,14 @@ pub fn dump_tables(
             Ok(filename)
         })
         .for_each(|result| match result {
-            Ok(filename) => eprintln!("Extracted file: {}", filename),
+            Ok(filename) => log::info!("Extracted file: {}", filename),
             Err(e) => {
                 let error_message = if *VERBOSE.get().unwrap() {
                     format!("{e:?}")
                 } else {
                     format!("{e}")
                 };
-                eprintln!("Failed to extract file: {error_message}");
+                log::error!("Failed to extract file: {error_message}");
             }
         });
 

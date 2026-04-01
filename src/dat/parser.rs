@@ -26,7 +26,7 @@ fn string<'a>(variable_section: &[u8]) -> impl WinnowParser<&'a [u8], Option<Str
             let string = take_utf16_string(&variable_section[offset as usize - 8..]);
             Some(string)
         } else {
-            eprintln!("WARN: Bad offset for string {offset}");
+            log::debug!("Bad offset for string {offset}");
             None
         }
     })
@@ -54,7 +54,7 @@ fn plain_column<'a>(
                             if b <= 2 {
                                 Some(b == 1)
                             } else {
-                                eprintln!("WARN: Bad value for bool: {b}");
+                                log::debug!("Bad value for bool: {b}");
                                 None
                             }
                         )
@@ -74,7 +74,7 @@ fn plain_column<'a>(
                         if (8..variable_section.len() as u64 + 8).contains(&offset) {
                             Some(offset)
                         } else {
-                            eprintln!("WARN: Array pointer out of bounds: {offset}");
+                            log::debug!("Array pointer out of bounds: {offset}");
                             None
                         }
                     }),
@@ -250,7 +250,7 @@ fn ref_column<'a>(
                         if (8..variable_section.len() as u64 + 8).contains(&offset) {
                             Some(offset)
                         } else {
-                            eprintln!("WARN: Array pointer out of bounds: {offset}");
+                            log::debug!("Array pointer out of bounds: {offset}");
                             None
                         }
                     }),
@@ -307,8 +307,8 @@ pub fn create_parser<'a>(
                 // NOTE: All the item parsers should pass with null on error, so an error here should
                 //  be unrecoverable. Return items parsed up until now instead of losing whole
                 //  row.
-                eprintln!(
-                    "WARN: Error applying schema for {:?} {:?}, bytes left: {:?}",
+                log::error!(
+                    "Error applying schema for {:?} {:?}, bytes left: {:?}",
                     schema.name,
                     column,
                     input.len(),
@@ -318,10 +318,7 @@ pub fn create_parser<'a>(
         }
 
         if !input.is_empty() {
-            eprintln!(
-                "WARN: Extra bytes left after applying schema: {:?}",
-                input.len(),
-            );
+            log::debug!("Extra bytes left after applying schema: {:?}", input.len(),);
 
             let _rest = rest(input)?;
         }

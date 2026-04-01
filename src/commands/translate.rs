@@ -163,13 +163,13 @@ pub fn translate(
         .filter_map(|f| match f {
             Ok(x) => Some(x),
             Err((path, e)) => {
-                eprintln!("Failed to extract file: {:?}: {:?}", path, e);
+                log::error!("Failed to extract file: {:?}: {:?}", path, e);
                 None
             }
         })
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
-            eprintln!("Extracting file: {filename}");
+            log::info!("Extracting file: {filename}");
             let parser = Parser::from_filename(Path::new(filename), poe_version.major())
                 .expect("Already verified parser exists above");
 
@@ -182,8 +182,8 @@ pub fn translate(
         })
         // Report results
         .for_each(|result| match result {
-            Ok(filename) => eprintln!("Extracted file: {}", filename),
-            Err(e) => eprintln!("{:?}", e),
+            Ok(filename) => log::info!("Extracted file: {}", filename),
+            Err(e) => log::error!("{:?}", e),
         });
 
     Ok(())

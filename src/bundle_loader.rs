@@ -45,11 +45,10 @@ impl CDNLoader {
         let cache_path =
             PathBuf::from(&self.cache_dir).join(url.to_string().trim_start_matches("https://"));
         if let Ok(bytes) = fs::read(&cache_path) {
-            //eprintln!("Loading bundle from cache: {:?}", path_stub);
             return Ok(Bytes::from(bytes));
         }
 
-        eprintln!("Downloading bundle: {}", url);
+        log::info!("Downloading bundle: {}", url);
         // Short timeout for initial connection, but none for transfer to allow for fetching large
         // files on a poor network connection
         let client = Client::builder()
@@ -74,7 +73,7 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
     if cache_file.exists() && fs::metadata(&cache_file)?.modified()?.elapsed()?.as_secs() < 3600 {
         let url = Url::parse(fs::read_to_string(&cache_file)?.as_str())
             .with_context(|| "Failed to parse URL")?;
-        eprintln!("Using cached CDN URL: {}", url);
+        log::info!("Using cached CDN URL: {}", url);
         return Ok(url);
     }
 
@@ -98,7 +97,7 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
 
     fs::create_dir_all(&cache_dir).context("Failed to create cache directory")?;
     fs::write(&cache_file, url.as_str()).context("Failed to write URL to cache")?;
-    eprintln!("Refreshed CDN URL: {}", url);
+    log::info!("Refreshed CDN URL: {}", url);
     Ok(url)
 }
 
