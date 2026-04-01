@@ -79,6 +79,14 @@ impl DatTableSchema {
             .filter(|(c, _)| c.unique)
             .map(|(_, name)| name)
     }
+
+    /// Iterate over all reference column names
+    pub fn references(&self) -> impl Iterator<Item = String> {
+        self.columns
+            .iter()
+            .filter_map(|c| c.get_ref())
+            .map(ToOwned::to_owned)
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -101,6 +109,15 @@ impl ColumnSchema {
     /// Whether this column refers to another schema
     pub fn is_ref(&self) -> bool {
         matches!(self.column_type.as_str(), "row" | "foreignrow" | "enumrow")
+    }
+
+    /// Get the target reference table name, if any
+    pub fn get_ref(&self) -> Option<&str> {
+        if let Some(r) = &self.references {
+            Some(&r.table)
+        } else {
+            None
+        }
     }
 
     /// Whether this column is a collection of multiple values

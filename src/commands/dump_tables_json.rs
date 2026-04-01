@@ -1,11 +1,11 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::{self, File},
     io::BufWriter,
     path::Path,
 };
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use glob::{MatchOptions, Pattern};
 use winnow::Parser;
 
@@ -14,7 +14,7 @@ use crate::{
     bundle_fs::FS,
     commands::Patch,
     dat::{
-        ivy_schema::{Enumeration, SchemaCollection, fetch_schema, load_schema},
+        ivy_schema::{DatTableSchema, Enumeration, SchemaCollection, fetch_schema, load_schema},
         parser::create_parser,
     },
     file_parsers::{
@@ -22,35 +22,6 @@ use crate::{
         dat::{DatParser, types::DatFile},
     },
 };
-
-fn build_dependency_graph(schemas: &SchemaCollection) -> HashMap<String, Vec<String>> {
-    // Tables
-    let mut dependencies = schemas
-        .tables
-        .iter()
-        .map(|s| {
-            let deps = s
-                .columns
-                .iter()
-                .filter(|c| c.column_type == "foreignrow" || c.column_type == "enumrow")
-                .filter_map(|c| c.references.as_ref())
-                .map(|r| r.table.to_lowercase())
-                .collect();
-
-            (s.name.to_lowercase(), deps)
-        })
-        .collect::<HashMap<_, _>>();
-
-    // Enums
-    dependencies.extend(
-        schemas
-            .enumerations
-            .iter()
-            .map(|e| (e.name.to_lowercase(), vec![])),
-    );
-
-    dependencies
-}
 
 fn resolve_enum(schema: &Enumeration) -> Vec<serde_json::Value> {
     std::iter::repeat_n(serde_json::Value::Null, schema.indexing)
@@ -61,77 +32,58 @@ fn resolve_enum(schema: &Enumeration) -> Vec<serde_json::Value> {
         .collect()
 }
 
-/// Recursively resolve a table and its dependencies
-fn resolve(
-    fs: &mut FS,
-    schemas: &SchemaCollection,
-    resolved: &mut HashMap<String, Vec<serde_json::Value>>,
-    resolved_keys: &mut HashMap<String, Vec<serde_json::Value>>,
-    deps: &HashMap<String, Vec<String>>,
-    table: &str,
-    version: &Patch,
-) -> anyhow::Result<()> {
-    if resolved.contains_key(table) {
-        return Ok(());
+pub enum TableResolutionStatus {
+    /// Non-reference columns resolved
+    /// Non-ref keys resolved
+    Resolving {
+        keys: Option<Vec<serde_json::Value>>,
+    },
+    /// All columns resolved
+    Resolved {
+        keys: Option<Vec<serde_json::Value>>,
+        table: Vec<serde_json::Value>,
+    },
+}
+
+impl TableResolutionStatus {
+    pub fn keys(&self) -> Option<&Vec<serde_json::Value>> {
+        match self {
+            TableResolutionStatus::Resolving { keys } => keys.as_ref(),
+            TableResolutionStatus::Resolved { keys, .. } => keys.as_ref(),
+        }
     }
+}
 
-    // Resolve children
-    if let Some(table_deps) = deps.get(table) {
-        table_deps.iter().try_for_each(|dep| {
-            resolve(fs, schemas, resolved, resolved_keys, deps, dep, version)
-                .context("Failed to resolve child table")
-        })?;
-    } else {
-        // NOTE: If there's no dependency entry, assume everything is a-ok (it's probably not).
-        // This can happen when the schema refers to a non-existent table
-        log::debug!(
-            "No dependency entry for table {:?}, assuming already resolved",
-            table
-        );
-        return Ok(());
-    }
-
-    // All dependencies resolved, so resolve this one
-    let filename = match version.major() {
-        1 => format!("data/{}.datc64", table),
-        2 => format!("data/balance/{}.datc64", table),
-        _ => unreachable!("Invalid major version"),
-    };
-    let bytes = fs.read(&filename).context("Failed to read file contents")?;
-    let schema = schemas
-        .tables
-        .iter()
-        .find(|s| s.name.eq_ignore_ascii_case(table))
-        .context("Failed to find schema for table")?;
-
+/// Attempt to resolve a table without recursing
+/// If any children have not yet been partially resolved, then this table cannot yet be resolved
+fn try_resolve_table(
+    tables: &HashMap<String, TableResolutionStatus>,
+    contents: &DatFile,
+    schema: &DatTableSchema,
+) -> TableResolutionStatus {
     let DatFile {
         rows,
         variable_data,
-    } = DatParser
-        .parse(&bytes)
-        .as_anyhow()
-        .context("Failed to parse dat file")?;
+    } = contents;
 
     // FIXME: Figure out a way to give variable section to the parser without leaking it to a
-    // 'static lifetime
-    let variable_section = Box::leak(Box::new(variable_data));
+    //          'static lifetime
+    let variable_section = Box::leak(Box::new(variable_data.clone()));
+    // (At least partially) resolve table
     let parsed = {
-        let mut parser = create_parser(resolved_keys, variable_section, schema);
+        let mut parser = create_parser(tables, variable_section, schema);
 
         rows.iter()
-            .map(|row| match parser.parse(row) {
-                Ok(key_vals) => key_vals,
-                Err(_) => serde_json::Value::Null,
-            })
+            .map(|row| parser.parse(row).unwrap_or(serde_json::Value::Null))
             .collect::<Vec<_>>()
     };
-    let parsed = resolved.entry(table.to_owned()).insert_entry(parsed);
-    let parsed = parsed.get();
 
+    // Extract keys, this should be valid in most cases, but if key column is a reference, it may
+    // or may not be resolved yet. This might be a problem. Ideally all keys should be plain types
     let keys_columns = schema.primary_keys().collect::<Vec<_>>();
-    if !keys_columns.is_empty() {
+    let keys = (!keys_columns.is_empty()).then(|| {
         // Try get the corresponding values for them
-        let keys = parsed
+        parsed
             .iter()
             .map(|row| {
                 let keys = keys_columns
@@ -146,53 +98,98 @@ fn resolve(
                     _ => serde_json::Value::Array(keys),
                 }
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    });
 
-        resolved_keys.insert(table.to_owned(), keys);
+    if schema
+        .columns
+        .iter()
+        .filter_map(|c| c.get_ref())
+        .all(|c| tables.contains_key(&c.to_lowercase()))
+    {
+        // All children are at least partially resolved, so this table should be fully resolved
+        TableResolutionStatus::Resolved {
+            keys,
+            table: parsed,
+        }
+    } else {
+        // At least one child has not yet been seen (i.e. keys not yet resolved), so this table
+        // needs to be re-resolved layer
+        TableResolutionStatus::Resolving { keys }
     }
-
-    log::info!("Resolved table: {:?}", table);
-
-    // Tables with self-references need to be parsed twice
-    let has_self_ref = schema.columns.iter().any(|c| c.column_type == "row");
-    if has_self_ref {
-        log::info!("Resolving self-refs table: {:?}", table);
-        let parsed = {
-            let mut parser = create_parser(resolved_keys, variable_section, schema);
-
-            rows.iter()
-                .map(|row| match parser.parse(row) {
-                    Ok(key_vals) => key_vals,
-                    Err(_) => serde_json::Value::Null,
-                })
-                .collect::<Vec<_>>()
-        };
-
-        resolved.insert(table.to_owned(), parsed);
-    }
-
-    Ok(())
 }
 
-/// Checks whether there is a cycle in the dependencies of a table
-fn has_cycle<'a>(
-    deps: &'a HashMap<String, Vec<String>>,
-    table: &'a str,
-    seen: &mut Vec<&'a str>,
-) -> bool {
-    if seen.contains(&table) {
-        return true;
-    }
-    seen.push(table);
+/// Recursively resolve a table and all children
+fn resolve_table(
+    fs: &mut FS,
+    schemas: &SchemaCollection,
+    tables: &mut HashMap<String, TableResolutionStatus>,
+    table_name: &str,
+    version: &Patch,
+) -> anyhow::Result<()> {
+    // Load up this file's contents
+    let filename = match version.major() {
+        1 => format!("data/{}.datc64", table_name),
+        2 => format!("data/balance/{}.datc64", table_name),
+        _ => unreachable!("Invalid major version"),
+    };
+    let bytes = fs.read(&filename).context("Failed to read file contents")?;
+    let schema = schemas
+        .tables
+        .iter()
+        .find(|s| s.name.eq_ignore_ascii_case(table_name))
+        .context("Failed to find schema for table")?;
 
-    if let Some(children) = deps.get(table)
-        && children.iter().any(|c| has_cycle(deps, c, seen))
-    {
-        return true;
-    }
-    seen.pop();
+    let contents = DatParser
+        .parse(&bytes)
+        .as_anyhow()
+        .context("Failed to parse dat file")?;
 
-    false
+    // Resolve this table once
+    let parsed = try_resolve_table(tables, &contents, schema);
+    match &parsed {
+        TableResolutionStatus::Resolving { .. } => {
+            log::debug!("Partially resolved table: {:?}", table_name)
+        }
+        TableResolutionStatus::Resolved { .. } => {
+            log::debug!("Fully resolved table: {:?}", table_name)
+        }
+    }
+
+    tables.insert(table_name.to_lowercase(), parsed);
+
+    // Resolve all children
+    let unresolved_children = schema
+        .references()
+        .filter(|child| !tables.contains_key(&child.to_lowercase()))
+        .collect::<HashSet<_>>();
+    for child in &unresolved_children {
+        resolve_table(fs, schemas, tables, child, version)?;
+    }
+
+    let has_self_ref = schema
+        .references()
+        .any(|r| r.eq_ignore_ascii_case(table_name));
+
+    if !has_self_ref && unresolved_children.is_empty() {
+        // All children resolved, so don't need a 2nd pass
+        return Ok(());
+    }
+
+    // 2nd pass at parent table to resolve child & self references
+    log::debug!("2nd pass: {:?}", table_name);
+    let parsed = try_resolve_table(tables, &contents, schema);
+    match &parsed {
+        TableResolutionStatus::Resolving { .. } => {
+            log::debug!("Partially resolved table: {:?}", table_name)
+        }
+        TableResolutionStatus::Resolved { .. } => {
+            log::debug!("Fully resolved table: {:?}", table_name)
+        }
+    }
+    tables.insert(table_name.to_lowercase(), parsed);
+
+    Ok(())
 }
 
 pub fn dump_tables(
@@ -244,30 +241,25 @@ pub fn dump_tables(
         enumerations: schemas.enumerations.clone(),
     };
 
-    // Build dependency graph
-    let mut dependencies = build_dependency_graph(&schemas);
-
-    // Remove ones with cycles
-    let cycles = dependencies
-        .keys()
-        .filter(|t| has_cycle(&dependencies, t, &mut vec![]))
-        .cloned()
-        .collect::<Vec<_>>();
-    for t in cycles {
-        dependencies.remove(&t);
-        log::warn!("Skipping table due to cycle: {:?}", t);
-    }
-
     let mut resolved = HashMap::new();
-    let mut resolved_keys = HashMap::new();
 
     // Resolve enums first as they have no dependencies
     schemas.enumerations.iter().for_each(|e| {
         let e_resolved = resolve_enum(e);
-        let name = e.name.to_lowercase();
-        resolved.insert(name.clone(), e_resolved.clone());
-        resolved_keys.insert(name, e_resolved);
+        resolved.insert(
+            e.name.to_lowercase(),
+            TableResolutionStatus::Resolved {
+                keys: Some(e_resolved.clone()),
+                table: e_resolved.clone(),
+            },
+        );
     });
+
+    let schema_names = schemas
+        .tables
+        .iter()
+        .map(|t| t.name.to_lowercase())
+        .collect::<Vec<_>>();
 
     // Filter list of files we're going to extract
     let filenames = fs
@@ -289,7 +281,7 @@ pub fn dump_tables(
             let path = Path::new(filename);
             let table_name = path.file_stem().unwrap().to_str().unwrap().to_lowercase();
 
-            let keep = dependencies.contains_key(&table_name);
+            let keep = schema_names.contains(&table_name);
 
             if !keep {
                 log::warn!("Skipping {:?}, schema not found", path);
@@ -305,17 +297,11 @@ pub fn dump_tables(
             let path = Path::new(&filename);
             let table_name = path.file_stem().unwrap().to_str().unwrap().to_lowercase();
 
-            resolve(
-                fs,
-                &schemas,
-                &mut resolved,
-                &mut resolved_keys,
-                &dependencies,
-                &table_name,
-                version,
-            )
-            .context("Failed to resolve table")?;
-            let json = &resolved[&table_name];
+            resolve_table(fs, &schemas, &mut resolved, &table_name, version)
+                .context("Failed to resolve table")?;
+            let TableResolutionStatus::Resolved { table: json, .. } = &resolved[&table_name] else {
+                bail!("Table not fully resolved after 2nd pass: {:?}", table_name);
+            };
 
             // Save out
             let output_path = output_folder.join(path).with_added_extension("json");
