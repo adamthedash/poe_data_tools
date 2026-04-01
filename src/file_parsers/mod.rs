@@ -24,6 +24,7 @@ pub mod pet;
 pub mod psg;
 pub mod rs;
 pub mod shared;
+pub mod smd;
 pub mod tmo;
 pub mod toy;
 pub mod trl;
