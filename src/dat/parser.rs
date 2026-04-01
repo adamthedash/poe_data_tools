@@ -32,6 +32,41 @@ fn string<'a>(variable_section: &[u8]) -> impl WinnowParser<&'a [u8], Option<Str
     })
 }
 
+/// Read an array of items from the variable data section
+fn array<'a, T>(
+    variable_section: &'a [u8],
+    mut item_parser: impl WinnowParser<&'a [u8], T>,
+) -> impl WinnowParser<&'a [u8], Option<Vec<T>>> {
+    move |input: &mut &[u8]| {
+        let (length, pointer) = (le_u64, le_u64).parse_next(input)?;
+
+        if length == 0 {
+            // NOTE: Empty array is expected to have pointer to end of variable data section. Add this as extra validation step?
+            if pointer != variable_section.len() as u64 + 8 {
+                log::debug!(
+                    "Array pointer didn't point to variable data section end. Expected: {}, got: {}",
+                    variable_section.len() + 8,
+                    pointer
+                );
+            }
+
+            return Ok(Some(vec![]));
+        } else if !(8..variable_section.len() as u64 + 8).contains(&pointer) {
+            log::debug!("Array pointer out of bounds: {pointer}");
+            return Ok(None);
+        }
+
+        let mut input = &variable_section[pointer as usize - 8..];
+        let items = (0..length)
+            .map(|_| item_parser.parse_next(&mut input))
+            // TODO: Should a failure to read all items in the array instead return null instead of
+            // failing? Or items parsed up until failure?
+            .collect::<winnow::Result<Vec<_>>>()?;
+
+        Ok(Some(items))
+    }
+}
+
 /// Basic data types & arrays of them
 fn plain_column<'a>(
     column: &ColumnSchema,
@@ -68,28 +103,9 @@ fn plain_column<'a>(
         let out = match (column.array, column.interval) {
             // Array
             (true, false) => {
-                let (length, pointer) = (
-                    le_u64,
-                    le_u64.map(|offset| {
-                        if (8..variable_section.len() as u64 + 8).contains(&offset) {
-                            Some(offset)
-                        } else {
-                            log::debug!("Array pointer out of bounds: {offset}");
-                            None
-                        }
-                    }),
-                )
-                    .parse_next(input)?;
-
-                let Some(pointer) = pointer else {
+                let Some(items) = array(variable_section, item_parser).parse_next(input)? else {
                     return Ok(Value::Null);
                 };
-
-                let mut input = &variable_section[pointer as usize - 8..];
-
-                let items = std::iter::repeat_with(|| item_parser.parse_next(&mut input))
-                    .take(length as usize)
-                    .collect::<winnow::Result<Vec<_>>>()?;
 
                 Value::Array(items)
             }
@@ -244,28 +260,9 @@ fn ref_column<'a>(
         let refs = match (column.array, column.interval) {
             // Array
             (true, false) => {
-                let (length, pointer) = (
-                    le_u64,
-                    le_u64.map(|offset| {
-                        if (8..variable_section.len() as u64 + 8).contains(&offset) {
-                            Some(offset)
-                        } else {
-                            log::debug!("Array pointer out of bounds: {offset}");
-                            None
-                        }
-                    }),
-                )
-                    .parse_next(input)?;
-
-                let Some(pointer) = pointer else {
+                let Some(items) = array(variable_section, ref_parser).parse_next(input)? else {
                     return Ok(Value::Null);
                 };
-
-                let mut input = &variable_section[pointer as usize - 8..];
-
-                let items = std::iter::repeat_with(|| ref_parser.parse_next(&mut input))
-                    .take(length as usize)
-                    .collect::<winnow::Result<Vec<_>>>()?;
 
                 ResolvedRefColumn::Multi(items)
             }
