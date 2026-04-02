@@ -198,6 +198,9 @@ By file format version (fails : successes)
 ## DDT File Format
 ![ddt format](./images/ddt_spec.png)  
 
+## DOLm Sub-File Format
+![dolm format](./images/dolm_spec.png)  
+
 ## DLP File Format
 ![dlp format](./images/dlp_spec.png)  
 
@@ -233,6 +236,9 @@ By file format version (fails : successes)
 
 ## RS File Format
 ![rs format](./images/rs_spec.png)  
+
+## SMD File Format
+![smd format](./images/smd_spec.png)  
 
 ## TMO File Format
 ![tmo format](./images/tmo_spec.png)  
