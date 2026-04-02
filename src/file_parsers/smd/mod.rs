@@ -1,6 +1,7 @@
 pub mod parser;
 pub mod types;
 
+use parser::parse_smd;
 use types::SMDFile;
 
 use crate::file_parsers::{FileParser, VersionedResult};
