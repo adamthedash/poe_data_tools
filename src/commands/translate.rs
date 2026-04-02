@@ -13,8 +13,8 @@ use crate::{
         dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
         et::ETParser, fmt::FMTParser, gcf::GCFParser, gft::GFTParser, gt::GTParser, mat::MATParser,
         mtd::MTDParser, pet::PETParser, psg::PSGParser, rs::RSParser,
-        shared::versioned_result::VersionedResult2, tmo::TMOParser, toy::TOYParser, trl::TRLParser,
-        tsi::TSIParser, tst::TSTParser,
+        shared::versioned_result::VersionedResult2, smd::SMDParser, tmo::TMOParser, toy::TOYParser,
+        trl::TRLParser, tsi::TSIParser, tst::TSTParser,
     },
 };
 
@@ -87,6 +87,7 @@ pub enum Parser {
     Gcf(GCFParser),
     Psg(PSGParser),
     Fmt(FMTParser),
+    Smd(SMDParser),
 }
 
 impl Parser {
@@ -119,6 +120,7 @@ impl Parser {
             "tmo" => Tmo(TMOParser),
             "gcf" => Gcf(GCFParser),
             "fmt" => Fmt(FMTParser),
+            "smd" => Smd(SMDParser),
             "psg" => Psg(PSGParser {
                 version: poe_version,
             }),
