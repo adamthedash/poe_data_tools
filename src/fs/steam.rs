@@ -11,7 +11,7 @@ use iterators_extended::bucket::Bucket;
 use super::FileSystem;
 use crate::{
     bundle::load_bundle_content, bundle_index::load_index_file,
-    file_parsers::bundle_index::types::BundleIndexFile, hasher::BuildMurmurHash64A,
+    file_parsers::bundle_index::types::BundleIndexFile, hasher::murmur64a::BuildMurmurHash64A,
     path::parse_paths,
 };
 

@@ -10,6 +10,8 @@ use enum_dispatch::enum_dispatch;
 use steam::SteamFS;
 use url::Url;
 
+use crate::fs::ggpk::GGPKBundleFS;
+
 #[enum_dispatch]
 pub trait FileSystem {
     /// Lists all paths in the index
@@ -30,7 +32,7 @@ pub trait FileSystem {
 pub enum FS {
     Steam(SteamFS),
     CDN(CDNFS),
-    // GGPK(GGPKFS),
+    GGPK(GGPKBundleFS),
 }
 
 impl FS {
@@ -42,5 +44,10 @@ impl FS {
     /// Initialise a file system using the CDN backend
     pub fn from_cdn(base_url: &Url, cache_dir: &Path) -> anyhow::Result<FS> {
         CDNFS::new(base_url, cache_dir).map(Self::CDN)
+    }
+
+    /// Initialise a file system over a standalone GGPK file
+    pub fn from_ggpk(ggpk_path: &Path) -> anyhow::Result<FS> {
+        GGPKBundleFS::new(ggpk_path).map(Self::GGPK)
     }
 }

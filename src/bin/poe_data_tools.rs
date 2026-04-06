@@ -96,7 +96,7 @@ enum Command {
     name = "poe_data_tools",
     group(
         ArgGroup::new("source")
-        .args(&["steam", "cache_dir"])
+        .args(&["steam", "cache_dir", "ggpk"])
         .required(false) // At least one is not required, but they are mutually exclusive
         .multiple(false) // Only one can be used at a time
     )
@@ -110,6 +110,10 @@ struct Cli {
     /// Specify the Steam folder path (optional)
     #[arg(long)]
     steam: Option<PathBuf>,
+
+    /// Specify the standalone .ggpk path (optional)
+    #[arg(long)]
+    ggpk: Option<PathBuf>,
 
     /// Specify the cache directory (optional)
     #[arg(long)]
@@ -127,6 +131,7 @@ struct Cli {
 enum Source {
     Cdn { cache_dir: PathBuf },
     Steam { steam_folder: PathBuf },
+    Ggpk { ggpk_path: PathBuf },
 }
 
 #[derive(Debug)]
@@ -149,16 +154,18 @@ fn parse_args() -> Result<Args> {
     let source = if let Some(steam_folder) = cli.steam {
         ensure!(steam_folder.exists(), "Steam folder doesn't exist");
         Source::Steam { steam_folder }
+    } else if let Some(ggpk_path) = cli.ggpk {
+        Source::Ggpk { ggpk_path }
     } else {
         Source::Cdn {
             cache_dir: cache_dir.clone(),
         }
     };
 
-    if matches!(source, Source::Steam { .. }) {
+    if matches!(source, Source::Steam { .. } | Source::Ggpk { .. }) {
         ensure!(
             !matches!(cli.patch, Patch::Specific { .. }),
-            "When using steam, specific patch versions are not supported."
+            "When using steam or ggpk, specific patch versions are not supported."
         );
     }
 
@@ -194,6 +201,7 @@ fn main() -> Result<()> {
             FS::from_cdn(&cdn_base_url(&cache_dir, version_string)?, &cache_dir)
         }
         Source::Steam { steam_folder } => FS::from_steam(steam_folder),
+        Source::Ggpk { ggpk_path } => FS::from_ggpk(&ggpk_path),
     }
     .context("Failed to initialise file system")?;
 

@@ -12,9 +12,11 @@ use url::Url;
 use super::FileSystem;
 use crate::{
     bundle::fetch_bundle_content, bundle_index::fetch_index_file,
-    file_parsers::bundle_index::types::BundleIndexFile, hasher::BuildMurmurHash64A,
+    file_parsers::bundle_index::types::BundleIndexFile, hasher::murmur64a::BuildMurmurHash64A,
     path::parse_paths,
 };
+
+const HASHER: BuildMurmurHash64A = BuildMurmurHash64A { seed: 0x1337b33f };
 
 pub struct CDNFS {
     index: BundleIndexFile,
@@ -65,13 +67,12 @@ impl FileSystem for CDNFS {
         paths: &'a [impl AsRef<str>],
     ) -> Box<dyn Iterator<Item = Result<(&'a str, Bytes), (&'a str, anyhow::Error)>> + 'a> {
         // Get FileInfo's
-        let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let (fileinfos, errors) = paths
             .iter()
             .map(|path| {
                 let path = path.as_ref();
                 // Compute hash
-                let mut hasher = hash_builder.build_hasher();
+                let mut hasher = HASHER.build_hasher();
                 hasher.write(path.to_lowercase().as_bytes());
                 let hash = hasher.finish();
 
@@ -132,8 +133,7 @@ impl FileSystem for CDNFS {
 
     fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
-        let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
-        let mut hasher = hash_builder.build_hasher();
+        let mut hasher = HASHER.build_hasher();
         hasher.write(path.to_lowercase().as_bytes());
         let hash = hasher.finish();
 
