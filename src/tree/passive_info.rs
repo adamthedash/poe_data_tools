@@ -11,9 +11,9 @@ use itertools::izip;
 use serde::Serialize;
 
 use crate::{
-    bundle_fs::FS,
     commands::{Patch, dump_tables_csv::load_parsed_table},
     dat::ivy_schema::fetch_schema,
+    fs::FS,
 };
 
 trait ColumnHelper {

@@ -3,7 +3,7 @@ use std::io::{self, BufWriter, Write};
 use anyhow::{Context, Result};
 use glob::{MatchOptions, Pattern};
 
-use crate::bundle_fs::FS;
+use crate::fs::{FS, FileSystem};
 
 /// List filenames matching a glob pattern
 pub fn list_files(file_system: &FS, patterns: &[Pattern]) -> Result<()> {

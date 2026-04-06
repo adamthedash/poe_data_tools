@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use anyhow::{Context, Result, ensure};
 use glob::{MatchOptions, Pattern};
 
-use crate::bundle_fs::FS;
+use crate::fs::{FS, FileSystem};
 
 /// Extract files to disk matching a glob pattern
 pub fn extract_art(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Result<()> {

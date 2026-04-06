@@ -6,7 +6,7 @@ use std::{
 use anyhow::{Context, Result};
 use glob::{MatchOptions, Pattern};
 
-use crate::bundle_fs::FS;
+use crate::fs::{FS, FileSystem};
 
 /// Extract files to disk matching a glob pattern
 pub fn extract_files(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Result<()> {

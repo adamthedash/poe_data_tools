@@ -1,6 +1,10 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use dirs::cache_dir;
-use poe_data_tools::{bundle_fs::FS, bundle_loader::cdn_base_url, steam::steam_folder_search};
+use poe_data_tools::{
+    bundle_loader::cdn_base_url,
+    fs::{FS, FileSystem},
+    steam::steam_folder_search,
+};
 
 fn fs_benchmark_steam(c: &mut Criterion) {
     read_some_files("steam", c, steam_fs(), "data/skill*.datc64");
