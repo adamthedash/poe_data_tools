@@ -16,6 +16,7 @@ pub mod et;
 pub mod fmt;
 pub mod gcf;
 pub mod gft;
+pub mod ggpk;
 pub mod gt;
 pub mod mat;
 pub mod mtd;

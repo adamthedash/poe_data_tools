@@ -11,7 +11,6 @@ use winnow::Parser;
 
 use crate::{
     VERBOSE,
-    bundle_fs::FS,
     commands::Patch,
     dat::{
         ivy_schema::{DatTableSchema, Enumeration, SchemaCollection, fetch_schema, load_schema},
@@ -21,6 +20,7 @@ use crate::{
         FileParser,
         dat::{DatParser, types::DatFile},
     },
+    fs::{FS, FileSystem},
 };
 
 fn resolve_enum(schema: &Enumeration) -> Vec<serde_json::Value> {

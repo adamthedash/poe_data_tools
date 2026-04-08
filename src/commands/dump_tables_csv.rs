@@ -21,13 +21,13 @@ use glob::{MatchOptions, Pattern};
 
 use crate::{
     VERBOSE,
-    bundle_fs::FS,
     commands::Patch,
     dat::ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection, fetch_schema, load_schema},
     file_parsers::{
         FileParser,
         dat::{DatParser, types::DatFile},
     },
+    fs::{FS, FileSystem},
 };
 
 fn parse_foreignrow(bytes: &[u8]) -> u64 {

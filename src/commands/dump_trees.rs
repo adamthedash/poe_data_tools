@@ -11,11 +11,11 @@ use glob::{MatchOptions, Pattern};
 use super::Patch;
 use crate::{
     VERBOSE,
-    bundle_fs::FS,
     file_parsers::{
         FileParser,
         psg::{PSGParser, types::PSGFile},
     },
+    fs::{FS, FileSystem},
     tree::{
         passive_info::{PassiveSkillInfo, load_passive_info},
         psg::PassiveSkillGraph,

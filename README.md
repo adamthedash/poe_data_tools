@@ -165,14 +165,14 @@ By file format version (fails : successes)
 |tsi|0 : 463||||||||||||||||||||||||||||||||||||||
 |tst|0 : 409||||||||||||||||||||||||||||||||||||||
 
-# Bundle File format
+# GGPK File Format
+![ggpk file format](./images/ggpk_spec.png)
+
+# Bundle File Format
 ![bundle file format](./images/bundle_spec.png)
 
-# Bundle Index File format
+# Bundle Index File Format
 ![bundle index file format](./images/bundle_index_spec.png)
-
-# Passive Skill Graph (PSG) File Format
-![psg file format](./images/psg_spec.png)  
 
 # World Area related files
 ![world areas](./images/world_areas.png)  
@@ -230,6 +230,9 @@ By file format version (fails : successes)
 
 ## PET File Format
 ![pet format](./images/pet_spec.png)  
+
+## PSG File Format
+![psg file format](./images/psg_spec.png)  
 
 ## RS File Format
 ![rs format](./images/rs_spec.png)  

@@ -6,7 +6,6 @@ use glob::{MatchOptions, Pattern};
 use serde::Serialize;
 
 use crate::{
-    bundle_fs::FS,
     commands::Patch,
     file_parsers::{
         FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
@@ -16,6 +15,7 @@ use crate::{
         shared::versioned_result::VersionedResult2, tmo::TMOParser, toy::TOYParser, trl::TRLParser,
         tsi::TSIParser, tst::TSTParser,
     },
+    fs::{FS, FileSystem},
 };
 
 #[enum_dispatch]

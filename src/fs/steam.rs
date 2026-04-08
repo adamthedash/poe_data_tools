@@ -7,27 +7,27 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
-use url::Url;
 
+use super::FileSystem;
 use crate::{
-    bundle::{fetch_bundle_content, load_bundle_content},
-    bundle_index::{fetch_index_file, load_index_file},
-    file_parsers::bundle_index::types::BundleIndexFile,
-    hasher::BuildMurmurHash64A,
+    bundle::load_bundle_content,
+    file_parsers::{
+        FileParser,
+        bundle_index::{BundleIndexParser, types::BundleIndexFile},
+    },
+    hasher::murmur64a::BuildMurmurHash64A,
     path::parse_paths,
 };
 
-pub struct FS {
+pub struct SteamFS {
     index: BundleIndexFile,
     lut: HashMap<u64, usize>,
-    steam_folder: Option<PathBuf>,
-    base_url: Option<Url>,
-    cache_dir: Option<PathBuf>,
+    steam_folder: PathBuf,
 }
 
-impl FS {
+impl SteamFS {
     /// Initialise a file system over a steam folder
-    pub fn from_steam(steam_folder: PathBuf) -> Result<FS> {
+    pub fn new(steam_folder: PathBuf) -> Result<Self> {
         let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
         let index = load_index_file(&index_path).context("Failed to load bundle index")?;
 
@@ -38,53 +38,30 @@ impl FS {
             .map(|(i, f)| (f.hash, i))
             .collect();
 
-        Ok(FS {
+        Ok(Self {
             index,
             lut,
-            steam_folder: Some(steam_folder.clone()),
-            base_url: None,
-            cache_dir: None,
+            steam_folder: steam_folder.clone(),
         })
     }
+}
 
-    /// Initialise a file system using the CDN background
-    pub fn from_cdn(base_url: &Url, cache_dir: &Path) -> Result<FS> {
-        let index = fetch_index_file(
-            base_url,
-            cache_dir,
-            PathBuf::from("Bundles2/_.index.bin").as_ref(),
-        )
-        .context("Failed to load bundle index")?;
-
-        let lut = index
-            .files
-            .iter()
-            .enumerate()
-            .map(|(i, f)| (f.hash, i))
-            .collect();
-
-        Ok(FS {
-            index,
-            lut,
-            steam_folder: None,
-            base_url: Some(base_url.clone()),
-            cache_dir: Some(cache_dir.to_path_buf()),
-        })
-    }
-
+impl FileSystem for SteamFS {
     /// Lists all paths in the index
-    pub fn list(&self) -> impl Iterator<Item = String> + '_ {
-        self.index
-            .paths
-            .iter()
-            .flat_map(|p| parse_paths(&self.index.path_rep_bundle, p).get_paths())
+    fn list(&self) -> Box<dyn Iterator<Item = String> + '_> {
+        Box::new(
+            self.index
+                .paths
+                .iter()
+                .flat_map(|p| parse_paths(&self.index.path_rep_bundle, p).get_paths()),
+        )
     }
 
     /// Read many files at once, optimising batch loads. Does not preserve order of paths given.
-    pub fn batch_read<'a>(
+    fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> impl Iterator<Item = Result<(&'a str, Bytes), (&'a str, anyhow::Error)>> {
+    ) -> Box<dyn Iterator<Item = Result<(&'a str, Bytes), (&'a str, anyhow::Error)>> + 'a> {
         // Get FileInfo's
         let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let (fileinfos, errors) = paths
@@ -121,23 +98,12 @@ impl FS {
         // Process files bundle-wise
         let file_contents = fileinfos.into_iter().flat_map(|(bundle_index, files)| {
             // Load the bundle
-            let bundle_path = format!(
+            let bundle_path = self.steam_folder.join(format!(
                 "Bundles2/{}.bundle.bin",
                 self.index.bundles[bundle_index as usize].name
-            );
-            let bundle = if let Some(steam_folder) = &self.steam_folder {
-                let bundle_path = steam_folder.join(bundle_path);
-                load_bundle_content(&bundle_path)
-                    .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path))
-            } else {
-                let bundle_path = PathBuf::from(bundle_path);
-                fetch_bundle_content(
-                    self.base_url.as_ref().unwrap(),
-                    self.cache_dir.as_ref().unwrap(),
-                    &bundle_path,
-                )
-                .with_context(|| format!("Failed to fetch bundle file: {:?}", bundle_path))
-            };
+            ));
+            let bundle = load_bundle_content(&bundle_path)
+                .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path));
 
             // Read the file contents - todo: see if we can do this lazily instead of
             // collecting all files within a bundle at once
@@ -158,10 +124,10 @@ impl FS {
         });
 
         // Add on previous errors
-        errors.into_iter().map(Err).chain(file_contents)
+        Box::new(errors.into_iter().map(Err).chain(file_contents))
     }
 
-    pub fn read(&self, path: &str) -> Result<Bytes> {
+    fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
         let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let mut hasher = hash_builder.build_hasher();
@@ -169,35 +135,34 @@ impl FS {
         let hash = hasher.finish();
 
         // Look up the file info for this file
-        let index = self
+        let file_index = self
             .lut
             .get(&hash)
             .with_context(|| format!("Path not found in index: {}", path))?;
-        let file = &self.index.files[*index];
+        let file = &self.index.files[*file_index];
 
         // Load the bundle
-        let bundle = if let Some(steam_folder) = &self.steam_folder {
-            let bundle_path = steam_folder.join(format!(
-                "Bundles2/{}.bundle.bin",
-                self.index.bundles[file.bundle_index as usize].name
-            ));
-            load_bundle_content(&bundle_path)
-                .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path))?
-        } else {
-            let bundle_path = PathBuf::from(format!(
-                "Bundles2/{}.bundle.bin",
-                self.index.bundles[file.bundle_index as usize].name
-            ));
-            fetch_bundle_content(
-                self.base_url.as_ref().unwrap(),
-                self.cache_dir.as_ref().unwrap(),
-                &bundle_path,
-            )
-            .with_context(|| format!("Failed to fetch bundle file: {:?}", bundle_path))?
-        };
+        let bundle_path = self.steam_folder.join(format!(
+            "Bundles2/{}.bundle.bin",
+            self.index.bundles[file.bundle_index as usize].name
+        ));
+        let bundle = load_bundle_content(&bundle_path)
+            .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path))?;
 
         // Pull out the file's contents
         let content = bundle.read_range(file.offset as usize, file.size as usize);
         Ok(content)
     }
+}
+
+/// Load an index file from disk
+pub fn load_index_file(path: &Path) -> Result<BundleIndexFile> {
+    let index_content = load_bundle_content(path)
+        .context("Failed to read bundle index")?
+        .read_all();
+
+    BundleIndexParser
+        .parse(&index_content)
+        .as_anyhow()
+        .context("Failed to parse bundle as index")
 }
