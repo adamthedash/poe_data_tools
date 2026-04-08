@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     hash::{BuildHasher, Hasher},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, anyhow};
@@ -10,8 +10,12 @@ use iterators_extended::bucket::Bucket;
 
 use super::FileSystem;
 use crate::{
-    bundle::load_bundle_content, bundle_index::load_index_file,
-    file_parsers::bundle_index::types::BundleIndexFile, hasher::murmur64a::BuildMurmurHash64A,
+    bundle::load_bundle_content,
+    file_parsers::{
+        FileParser,
+        bundle_index::{BundleIndexParser, types::BundleIndexFile},
+    },
+    hasher::murmur64a::BuildMurmurHash64A,
     path::parse_paths,
 };
 
@@ -149,4 +153,16 @@ impl FileSystem for SteamFS {
         let content = bundle.read_range(file.offset as usize, file.size as usize);
         Ok(content)
     }
+}
+
+/// Load an index file from disk
+pub fn load_index_file(path: &Path) -> Result<BundleIndexFile> {
+    let index_content = load_bundle_content(path)
+        .context("Failed to read bundle index")?
+        .read_all();
+
+    BundleIndexParser
+        .parse(&index_content)
+        .as_anyhow()
+        .context("Failed to parse bundle as index")
 }

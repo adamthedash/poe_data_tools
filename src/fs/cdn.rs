@@ -11,8 +11,12 @@ use url::Url;
 
 use super::FileSystem;
 use crate::{
-    bundle::fetch_bundle_content, bundle_index::fetch_index_file,
-    file_parsers::bundle_index::types::BundleIndexFile, hasher::murmur64a::BuildMurmurHash64A,
+    bundle::fetch_bundle_content,
+    file_parsers::{
+        FileParser,
+        bundle_index::{BundleIndexParser, types::BundleIndexFile},
+    },
+    hasher::murmur64a::BuildMurmurHash64A,
     path::parse_paths,
 };
 
@@ -156,4 +160,16 @@ impl FileSystem for CDNFS {
         let content = bundle.read_range(file.offset as usize, file.size as usize);
         Ok(content)
     }
+}
+
+/// Fetch an index file from the CDN (or cache)
+pub fn fetch_index_file(base_url: &Url, cache_dir: &Path, path: &Path) -> Result<BundleIndexFile> {
+    let index_content = fetch_bundle_content(base_url, cache_dir, path)
+        .context("Failed to fetch bundle index")?
+        .read_all();
+
+    BundleIndexParser
+        .parse(&index_content)
+        .as_anyhow()
+        .context("Failed to parse bundle as index")
 }

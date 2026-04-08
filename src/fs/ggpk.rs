@@ -32,6 +32,7 @@ struct FileInfo {
     length: usize,
 }
 
+/// A file system over the the Content.ggpk file
 pub struct GGPKFS {
     file: RefCell<BufReader<File>>,
     index: GGPKFile,
@@ -177,6 +178,7 @@ impl FileSystem for GGPKFS {
     }
 }
 
+/// A file system over the bundles within the Content.ggpk file
 pub struct GGPKBundleFS {
     ggpk: GGPKFS,
     lut: HashMap<u64, usize>,
