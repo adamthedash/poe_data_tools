@@ -1,4 +1,3 @@
-
 use crate::file_parsers::{FileParser, VersionedResult, shared::utf16_bom_to_string};
 
 pub mod parser;

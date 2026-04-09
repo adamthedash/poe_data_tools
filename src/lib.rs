@@ -13,7 +13,6 @@ pub mod file_parsers;
 pub mod fs;
 pub mod hasher;
 pub mod path;
-pub mod steam;
 pub mod tree;
 
 /// Application-level verbosity
