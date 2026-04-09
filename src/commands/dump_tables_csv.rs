@@ -554,11 +554,13 @@ pub fn dump_tables(
                 .iter()
                 // valid_for == 3 is common between both games
                 .filter(|t| t.valid_for == version || t.valid_for == 3)
-                .find(|t| *t.name.to_lowercase() == *PathBuf::from(&filename).file_stem().unwrap())
+                .find(|t| {
+                    *t.name.to_lowercase() == *PathBuf::from(filename.as_ref()).file_stem().unwrap()
+                })
                 .with_context(|| format!("Couldn't find schema for {:?}", &filename))?;
 
             // Convert the data table
-            let output_path = output_folder.join(filename).with_extension("csv");
+            let output_path = output_folder.join(filename.as_ref()).with_extension("csv");
             process_file(&contents, &output_path, schema)
                 .with_context(|| format!("Failed to process file: {:?}", filename))?;
 

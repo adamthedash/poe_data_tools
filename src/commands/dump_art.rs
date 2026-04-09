@@ -42,7 +42,7 @@ pub fn extract_art(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> R
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
             let img = image::load_from_memory(&contents).context("Failed to pares DDS image")?;
 
-            let out_filename = output_folder.join(filename).with_extension("png");
+            let out_filename = output_folder.join(filename.as_ref()).with_extension("png");
             fs::create_dir_all(out_filename.parent().unwrap())
                 .context("Failed to create folder")?;
 

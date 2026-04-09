@@ -6,7 +6,7 @@ pub struct BundleInfo {
     pub uncompressed_size: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileInfo {
     pub hash: u64,
     pub bundle_index: u32,

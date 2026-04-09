@@ -172,10 +172,12 @@ pub fn translate(
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
             log::info!("Extracting file: {filename}");
-            let parser = Parser::from_filename(Path::new(filename), poe_version.major())
+            let parser = Parser::from_filename(Path::new(filename.as_ref()), poe_version.major())
                 .expect("Already verified parser exists above");
 
-            let out_path = output_folder.join(filename).with_added_extension("json");
+            let out_path = output_folder
+                .join(filename.as_ref())
+                .with_added_extension("json");
             parser
                 .parse_to_json_file(&contents, &out_path)
                 .with_context(|| format!("Failed to process file: {:?}", filename))?;

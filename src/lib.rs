@@ -4,6 +4,7 @@
 #![feature(never_type)]
 #![feature(f16)]
 #![feature(try_find)]
+#![feature(iter_collect_into)]
 use std::sync::OnceLock;
 
 pub mod bundle;

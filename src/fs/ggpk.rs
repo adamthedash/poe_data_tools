@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cell::RefCell,
     collections::HashMap,
     fs::File,
@@ -129,7 +130,8 @@ impl FileSystem for GGPKFS {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = Result<(&'a str, Bytes), (&'a str, anyhow::Error)>> + 'a> {
+    ) -> Box<dyn Iterator<Item = Result<(Cow<'a, str>, Bytes), (Cow<'a, str>, anyhow::Error)>> + 'a>
+    {
         // Get FileInfo's
         let (mut fileinfos, errors) = paths
             .iter()
@@ -158,7 +160,10 @@ impl FileSystem for GGPKFS {
         });
 
         // Add on previous errors
-        Box::new(errors.into_iter().map(Err).chain(file_contents))
+        Box::new(errors.into_iter().map(Err).chain(file_contents).map(|r| {
+            r.map(|(s, b)| (Cow::Borrowed(s), b))
+                .map_err(|(s, e)| (Cow::Borrowed(s), e))
+        }))
     }
 
     fn read(&self, path: &str) -> anyhow::Result<Bytes> {
@@ -227,7 +232,8 @@ impl FileSystem for GGPKBundleFS {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = Result<(&'a str, Bytes), (&'a str, anyhow::Error)>> + 'a> {
+    ) -> Box<dyn Iterator<Item = Result<(Cow<'a, str>, Bytes), (Cow<'a, str>, anyhow::Error)>> + 'a>
+    {
         // Get FileInfo's
         let (fileinfos, errors) = paths
             .iter()
@@ -297,7 +303,10 @@ impl FileSystem for GGPKBundleFS {
         });
 
         // Add on previous errors
-        Box::new(errors.into_iter().map(Err).chain(file_contents))
+        Box::new(errors.into_iter().map(Err).chain(file_contents).map(|r| {
+            r.map(|(s, b)| (Cow::Borrowed(s), b))
+                .map_err(|(s, e)| (Cow::Borrowed(s), e))
+        }))
     }
 
     fn read(&self, path: &str) -> anyhow::Result<Bytes> {

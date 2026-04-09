@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fs,
     hash::{BuildHasher, Hasher},
@@ -62,7 +63,8 @@ impl FileSystem for SteamFS {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = Result<(&'a str, Bytes), (&'a str, anyhow::Error)>> + 'a> {
+    ) -> Box<dyn Iterator<Item = Result<(Cow<'a, str>, Bytes), (Cow<'a, str>, anyhow::Error)>> + 'a>
+    {
         // Get FileInfo's
         let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let (fileinfos, errors) = paths
@@ -125,7 +127,10 @@ impl FileSystem for SteamFS {
         });
 
         // Add on previous errors
-        Box::new(errors.into_iter().map(Err).chain(file_contents))
+        Box::new(errors.into_iter().map(Err).chain(file_contents).map(|r| {
+            r.map(|(s, b)| (Cow::Borrowed(s), b))
+                .map_err(|(s, e)| (Cow::Borrowed(s), e))
+        }))
     }
 
     fn read(&self, path: &str) -> Result<Bytes> {

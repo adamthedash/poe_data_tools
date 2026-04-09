@@ -186,6 +186,91 @@ impl CDNLoader {
 
         Ok(bytes)
     }
+
+    /// Async version of load
+    // TODO: Mutex to prevent multiple concurrent downloads of same file. Shouldn't happen under
+    // normal circumstances
+    pub async fn load_async(&self, path_stub: &Path) -> anyhow::Result<Bytes> {
+        let url = self.base_url.join(
+            path_stub
+                .to_str()
+                .context("Failed to parse path as string")?,
+        )?;
+
+        // Short timeout for initial connection, but none for transfer to allow for fetching large
+        // files on a poor network connection
+        let client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .build()?;
+
+        // If already cached, assume nothing has changed due to version immutability
+        let cache_path = self.cache_dir.join(path_stub);
+        if let Ok(bytes) = tokio::fs::read(&cache_path).await {
+            log::info!("Using cached bundle: {:?}", cache_path);
+            return Ok(Bytes::from(bytes));
+        }
+
+        // Look at fallback caches and see if there's any that match the CDN's
+        let mut fallbacks = self.get_fallbacks(path_stub);
+        let fallback = loop {
+            let Some((fallback_path, fallback_etag)) = fallbacks.next() else {
+                break None;
+            };
+
+            let resp = client
+                .head(url.clone())
+                .header("If-None-Match", fallback_etag.clone())
+                .send()
+                .await?
+                .error_for_status()?;
+            let resp_etag = resp.headers().get("etag").context("no etag")?.to_str()?;
+
+            if resp.status() == StatusCode::NOT_MODIFIED
+                || (resp.status() == StatusCode::OK && resp_etag == fallback_etag)
+            {
+                break Some((fallback_path, fallback_etag));
+            }
+        };
+
+        let bytes = if let Some((fallback_path, _)) = fallback {
+            // Our cached version is the same, copy it to the current version's directory
+            log::info!(
+                "Using cached bundle from different patch: {:?}",
+                fallback_path
+            );
+            tokio::fs::create_dir_all(cache_path.parent().context("Failed to get path parent")?)
+                .await?;
+            tokio::fs::copy(&fallback_path, &cache_path).await?;
+            tokio::fs::copy(
+                fallback_path.with_added_extension("etag"),
+                cache_path.with_added_extension("etag"),
+            )
+            .await?;
+
+            Bytes::from(fs::read(&cache_path)?)
+        } else {
+            // No candidate cached version, download from CDN
+            log::info!("Downloading bundle: {}", url);
+            let resp = client.get(url).send().await?;
+
+            let etag = resp
+                .headers()
+                .get("etag")
+                .context("no etag")?
+                .to_str()?
+                .to_owned();
+
+            let bytes = resp.bytes().await?;
+            tokio::fs::create_dir_all(cache_path.parent().context("Failed to get path parent")?)
+                .await?;
+            tokio::fs::write(&cache_path, &bytes).await?;
+            tokio::fs::write(cache_path.with_added_extension("etag"), etag.as_bytes()).await?;
+
+            bytes
+        };
+
+        Ok(bytes)
+    }
 }
 
 pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {

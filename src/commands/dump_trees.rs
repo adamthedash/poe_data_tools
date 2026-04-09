@@ -120,7 +120,7 @@ pub fn dump_trees(
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
             // Convert the data table
-            let output_path = output_folder.join(filename).with_extension("json");
+            let output_path = output_folder.join(filename.as_ref()).with_extension("json");
             process_file(&contents, &output_path, version, &passive_info)
                 .with_context(|| format!("Failed to process file: {:?}", filename))?;
 

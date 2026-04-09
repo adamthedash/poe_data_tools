@@ -25,17 +25,21 @@ fn bench_version(version: Patch) {
         .batch_read(&filenames)
         .filter_map(Result::ok)
         .map(|(filename, contents)| {
-            let parser = Parser::from_filename(Path::new(filename), version.major())
+            let parser = Parser::from_filename(Path::new(filename.as_ref()), version.major())
                 .expect("Already validated above");
 
             let res = parser.validate(&contents);
 
-            let ext = Path::new(filename).extension().unwrap().to_str().unwrap();
+            let ext = Path::new(filename.as_ref())
+                .extension()
+                .unwrap()
+                .to_str()
+                .unwrap();
 
-            (ext, res)
+            (ext.to_owned(), res)
         })
         .fold(HashMap::new(), |mut hm, (ext, res)| {
-            let version_counts = if let Some(version_counts) = hm.get_mut(ext) {
+            let version_counts = if let Some(version_counts) = hm.get_mut(&ext) {
                 version_counts
             } else {
                 hm.entry(ext.to_string()).or_insert(HashMap::new())

@@ -2,7 +2,10 @@ pub mod cdn;
 pub mod ggpk;
 pub mod steam;
 
-use std::path::{Path, PathBuf};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 
 use bytes::Bytes;
 use cdn::CDNFS;
@@ -22,7 +25,7 @@ pub trait FileSystem {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = Result<(&'a str, Bytes), (&'a str, anyhow::Error)>> + 'a>;
+    ) -> Box<dyn Iterator<Item = Result<(Cow<'a, str>, Bytes), (Cow<'a, str>, anyhow::Error)>> + 'a>;
 
     /// Read a single file's contents
     fn read(&self, path: &str) -> anyhow::Result<Bytes>;
