@@ -9,13 +9,14 @@ use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
 use url::Url;
 
-use super::FileSystem;
+use super::CDNLoader;
 use crate::{
-    bundle::fetch_bundle_content,
     file_parsers::{
         FileParser,
+        bundle::{BundleParser, types::BundleFile},
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
     },
+    fs::FileSystem,
     hasher::murmur64a::BuildMurmurHash64A,
     path::parse_paths,
 };
@@ -23,20 +24,17 @@ use crate::{
 const HASHER: BuildMurmurHash64A = BuildMurmurHash64A { seed: 0x1337b33f };
 
 pub struct CDNFS {
+    cdn_loader: CDNLoader,
     index: BundleIndexFile,
     lut: HashMap<u64, usize>,
-    base_url: Url,
-    cache_dir: PathBuf,
 }
 
 impl CDNFS {
     pub fn new(base_url: &Url, cache_dir: &Path) -> Result<Self> {
-        let index = fetch_index_file(
-            base_url,
-            cache_dir,
-            PathBuf::from("Bundles2/_.index.bin").as_ref(),
-        )
-        .context("Failed to load bundle index")?;
+        let cdn_loader = CDNLoader::new(base_url, cache_dir.to_str().unwrap())?;
+
+        let index = fetch_index_file(&cdn_loader, PathBuf::from("Bundles2/_.index.bin").as_ref())
+            .context("Failed to load bundle index")?;
 
         let lut = index
             .files
@@ -46,10 +44,9 @@ impl CDNFS {
             .collect();
 
         Ok(Self {
+            cdn_loader,
             index,
             lut,
-            base_url: base_url.clone(),
-            cache_dir: cache_dir.to_path_buf(),
         })
     }
 }
@@ -109,9 +106,8 @@ impl FileSystem for CDNFS {
                 "Bundles2/{}.bundle.bin",
                 self.index.bundles[bundle_index as usize].name
             );
-            let bundle =
-                fetch_bundle_content(&self.base_url, &self.cache_dir, Path::new(&bundle_path))
-                    .with_context(|| format!("Failed to fetch bundle file: {:?}", bundle_path));
+            let bundle = fetch_bundle_content(&self.cdn_loader, Path::new(&bundle_path))
+                .with_context(|| format!("Failed to fetch bundle file: {:?}", bundle_path));
 
             // Read the file contents - todo: see if we can do this lazily instead of
             // collecting all files within a bundle at once
@@ -153,7 +149,7 @@ impl FileSystem for CDNFS {
             "Bundles2/{}.bundle.bin",
             self.index.bundles[file.bundle_index as usize].name
         );
-        let bundle = fetch_bundle_content(&self.base_url, &self.cache_dir, Path::new(&bundle_path))
+        let bundle = fetch_bundle_content(&self.cdn_loader, Path::new(&bundle_path))
             .with_context(|| format!("Failed to fetch bundle file: {:?}", bundle_path))?;
 
         // Pull out the file's contents
@@ -163,8 +159,8 @@ impl FileSystem for CDNFS {
 }
 
 /// Fetch an index file from the CDN (or cache)
-pub fn fetch_index_file(base_url: &Url, cache_dir: &Path, path: &Path) -> Result<BundleIndexFile> {
-    let index_content = fetch_bundle_content(base_url, cache_dir, path)
+fn fetch_index_file(cdn_loader: &CDNLoader, path: &Path) -> Result<BundleIndexFile> {
+    let index_content = fetch_bundle_content(cdn_loader, path)
         .context("Failed to fetch bundle index")?
         .read_all();
 
@@ -172,4 +168,16 @@ pub fn fetch_index_file(base_url: &Url, cache_dir: &Path, path: &Path) -> Result
         .parse(&index_content)
         .as_anyhow()
         .context("Failed to parse bundle as index")
+}
+
+// Fetch a bundle file from the CDN (or cache)
+fn fetch_bundle_content(cdn_loader: &CDNLoader, path: &Path) -> Result<BundleFile> {
+    let bundle_content = cdn_loader.load(path).context("Failed to load bundle")?;
+
+    let bundle = BundleParser
+        .parse(&bundle_content)
+        .as_anyhow()
+        .context("Failed to parse bundle")?;
+
+    Ok(bundle)
 }

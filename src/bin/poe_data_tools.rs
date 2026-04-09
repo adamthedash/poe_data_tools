@@ -5,13 +5,12 @@ use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 use glob::Pattern;
 use poe_data_tools::{
     VERBOSE,
-    bundle_loader::cdn_base_url,
     commands::{
         Patch, cat::cat_file, dump_art::extract_art, dump_tables_csv::dump_tables,
         dump_tables_json, dump_trees::dump_trees, extract::extract_files, list::list_files,
         translate::translate,
     },
-    fs::FS,
+    fs::{FS, cdn::cdn_base_url},
 };
 
 #[derive(Debug, Clone, ValueEnum)]

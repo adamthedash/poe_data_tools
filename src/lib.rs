@@ -3,10 +3,10 @@
 #![feature(try_trait_v2)]
 #![feature(never_type)]
 #![feature(f16)]
+#![feature(try_find)]
 use std::sync::OnceLock;
 
 pub mod bundle;
-pub mod bundle_loader;
 pub mod commands;
 pub mod dat;
 pub mod file_parsers;

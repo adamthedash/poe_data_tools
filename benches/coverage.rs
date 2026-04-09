@@ -2,12 +2,11 @@ use std::{collections::HashMap, path::Path};
 
 use itertools::Itertools;
 use poe_data_tools::{
-    bundle_loader::cdn_base_url,
     commands::{
         Patch,
         translate::{FileParserExt, Parser},
     },
-    fs::{FS, FileSystem},
+    fs::{FS, FileSystem, cdn::cdn_base_url},
 };
 
 fn bench_version(version: Patch) {
