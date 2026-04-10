@@ -10,7 +10,6 @@ use winnow::{
 };
 
 use crate::{
-    commands::dump_tables_json::TableResolutionStatus,
     dat::{
         ivy_schema::{ColumnSchema, DatTableSchema},
         table_view::take_utf16_string,
@@ -221,15 +220,13 @@ impl ResolvedRefColumn {
 fn ref_column<'a>(
     column: &ColumnSchema,
     variable_section: &'static [u8],
-    resolved_tables: &HashMap<String, TableResolutionStatus>,
+    resolved_keys: &HashMap<String, Option<Vec<Value>>>,
 ) -> impl WinnowParser<&'a [u8], Value> {
     move |input: &mut &[u8]| -> winnow::Result<_> {
         let target_table = column.references.as_ref().map(|r| r.table.as_str());
-        let target_keys = target_table.and_then(|name| {
-            resolved_tables
-                .get(&name.to_lowercase())
-                .and_then(|t| t.keys())
-        });
+        let target_keys = target_table
+            .and_then(|name| resolved_keys.get(&name.to_lowercase()))
+            .flatten_ref();
 
         let mut ref_parser = |input: &mut &[u8]| -> winnow::Result<_> {
             let row = dispatch! {
@@ -289,7 +286,7 @@ fn ref_column<'a>(
 
 /// Creates a winnow parser from a schema which can then be applied to the bytes of the dat table
 pub fn create_parser<'a>(
-    resolved_tables: &HashMap<String, TableResolutionStatus>,
+    resolved_keys: &HashMap<String, Option<Vec<Value>>>,
     variable_section: &'static [u8],
     schema: &DatTableSchema,
 ) -> impl Parser<&'a [u8], Value, ContextError> {
@@ -298,7 +295,7 @@ pub fn create_parser<'a>(
 
         for (column, column_name) in schema.columns.iter().zip(schema.column_names()) {
             let res = if column.is_ref() {
-                ref_column(column, variable_section, resolved_tables).parse_next(input)
+                ref_column(column, variable_section, resolved_keys).parse_next(input)
             } else {
                 plain_column(column, variable_section).parse_next(input)
             };

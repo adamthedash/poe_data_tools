@@ -4,6 +4,7 @@
 #![feature(never_type)]
 #![feature(f16)]
 #![feature(try_find)]
+#![feature(option_reference_flattening)]
 use std::sync::OnceLock;
 
 pub mod bundle;

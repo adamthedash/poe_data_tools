@@ -71,6 +71,11 @@ impl DatTableSchema {
         })
     }
 
+    /// Iterate over columns and their names
+    pub fn enumerate(&self) -> impl Iterator<Item = (String, &ColumnSchema)> {
+        self.column_names().zip(&self.columns)
+    }
+
     /// Iterate over all columns marked unique in the schema
     pub fn primary_keys(&self) -> impl Iterator<Item = String> {
         self.columns
