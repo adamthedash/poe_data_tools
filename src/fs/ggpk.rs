@@ -284,21 +284,18 @@ impl FileSystem for GGPKBundleFS {
                         .context("Failed to parse bundle")
                 });
 
-            // Read the file contents - todo: see if we can do this lazily instead of
-            // collecting all files within a bundle at once
-            let contents: Vec<_> = match bundle {
-                Ok(b) => files
-                    .into_iter()
-                    .map(|(path, file)| {
-                        b.read_range(file.offset as usize, file.size as usize)
-                            .map(|b| (path, b))
-                            .map_err(|e| (path, e))
-                    })
-                    .collect(),
-                Err(e) => files
-                    .into_iter()
-                    .map(|(path, _)| Err((path, anyhow!("{:?}", e))))
-                    .collect(),
+            // Read the file contents
+            let contents: Box<dyn Iterator<Item = _>> = match bundle {
+                Ok(b) => Box::new(files.into_iter().map(move |(path, file)| {
+                    b.read_range(file.offset as usize, file.size as usize)
+                        .map(|b| (path, b))
+                        .map_err(|e| (path, e))
+                })),
+                Err(e) => Box::new(
+                    files
+                        .into_iter()
+                        .map(move |(path, _)| Err((path, anyhow!("{:?}", e)))),
+                ),
             };
 
             contents

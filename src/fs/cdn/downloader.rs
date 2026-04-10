@@ -326,9 +326,7 @@ fn parse_utf16_string<'a>() -> impl WinnowParser<&'a [u8], String> {
 
 /// Fetch the current latest version of the game
 fn cur_url(host: String, send: &[u8]) -> anyhow::Result<Url> {
-    // Fetch data from the CDN - todo: looks like this returns a list of URLs. Might need to use a
-    // streaming-style parsing instead of just reading 1Kb down the line if there's a bunch of
-    // strings
+    // Fetch data from the CDN
     let mut stream = TcpStream::connect(host)?;
     stream.write_all(send)?;
     let mut buf = [0; 1024];

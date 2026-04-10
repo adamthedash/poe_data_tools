@@ -108,21 +108,18 @@ impl FileSystem for SteamFS {
             let bundle = load_bundle_content(&bundle_path)
                 .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path));
 
-            // Read the file contents - todo: see if we can do this lazily instead of
-            // collecting all files within a bundle at once
-            let contents: Vec<_> = match bundle {
-                Ok(b) => files
-                    .into_iter()
-                    .map(|(path, file)| {
-                        b.read_range(file.offset as usize, file.size as usize)
-                            .map(|b| (path, b))
-                            .map_err(|e| (path, e))
-                    })
-                    .collect(),
-                Err(e) => files
-                    .into_iter()
-                    .map(|(path, _)| Err((path, anyhow!("{:?}", e))))
-                    .collect(),
+            // Read the file contents
+            let contents: Box<dyn Iterator<Item = _>> = match bundle {
+                Ok(b) => Box::new(files.into_iter().map(move |(path, file)| {
+                    b.read_range(file.offset as usize, file.size as usize)
+                        .map(|b| (path, b))
+                        .map_err(|e| (path, e))
+                })),
+                Err(e) => Box::new(
+                    files
+                        .into_iter()
+                        .map(move |(path, _)| Err((path, anyhow!("{:?}", e)))),
+                ),
             };
 
             contents

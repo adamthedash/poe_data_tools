@@ -179,20 +179,18 @@ impl FileSystem for CDNFS {
                     .context("Failed to parse bundle")
             });
 
-            let contents: Vec<_> = match bundle {
-                Ok(b) => files
-                    .into_iter()
-                    .map(|(path, file)| {
-                        match b.read_range(file.offset as usize, file.size as usize) {
-                            Ok(b) => Ok((path, b)),
-                            Err(e) => Err((path, e)),
-                        }
-                    })
-                    .collect(),
-                Err(e) => files
-                    .into_iter()
-                    .map(|(path, _)| Err((path, anyhow!("{:?}", e))))
-                    .collect(),
+            let contents: Box<dyn Iterator<Item = _>> = match bundle {
+                Ok(b) => Box::new(files.into_iter().map(move |(path, file)| {
+                    match b.read_range(file.offset as usize, file.size as usize) {
+                        Ok(b) => Ok((path, b)),
+                        Err(e) => Err((path, e)),
+                    }
+                })),
+                Err(e) => Box::new(
+                    files
+                        .into_iter()
+                        .map(move |(path, _)| Err((path, anyhow!("{:?}", e)))),
+                ),
             };
 
             contents
