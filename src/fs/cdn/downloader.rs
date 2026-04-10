@@ -119,19 +119,19 @@ impl CDNLoader {
                 .context("Failed to parse path as string")?,
         )?;
 
+        // If already cached, assume nothing has changed due to version immutability
+        let cache_path = self.cache_dir.join(path_stub);
+        if let Ok(bytes) = fs::read(&cache_path) {
+            log::debug!("Using cached bundle: {:?}", cache_path);
+            return Ok(Bytes::from(bytes));
+        }
+
         // Short timeout for initial connection, but none for transfer to allow for fetching large
         // files on a poor network connection
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(10))
             .timeout(None)
             .build()?;
-
-        // If already cached, assume nothing has changed due to version immutability
-        let cache_path = self.cache_dir.join(path_stub);
-        if let Ok(bytes) = fs::read(&cache_path) {
-            log::info!("Using cached bundle: {:?}", cache_path);
-            return Ok(Bytes::from(bytes));
-        }
 
         // Look at fallback caches and see if there's any that match the CDN's
         let fallback =
@@ -152,7 +152,7 @@ impl CDNLoader {
 
         let bytes = if let Some((fallback_path, _)) = fallback {
             // Our cached version is the same, copy it to the current version's directory
-            log::info!(
+            log::debug!(
                 "Using cached bundle from different patch: {:?}",
                 fallback_path
             );
@@ -206,7 +206,7 @@ impl CDNLoader {
         // If already cached, assume nothing has changed due to version immutability
         let cache_path = self.cache_dir.join(path_stub);
         if let Ok(bytes) = tokio::fs::read(&cache_path).await {
-            log::info!("Using cached bundle: {:?}", cache_path);
+            log::debug!("Using cached bundle: {:?}", cache_path);
             return Ok(Bytes::from(bytes));
         }
 
@@ -234,7 +234,7 @@ impl CDNLoader {
 
         let bytes = if let Some((fallback_path, _)) = fallback {
             // Our cached version is the same, copy it to the current version's directory
-            log::info!(
+            log::debug!(
                 "Using cached bundle from different patch: {:?}",
                 fallback_path
             );
@@ -250,7 +250,7 @@ impl CDNLoader {
             Bytes::from(fs::read(&cache_path)?)
         } else {
             // No candidate cached version, download from CDN
-            log::info!("Downloading bundle: {}", url);
+            log::debug!("Downloading bundle: {}", url);
             let resp = client.get(url).send().await?;
 
             let etag = resp
@@ -282,7 +282,7 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
     if cache_file.exists() && fs::metadata(&cache_file)?.modified()?.elapsed()?.as_secs() < 3600 {
         let url = Url::parse(fs::read_to_string(&cache_file)?.as_str())
             .with_context(|| "Failed to parse URL")?;
-        log::info!("Using cached CDN URL: {}", url);
+        log::debug!("Using cached CDN URL: {}", url);
         return Ok(url);
     }
 
@@ -306,7 +306,7 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
 
     fs::create_dir_all(&cache_dir).context("Failed to create cache directory")?;
     fs::write(&cache_file, url.as_str()).context("Failed to write URL to cache")?;
-    log::info!("Refreshed CDN URL: {}", url);
+    log::debug!("Refreshed CDN URL: {}", url);
     Ok(url)
 }
 
