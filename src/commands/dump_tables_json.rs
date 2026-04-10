@@ -77,8 +77,8 @@ fn resolve_keys(
         .collect::<Vec<_>>();
 
     if !ref_keys.is_empty() {
+        // This table is not yet ready to be resolved. Push children to stack and go again
         log::debug!("Table not yet resolvable: {table_name}");
-        // This table is not yet ready to be resolved
         resolve_keys_stack.push(table_name.to_owned());
         resolve_keys_stack.extend(ref_keys);
         return Ok(());

@@ -202,7 +202,7 @@ impl GGPKBundleFS {
             .as_anyhow()
             .context("Failed to parse bundle")?;
         let index = BundleIndexParser
-            .parse(&index_bundle.read_all())
+            .parse(&index_bundle.read_all()?)
             .as_anyhow()
             .context("Failed to parse bundle as index")?;
 
@@ -290,7 +290,9 @@ impl FileSystem for GGPKBundleFS {
                 Ok(b) => files
                     .into_iter()
                     .map(|(path, file)| {
-                        Ok((path, b.read_range(file.offset as usize, file.size as usize)))
+                        b.read_range(file.offset as usize, file.size as usize)
+                            .map(|b| (path, b))
+                            .map_err(|e| (path, e))
                     })
                     .collect(),
                 Err(e) => files
@@ -337,7 +339,7 @@ impl FileSystem for GGPKBundleFS {
             .context("Failed to parse bundle")?;
 
         // Pull out the file's contents
-        let content = bundle.read_range(file.offset as usize, file.size as usize);
+        let content = bundle.read_range(file.offset as usize, file.size as usize)?;
         Ok(content)
     }
 }

@@ -7,13 +7,11 @@ use crate::file_parsers::bundle::types::BundleFile;
 
 impl BundleFile {
     /// Return the entire content of the bundle
-    // TODO: decode blocks in parallel
-    //     Also return a result instead of panicing
-    pub fn read_all(&self) -> Bytes {
+    pub fn read_all(&self) -> anyhow::Result<Bytes> {
         self.read_range(0, self.head.uncompressed_size as usize)
     }
 
-    pub fn read_range(&self, offset: usize, len: usize) -> Bytes {
+    pub fn read_range(&self, offset: usize, len: usize) -> anyhow::Result<Bytes> {
         let block_size = self.head.uncompressed_block_granularity as usize;
 
         // Create a buffer, needs to be block-aligned since we're decoding entire blocks into it
@@ -30,15 +28,16 @@ impl BundleFile {
         chunks
             .into_par_iter()
             .zip(&self.blocks[block_start..block_end])
-            .for_each(|(chunk, block)| {
+            .try_for_each(|(chunk, block)| {
                 let mut ext = Extractor::new();
 
                 ext.read_from_slice(block, chunk)
+                    .map(|_| ())
                     .context("Failed to decompress bundle block")
-                    .unwrap();
-            });
+            })?;
 
         // Grab subset form block aligned buffer
-        Bytes::from(buf).slice(offset % block_size..offset % block_size + len)
+        let slice = Bytes::from(buf).slice(offset % block_size..offset % block_size + len);
+        Ok(slice)
     }
 }

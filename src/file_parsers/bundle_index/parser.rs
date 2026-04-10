@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
@@ -47,18 +49,29 @@ fn path_rep<'a>() -> impl WinnowParser<&'a [u8], PathRep> {
     )
 }
 
+/// Wrapper for anyhow::Error that implements std Error so winnow can properly handle them
+#[derive(Debug)]
+pub struct AnyhowError(anyhow::Error);
+impl std::error::Error for AnyhowError {}
+
+impl Display for AnyhowError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 pub fn parse_bundle_index_bytes(contents: &[u8]) -> Result<BundleIndexFile> {
     let mut parser = (
         length_repeat(le_u32, bundle_info()),
         length_repeat(le_u32, file_info()),
         length_repeat(le_u32, path_rep()),
-        bundle(),
+        bundle().try_map(|b| b.read_all().map_err(AnyhowError)),
     )
         .map(|(bundles, files, paths, path_rep_bundle)| BundleIndexFile {
             bundles,
             files,
             paths,
-            path_rep_bundle: path_rep_bundle.read_all(),
+            path_rep_bundle,
         });
 
     let file = parser

@@ -87,7 +87,7 @@ impl FileSystem for CDNFS {
             .with_context(|| format!("Failed to fetch bundle file: {:?}", bundle_path))?;
 
         // Pull out the file's contents
-        let content = bundle.read_range(file.offset as usize, file.size as usize);
+        let content = bundle.read_range(file.offset as usize, file.size as usize)?;
         Ok(content)
     }
 
@@ -183,7 +183,10 @@ impl FileSystem for CDNFS {
                 Ok(b) => files
                     .into_iter()
                     .map(|(path, file)| {
-                        Ok((path, b.read_range(file.offset as usize, file.size as usize)))
+                        match b.read_range(file.offset as usize, file.size as usize) {
+                            Ok(b) => Ok((path, b)),
+                            Err(e) => Err((path, e)),
+                        }
                     })
                     .collect(),
                 Err(e) => files
@@ -207,7 +210,7 @@ impl FileSystem for CDNFS {
 fn fetch_index_file(cdn_loader: &CDNLoader, path: &Path) -> Result<BundleIndexFile> {
     let index_content = fetch_bundle_content(cdn_loader, path)
         .context("Failed to fetch bundle index")?
-        .read_all();
+        .read_all()?;
 
     BundleIndexParser
         .parse(&index_content)

@@ -114,7 +114,9 @@ impl FileSystem for SteamFS {
                 Ok(b) => files
                     .into_iter()
                     .map(|(path, file)| {
-                        Ok((path, b.read_range(file.offset as usize, file.size as usize)))
+                        b.read_range(file.offset as usize, file.size as usize)
+                            .map(|b| (path, b))
+                            .map_err(|e| (path, e))
                     })
                     .collect(),
                 Err(e) => files
@@ -156,7 +158,9 @@ impl FileSystem for SteamFS {
             .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path))?;
 
         // Pull out the file's contents
-        let content = bundle.read_range(file.offset as usize, file.size as usize);
+        let content = bundle
+            .read_range(file.offset as usize, file.size as usize)
+            .context("Failed to read bytes from bundle")?;
         Ok(content)
     }
 }
@@ -165,7 +169,8 @@ impl FileSystem for SteamFS {
 fn load_index_file(path: &Path) -> Result<BundleIndexFile> {
     let index_content = load_bundle_content(path)
         .context("Failed to read bundle index")?
-        .read_all();
+        .read_all()
+        .context("Failed to read bytes from bundle")?;
 
     BundleIndexParser
         .parse(&index_content)
