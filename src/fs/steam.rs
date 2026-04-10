@@ -63,8 +63,7 @@ impl FileSystem for SteamFS {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = Result<(Cow<'a, str>, Bytes), (Cow<'a, str>, anyhow::Error)>> + 'a>
-    {
+    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, anyhow::Result<Bytes>)> + 'a> {
         // Get FileInfo's
         let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let (fileinfos, errors) = paths
@@ -77,12 +76,10 @@ impl FileSystem for SteamFS {
                 let hash = hasher.finish();
 
                 // Look up the file info for this file
-                self.lut
-                    .get(&hash)
-                    .map(|i| &self.index.files[*i])
-                    .with_context(|| format!("Path not found in index: {}", path))
-                    .map(|f| (path, f))
-                    .map_err(|e| (path, e))
+                match self.lut.get(&hash).map(|i| &self.index.files[*i]) {
+                    Some(f) => Ok((path, f)),
+                    None => Err((path, Err(anyhow!("Path not found in index: {}", path)))),
+                }
             })
             .bucket_result();
 
@@ -111,14 +108,12 @@ impl FileSystem for SteamFS {
             // Read the file contents
             let contents: Box<dyn Iterator<Item = _>> = match bundle {
                 Ok(b) => Box::new(files.into_iter().map(move |(path, file)| {
-                    b.read_range(file.offset as usize, file.size as usize)
-                        .map(|b| (path, b))
-                        .map_err(|e| (path, e))
+                    (path, b.read_range(file.offset as usize, file.size as usize))
                 })),
                 Err(e) => Box::new(
                     files
                         .into_iter()
-                        .map(move |(path, _)| Err((path, anyhow!("{:?}", e)))),
+                        .map(move |(path, _)| (path, Err(anyhow!("{:?}", e)))),
                 ),
             };
 
@@ -126,10 +121,12 @@ impl FileSystem for SteamFS {
         });
 
         // Add on previous errors
-        Box::new(errors.into_iter().map(Err).chain(file_contents).map(|r| {
-            r.map(|(s, b)| (Cow::Borrowed(s), b))
-                .map_err(|(s, e)| (Cow::Borrowed(s), e))
-        }))
+        Box::new(
+            errors
+                .into_iter()
+                .chain(file_contents)
+                .map(|(path, r)| (Cow::Borrowed(path), r)),
+        )
     }
 
     fn read(&self, path: &str) -> Result<Bytes> {

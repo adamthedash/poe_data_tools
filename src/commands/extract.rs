@@ -27,9 +27,9 @@ pub fn extract_files(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) ->
 
     fs.batch_read(&filenames)
         // Print and filter out errors
-        .filter_map(|f| match f {
-            Ok(x) => Some(x),
-            Err((path, e)) => {
+        .filter_map(|(path, res)| match res {
+            Ok(b) => Some((path, b)),
+            Err(e) => {
                 log::error!("Failed to extract file: {:?}: {:?}", path, e);
                 None
             }

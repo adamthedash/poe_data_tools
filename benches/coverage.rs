@@ -23,7 +23,10 @@ fn bench_version(version: Patch) {
 
     let results = fs
         .batch_read(&filenames)
-        .filter_map(Result::ok)
+        .filter_map(|(path, res)| match res {
+            Ok(b) => Some((path, b)),
+            Err(_) => None,
+        })
         .map(|(filename, contents)| {
             let parser = Parser::from_filename(Path::new(filename.as_ref()), version.major())
                 .expect("Already validated above");

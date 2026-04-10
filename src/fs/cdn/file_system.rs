@@ -94,25 +94,25 @@ impl FileSystem for CDNFS {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = Result<(Cow<'a, str>, Bytes), (Cow<'a, str>, anyhow::Error)>> + 'a>
-    {
+    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, anyhow::Result<Bytes>)> + 'a> {
         // Get FileInfo's
         let (fileinfos, errors) = paths
             .iter()
             .map(|path| {
-                let path = path.as_ref();
+                let path = path.as_ref().to_owned();
                 // Compute hash
                 let mut hasher = HASHER.build_hasher();
                 hasher.write(path.to_lowercase().as_bytes());
                 let hash = hasher.finish();
 
                 // Look up the file info for this file
-                self.lut
-                    .get(&hash)
-                    .map(|i| self.index.files[*i].clone())
-                    .with_context(|| format!("Path not found in index: {}", path))
-                    .map(|f| (path.to_owned(), f))
-                    .map_err(|e| (path.to_owned(), e))
+                match self.lut.get(&hash).map(|i| self.index.files[*i].clone()) {
+                    Some(f) => Ok((path, f)),
+                    None => {
+                        let e = anyhow!("Path not found in index: {}", path);
+                        Err((path, Err(e)))
+                    }
+                }
             })
             .bucket_result();
 
@@ -181,15 +181,12 @@ impl FileSystem for CDNFS {
 
             let contents: Box<dyn Iterator<Item = _>> = match bundle {
                 Ok(b) => Box::new(files.into_iter().map(move |(path, file)| {
-                    match b.read_range(file.offset as usize, file.size as usize) {
-                        Ok(b) => Ok((path, b)),
-                        Err(e) => Err((path, e)),
-                    }
+                    (path, b.read_range(file.offset as usize, file.size as usize))
                 })),
                 Err(e) => Box::new(
                     files
                         .into_iter()
-                        .map(move |(path, _)| Err((path, anyhow!("{:?}", e)))),
+                        .map(move |(path, _)| (path, Err(anyhow!("{:?}", e)))),
                 ),
             };
 
@@ -197,10 +194,12 @@ impl FileSystem for CDNFS {
         });
 
         // Add on previous errors
-        Box::new(errors.into_iter().map(Err).chain(file_contents).map(|r| {
-            r.map(|(s, b)| (Cow::Owned(s), b))
-                .map_err(|(s, e)| (Cow::Owned(s), e))
-        }))
+        Box::new(
+            errors
+                .into_iter()
+                .chain(file_contents)
+                .map(|(path, r)| (Cow::Owned(path), r)),
+        )
     }
 }
 

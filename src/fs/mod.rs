@@ -25,7 +25,7 @@ pub trait FileSystem {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = Result<(Cow<'a, str>, Bytes), (Cow<'a, str>, anyhow::Error)>> + 'a>;
+    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, anyhow::Result<Bytes>)> + 'a>;
 
     /// Read a single file's contents
     fn read(&self, path: &str) -> anyhow::Result<Bytes>;

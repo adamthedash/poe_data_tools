@@ -540,11 +540,12 @@ pub fn dump_tables(
 
     fs.batch_read(&filenames)
         // Print and filter out errors
-        .filter_map(|f| {
-            f.inspect_err(|(path, e)| {
+        .filter_map(|(path, res)| match res {
+            Ok(b) => Some((path, b)),
+            Err(e) => {
                 log::error!("Failed to extract file: {:?}: {:?}", path, e);
-            })
-            .ok()
+                None
+            }
         })
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
