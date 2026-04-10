@@ -204,6 +204,31 @@ fn resolve_table(
     Ok(parsed)
 }
 
+fn dump_table(
+    fs: &mut FS,
+    version: &Patch,
+    schemas: &SchemaCollection,
+    output_folder: &Path,
+    resolved: &mut ResolvedKeys,
+    filename: &str,
+) -> anyhow::Result<()> {
+    let path = Path::new(&filename);
+    let table_name = path.file_stem().unwrap().to_str().unwrap().to_lowercase();
+
+    let json = resolve_table(fs, schemas, version, resolved, &table_name)
+        .context("Failed to resolve table")?;
+
+    // Save out
+    let output_path = output_folder.join(path).with_added_extension("json");
+    fs::create_dir_all(output_path.parent().unwrap()).context("Failed to create output folder")?;
+
+    let mut out =
+        BufWriter::new(File::create(&output_path).context("Failed to create output file")?);
+    serde_json::to_writer_pretty(&mut out, &json).context("Failed to serialize json")?;
+
+    Ok(())
+}
+
 pub fn dump_tables(
     fs: &mut FS,
     patterns: &[Pattern],
@@ -271,37 +296,27 @@ pub fn dump_tables(
         })
         .collect::<Vec<_>>();
 
-    filenames
-        .into_iter()
-        .map(|filename| -> anyhow::Result<_> {
-            let path = Path::new(&filename);
-            let table_name = path.file_stem().unwrap().to_str().unwrap().to_lowercase();
+    filenames.into_iter().for_each(|filename| {
+        let result = dump_table(
+            fs,
+            version,
+            &schemas,
+            output_folder,
+            &mut resolved,
+            &filename,
+        );
 
-            let json = resolve_table(fs, &schemas, version, &mut resolved, &table_name)
-                .context("Failed to resolve table")?;
-
-            // Save out
-            let output_path = output_folder.join(path).with_added_extension("json");
-            fs::create_dir_all(output_path.parent().unwrap())
-                .context("Failed to create output folder")?;
-
-            let mut out =
-                BufWriter::new(File::create(&output_path).context("Failed to create output file")?);
-            serde_json::to_writer_pretty(&mut out, &json).context("Failed to serialize json")?;
-
-            Ok(filename)
-        })
-        .for_each(|result| match result {
-            Ok(filename) => log::info!("Extracted file: {}", filename),
-            Err(e) => {
-                let error_message = if *VERBOSE.get().unwrap() {
-                    format!("{e:?}")
-                } else {
-                    format!("{e}")
-                };
-                log::error!("Failed to extract file: {error_message}");
-            }
-        });
+        if let Err(e) = result {
+            let error_message = if *VERBOSE.get().unwrap() {
+                format!("{e:?}")
+            } else {
+                format!("{e}")
+            };
+            log::error!("Failed to extract file {filename:?}: {error_message}");
+        } else {
+            log::info!("Extracted file: {}", filename);
+        }
+    });
 
     Ok(())
 }
