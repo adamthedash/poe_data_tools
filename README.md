@@ -254,6 +254,9 @@ PoE 2 (patch 4.4.0.11.2), PoE Data Tools v1.7.1
 ## RS File Format
 ![rs format](./images/rs_spec.png)  
 
+## SM File Format
+![sm format](./images/sm_spec.png)  
+
 ## SMD File Format
 ![smd format](./images/smd_spec.png)  
 
