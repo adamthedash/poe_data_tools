@@ -1,6 +1,7 @@
 #![feature(trait_alias)]
 #![feature(str_from_utf16_endian)]
 #![feature(try_trait_v2)]
+#![feature(try_trait_v2_residual)]
 #![feature(never_type)]
 #![feature(f16)]
 #![feature(try_find)]
