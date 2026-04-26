@@ -64,7 +64,7 @@ pub fn dolm<'a>() -> impl WinnowParser<&'a [u8], Dolm> {
 
         let shape_extents: Vec<_> = repeat(
             header.num_lods as usize,
-            repeat(
+            repeat::<_, _, Vec<_>, _, _>(
                 header.num_shapes as usize,
                 repeat_array(le_u32).map(|[start_index, count_index]| DolmShapeExtents {
                     start_index,
