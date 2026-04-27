@@ -105,24 +105,46 @@ pub fn index_buffer(
         .trace("index_buffer")
 }
 
-pub fn dolm() -> impl U8Parser<Output = Dolm> {
-    let c0h = u16::LE.trace("c0h").store();
-
-    let lod_count = u8::LE.store();
-    let shape_count = u16::LE.store();
-    let vertex_format = u32::LE.trace("vertex_format").store();
-    let vertex_format_output = vertex_format.output();
-    let (vertex, vertex_conf) = vertex(vertex_format.output());
-    let vertex_format = vertex_format.configuring(vertex_conf);
-
+fn mesh(
+    vertex_format: ForwardRef<u32>,
+    num_shapes: ForwardRef<u16>,
+    temp_lod_extents: ForwardRef<[u32; 2]>,
+) -> (impl U8Parser<Output = Mesh>, impl Fn()) {
     let shape_extents = u32::LE
         .repeat::<2>()
         .map_silent(|[start_index, count_index]| DolmShapeExtents {
             start_index,
             count_index,
         })
-        .repeat_vec(shape_count.output())
-        .repeat_vec(lod_count.output());
+        .repeat_vec(num_shapes)
+        .trace("shape_extents");
+
+    let temp_num_vertices = temp_lod_extents.clone().map(|[_, v]| *v);
+    let single_index_buffer = index_buffer(
+        temp_lod_extents.clone().map(|[t, _]| *t),
+        temp_num_vertices.clone(),
+    );
+
+    let (vertex, vertex_conf) = vertex(vertex_format);
+    let vertex_buffer = vertex.repeat_vec(temp_num_vertices);
+
+    let mesh = (shape_extents, single_index_buffer, vertex_buffer)
+        .map_silent(|(shape_extents, indices, vertices)| Mesh {
+            shape_extents,
+            indices,
+            vertices,
+        })
+        .trace("mesh");
+
+    (mesh, vertex_conf)
+}
+
+pub fn dolm() -> impl U8Parser<Output = Dolm> {
+    // Header
+    let c0h = u16::LE.trace("c0h").store();
+    let lod_count = u8::LE.store().trace("num_lods");
+    let shape_count = u16::LE.store().trace("num_shapes");
+    let vertex_format = u32::LE.trace("vertex_format").store();
 
     let header_lod_extents = u32::LE
         .repeat::<2>()
@@ -131,51 +153,23 @@ pub fn dolm() -> impl U8Parser<Output = Dolm> {
         .store();
 
     let temp_lod_extents = ForwardRef::<[u32; 2]>::new_source();
-    let single_index_buffer = index_buffer(
-        temp_lod_extents.clone().map(|[t, _]| *t),
-        temp_lod_extents.clone().map(|[_, v]| *v),
+    let (mesh, mesh_conf) = mesh(
+        vertex_format.output(),
+        shape_count.output(),
+        temp_lod_extents.clone(),
     );
-    let index_buffers = single_index_buffer
+    let vertex_format = vertex_format.configuring(mesh_conf);
+
+    let lods = mesh
         .parameterize(header_lod_extents.output(), temp_lod_extents)
-        .trace("index_buffers");
-
-    let temp_num_vertices = ForwardRef::new_source();
-    let vertex_buffer = vertex.repeat_vec(temp_num_vertices.clone());
-    let num_vertices = header_lod_extents.output().map(|extents| {
-        extents
-            .iter()
-            .map(|[_, num_vertices]| *num_vertices)
-            .collect::<Vec<_>>()
-    });
-    let vertex_buffers = vertex_buffer
-        .parameterize(num_vertices, temp_num_vertices)
-        .trace("vertex_buffers");
-
-    let lods = (
-        shape_extents, //
-        index_buffers,
-        vertex_buffers,
-    )
-        .map_silent(|(shape_extents, index_buffers, vertex_buffers)| {
-            shape_extents
-                .into_iter()
-                .zip(index_buffers)
-                .zip(vertex_buffers)
-                .map(|((extents, indices), vertices)| Mesh {
-                    shape_extents: extents,
-                    indices,
-                    vertices,
-                })
-                .collect()
-        })
         .trace("lods");
 
     let extra_vformat_6 = take_arr_u8::<36>()
         .repeat_vec(shape_count.output())
-        .run_if(vertex_format_output.clone().map(|v| (*v >> 6) & 1 == 1));
+        .run_if(vertex_format.output().map(|v| (*v >> 6) & 1 == 1));
 
     let extra_vformat_6_c0h_2 = take_arr_u8::<4>().repeat_vec(shape_count.output()).run_if(
-        (c0h.output(), vertex_format_output).map(|(c0h, vf)| *c0h == 2 && (*vf >> 6) & 1 == 1),
+        (c0h.output(), vertex_format.output()).map(|(c0h, vf)| *c0h == 2 && (*vf >> 6) & 1 == 1),
     );
 
     let extra_c0h_4 = take_arr_u8::<4>().run_if(
