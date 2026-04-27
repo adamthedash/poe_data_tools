@@ -9,7 +9,7 @@ pub struct TGMFile {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ShapeExtents {
+pub struct ShapeExtentsV8 {
     pub ordinal: Option<u16>,
     pub bbox: [f32; 6],
     pub index_base: u32,
@@ -18,7 +18,7 @@ pub struct ShapeExtents {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Mesh {
-    pub shape_extents: Vec<ShapeExtents>,
+    pub shape_extents: Vec<ShapeExtentsV8>,
     pub indices: IndexBuffer,
     pub vertices: Vec<DolmVertex>,
 }
@@ -39,14 +39,13 @@ pub struct V8Section {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct V9Section {
-    pub extra_bytes: [u8; 4],
+    pub extra_u16s: [u16; 2],
     pub geometries: Vec<Geometry>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ShapeExtentsV9 {
     pub ordinal: u32,
-    pub main_bytes: Option<[u8; 2]>,
     pub bbox: [f32; 6],
 }
 

@@ -1,6 +1,6 @@
 use annotated_parser::{
     AnnotationMode, ForwardRef,
-    parsers::{EoF, TakeArray, TakeVec, byte::F16LE},
+    parsers::{EoF, TakeVec, byte::F16LE},
     prelude::*,
 };
 
@@ -31,11 +31,11 @@ fn geom_info() -> impl U8Parser<Output = GeomInfo> {
         .trace("geom_info")
 }
 
-fn shape() -> impl U8Parser<Output = ShapeExtents> {
+fn shape() -> impl U8Parser<Output = ShapeExtentsV8> {
     let ordinal = u16::LE.map_silent(Some);
 
     (ordinal, f32::LE.repeat::<6>(), u32::LE, u32::LE)
-        .map_silent(|(ordinal, bbox, index_base, index_count)| ShapeExtents {
+        .map_silent(|(ordinal, bbox, index_base, index_count)| ShapeExtentsV8 {
             ordinal,
             bbox,
             index_base,
@@ -201,31 +201,30 @@ fn v8_section(version: ForwardRef<u8>) -> impl U8Parser<Output = V8Section> {
         .trace("v8_section")
 }
 
-fn v9_section() -> impl U8Parser<Output = V9Section> {
-    let num_shapes = u16::LE.store();
-    let extra_bytes = TakeArray::<4>;
+fn v9_section(version: ForwardRef<u8>) -> impl U8Parser<Output = V9Section> {
+    let num_shapes = u16::LE.store().trace("num_shapes");
+    let extra_u16s = u16::LE.repeat::<2>().trace("extra_u16s");
 
-    let dolm = dolm().store();
+    let dolm = dolm().store().trace("dolm");
 
     let is_main_mesh = ForwardRef::new_source();
     let ordinal = (
         u16::LE.map_silent(|x| x as u32), //
         u32::LE,
     )
-        .dispatch(is_main_mesh.clone().map(|m| Some(*m as usize)))
+        .dispatch((version, is_main_mesh.clone()).map(|(v, m)| {
+            let index = match (*v, *m) {
+                (9, _) => 0,
+                (_, false) => 0,
+                _ => 1,
+            };
+            Some(index)
+        }))
         .trace("ordinal");
     let bbox = f32::LE.repeat::<6>().trace("bbox");
 
-    let shape_bounds = (
-        ordinal, //
-        ParserAdapter::<&[u8]>::run_if(TakeArray::<2>, is_main_mesh.clone()),
-        bbox,
-    )
-        .map_silent(|(ordinal, main_bytes, bbox)| ShapeExtentsV9 {
-            ordinal,
-            main_bytes,
-            bbox,
-        })
+    let shape_bounds = (ordinal, bbox)
+        .map_silent(|(ordinal, bbox)| ShapeExtentsV9 { ordinal, bbox })
         .repeat_vec(
             // TODO: just use num_shapes above?
             dolm.output()
@@ -240,17 +239,19 @@ fn v9_section() -> impl U8Parser<Output = V9Section> {
         })
         .parameterize(ForwardRef::with_value(vec![true, false]), is_main_mesh);
 
-    (num_shapes, extra_bytes, geom_parsers).map_silent(|(_, extra_bytes, geometries)| V9Section {
-        extra_bytes,
-        geometries,
-    })
+    (num_shapes, extra_u16s, geom_parsers)
+        .map_silent(|(_, extra_u16s, geometries)| V9Section {
+            extra_u16s,
+            geometries,
+        })
+        .trace("v9_section")
 }
 
 pub fn tgm_parser() -> (impl U8Parser<Output = TGMFile>, ForwardRef<u32>) {
     let version = u8::LE.store();
     let section = (
         v8_section(version.output()).map_silent(Section::V8), //
-        v9_section().map_silent(Section::V9),
+        v9_section(version.output()).map_silent(Section::V9),
     )
         .dispatch(version.output().map(|v| {
             let index = if *v < 9 { 0 } else { 1 };
