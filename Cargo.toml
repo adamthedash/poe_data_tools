@@ -1,6 +1,6 @@
 [package]
 name = "poe_data_tools"
-version = "1.7.1"
+version = "1.7.2"
 edition = "2024"
 default-run = "poe_data_tools"
 
