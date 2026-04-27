@@ -46,8 +46,8 @@ arrow-schema = "56.2.0"
 # Forked version of winnow with better debugging capabilities
 winnow = { git = "https://github.com/adamthedash/winnow.git" }
 
-# annotated_parser = { git = "https://github.com/adamthedash/annotated_parser.git", features = ["f16"] }
-annotated_parser = { path = "../annotated_parser", features = ["f16"] }
+annotated_parser = { git = "https://github.com/adamthedash/annotated_parser.git", features = ["f16"] }
+# annotated_parser = { path = "../annotated_parser", features = ["f16"] }
 
 [features]
 default = []
