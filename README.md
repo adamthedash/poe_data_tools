@@ -263,6 +263,9 @@ PoE 2 (patch 4.4.0.11.2), PoE Data Tools v1.7.1
 ## TGM File Format
 ![tgm format](./images/tgm_spec.png)  
 
+## TGT File Format
+![tgt format](./images/tgt_spec.png)  
+
 ## TMO File Format
 ![tmo format](./images/tmo_spec.png)  
 
