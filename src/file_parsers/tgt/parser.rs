@@ -55,10 +55,11 @@ fn subtile_material_indices(
         .trace("subtile_material_indices")
 }
 
-pub fn tgt_file() -> (impl StrParser<Output = TGTFile>, ForwardRef<u32>) {
-    let version = "version ".ignore_then(U32).store();
-    let version_out = version.output();
+fn ground_mask() -> impl StrParser<Output = String> {
+    "GroundMask ".ignore_then(quoted())
+}
 
+fn v3_section() -> impl StrParser<Output = V3Section> {
     let size = "Size ".ignore_then(U32.separated_arr::<2, _>(" ")).store();
 
     let normal_materials = "NormalMaterials "
@@ -68,41 +69,81 @@ pub fn tgt_file() -> (impl StrParser<Output = TGTFile>, ForwardRef<u32>) {
     let subtile_material_indices = subtile_material_indices(size.output())
         .run_if(normal_materials.output().map(|mats| !mats.is_empty()));
 
-    let parser = (
-        version,
+    (
+        "SourceScene ".ignore_then(quoted()).optional(),
         size,
         "TileMeshRoot ".ignore_then(quoted()),
-        "GroundMask ".ignore_then(quoted()).optional(),
+        ground_mask().optional(),
         normal_materials,
         "MaterialSlots "
             .ignore_then(LengthRepeat::new(U32, whitespace().ignore_then(quoted())))
             .optional(),
         subtile_material_indices,
-        EoF,
     )
         .separated_tuple(whitespace())
         .map_silent(
             |(
-                version,
+                source_scene,
                 size,
                 tile_mesh_root,
                 ground_mask,
                 normal_materials,
                 material_slots,
                 subtile_material_indices,
-                _,
-            )| {
-                TGTFile {
-                    version,
-                    size,
-                    tile_mesh_root,
-                    ground_mask,
-                    normal_materials,
-                    material_slots,
-                    subtile_material_indices,
-                }
+            )| V3Section {
+                source_scene,
+                size,
+                tile_mesh_root,
+                ground_mask,
+                normal_materials,
+                material_slots,
+                subtile_material_indices,
             },
         )
+        .trace("v3_section")
+}
+
+fn v1_normal_material() -> impl StrParser<Output = V1NormalMaterial> {
+    (quoted(), U32)
+        .separated_tuple(whitespace())
+        .map_silent(|(mat_file, uint)| V1NormalMaterial { mat_file, uint })
+        .trace("v1_normal_material")
+}
+
+fn v1_section() -> impl StrParser<Output = V1Section> {
+    (
+        "TileMesh ".ignore_then(quoted()),
+        ground_mask().optional(),
+        "NormalMaterials ".ignore_then(LengthRepeat::new(
+            U32,
+            whitespace().ignore_then(v1_normal_material()),
+        )),
+    )
+        .separated_tuple(whitespace())
+        .map_silent(|(tile_mesh, ground_mask, normal_materials)| V1Section {
+            tile_mesh,
+            ground_mask,
+            normal_materials,
+        })
+        .trace("v1_section")
+}
+
+pub fn tgt_file() -> (impl StrParser<Output = TGTFile>, ForwardRef<u32>) {
+    let version = "version ".ignore_then(U32).store();
+    let version_out = version.output();
+
+    let section = (
+        v1_section().map_silent(Section::V1), //
+        v3_section().map_silent(Section::V3),
+    )
+        .dispatch(version.output().map(|v| match *v {
+            ..3 => Some(0),
+            3.. => Some(1),
+        }));
+
+    let parser = (version, section, EoF)
+        .separated_tuple(whitespace())
+        .map_silent(|(version, section, _)| TGTFile { version, section })
         .trace("tgt_file");
 
     (parser, version_out)
