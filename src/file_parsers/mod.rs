@@ -27,6 +27,7 @@ pub mod shared;
 pub mod sm;
 pub mod smd;
 pub mod tgm;
+pub mod tgt;
 pub mod tmo;
 pub mod toy;
 pub mod trl;
