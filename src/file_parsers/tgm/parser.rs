@@ -226,7 +226,7 @@ fn v9_section(version: ForwardRef<u8>) -> impl U8Parser<Output = V9Section> {
         u16::LE.map_silent(|x| x as u32), //
         u32::LE,
     )
-        .dispatch((version, is_main_mesh.clone()).map(|(v, m)| {
+        .dispatch((version.clone(), is_main_mesh.clone()).map(|(v, m)| {
             let index = match (*v, *m) {
                 (9, _) => 0,
                 (_, false) => 0,
@@ -237,8 +237,16 @@ fn v9_section(version: ForwardRef<u8>) -> impl U8Parser<Output = V9Section> {
         .trace("ordinal");
     let bbox = f32::LE.repeat::<6>().trace("bbox");
 
-    let shape_bounds = (ordinal, bbox)
-        .map_silent(|(ordinal, bbox)| ShapeExtentsV9 { ordinal, bbox })
+    let shape_bounds = (
+        ordinal, //
+        u16::LE.run_if((version, is_main_mesh.clone()).map(|(v, m)| *v >= 12 && *m)),
+        bbox,
+    )
+        .map_silent(|(ordinal, v12_u16, bbox)| ShapeExtentsV9 {
+            ordinal,
+            bbox,
+            v12_u16,
+        })
         .repeat_vec(
             // TODO: just use num_shapes above?
             dolm.output()

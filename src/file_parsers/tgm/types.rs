@@ -56,6 +56,7 @@ pub struct TailEntry {
 #[derive(Debug, Clone, Serialize)]
 pub struct ShapeExtentsV9 {
     pub ordinal: u32,
+    pub v12_u16: Option<u16>,
     pub bbox: [f32; 6],
 }
 
