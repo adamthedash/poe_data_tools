@@ -39,8 +39,18 @@ pub struct V8Section {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct V9Section {
-    pub extra_u16s: [u16; 2],
+    pub extra_u16: u16,
+    pub extra_u8: u8,
     pub geometries: Vec<Geometry>,
+    pub tail: Vec<TailEntry>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TailEntry {
+    pub uint1: u32,
+    pub floats: [f32; 12],
+    pub uint2: u32,
+    pub bytes: [u8; 31],
 }
 
 #[derive(Debug, Clone, Serialize)]

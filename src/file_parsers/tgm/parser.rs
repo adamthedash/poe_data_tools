@@ -1,6 +1,6 @@
 use annotated_parser::{
     AnnotationMode, ForwardRef,
-    parsers::{EoF, TakeVec, byte::F16LE},
+    parsers::{EoF, TakeArray, TakeVec, byte::F16LE},
     prelude::*,
 };
 
@@ -201,9 +201,23 @@ fn v8_section(version: ForwardRef<u8>) -> impl U8Parser<Output = V8Section> {
         .trace("v8_section")
 }
 
+fn tail_entry() -> impl U8Parser<Output = TailEntry> {
+    (u32::LE, f32::LE.repeat::<12>(), u32::LE, TakeArray::<31>)
+        .map_silent(|(uint1, floats, uint2, bytes)| TailEntry {
+            uint1,
+            floats,
+            uint2,
+            bytes,
+        })
+        .trace("tail_entry")
+}
+
 fn v9_section(version: ForwardRef<u8>) -> impl U8Parser<Output = V9Section> {
+    // header
     let num_shapes = u16::LE.store().trace("num_shapes");
-    let extra_u16s = u16::LE.repeat::<2>().trace("extra_u16s");
+    let extra_u16 = u16::LE.trace("extra_u16");
+    let extra_u8 = u8::LE.trace("extra_u8");
+    let tail_count = u8::LE.trace("tail_count").store();
 
     let dolm = dolm().store().trace("dolm");
 
@@ -237,12 +251,24 @@ fn v9_section(version: ForwardRef<u8>) -> impl U8Parser<Output = V9Section> {
             dolm,
             shape_extents,
         })
-        .parameterize(ForwardRef::with_value(vec![true, false]), is_main_mesh);
+        .parameterize(ForwardRef::with_value(vec![true, false]), is_main_mesh)
+        .trace("geometries");
 
-    (num_shapes, extra_u16s, geom_parsers)
-        .map_silent(|(_, extra_u16s, geometries)| V9Section {
-            extra_u16s,
+    let tail = tail_entry().repeat_vec(tail_count.output());
+
+    (
+        num_shapes,
+        extra_u16,
+        extra_u8,
+        tail_count,
+        geom_parsers,
+        tail,
+    )
+        .map_silent(|(_, extra_u16, extra_u8, _, geometries, tail)| V9Section {
+            extra_u16,
+            extra_u8,
             geometries,
+            tail,
         })
         .trace("v9_section")
 }
