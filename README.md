@@ -260,6 +260,9 @@ PoE 2 (patch 4.4.0.11.2), PoE Data Tools v1.7.1
 ## SMD File Format
 ![smd format](./images/smd_spec.png)  
 
+## TGM File Format
+![tgm format](./images/tgm_spec.png)  
+
 ## TMO File Format
 ![tmo format](./images/tmo_spec.png)  
 

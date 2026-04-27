@@ -3,14 +3,14 @@ use serde_with::serde_as;
 
 use crate::file_parsers::shared::serialise::SerF16;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub enum IndexBuffer {
     U16(Vec<u16>),
     U32(Vec<u32>),
 }
 
 #[serde_as]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Dolm {
     pub c0h: u16,
     pub vertex_format: u32,
@@ -23,21 +23,21 @@ pub struct Dolm {
     pub extra_c0h_4: Option<[u8; 4]>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Mesh {
     pub shape_extents: Vec<DolmShapeExtents>,
     pub indices: IndexBuffer,
     pub vertices: Vec<DolmVertex>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DolmShapeExtents {
     pub start_index: u32,
     pub count_index: u32,
 }
 
 #[serde_as]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DolmVertex {
     pub pos: [f32; 3],
     pub normal: [i8; 4],

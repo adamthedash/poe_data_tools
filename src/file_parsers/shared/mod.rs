@@ -1,3 +1,4 @@
+pub mod annotated_parser;
 pub mod lift;
 pub mod serialise;
 pub mod versioned_result;

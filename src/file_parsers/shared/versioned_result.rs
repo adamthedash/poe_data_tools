@@ -1,14 +1,12 @@
 use std::{
     convert::Infallible,
-    ops::{ControlFlow, FromResidual, Try},
+    ops::{ControlFlow, FromResidual, Residual, Try},
 };
 
 use anyhow::Context;
 
 pub type VersionedResult<T> = VersionedResult2<T, anyhow::Error>;
 
-/// Wrapper around a result that optionally carries a file version
-/// Used for tracking pass/fails where the file format version is discovered during pasring
 pub struct VersionedResult2<T, E> {
     pub version: Option<u32>,
     pub inner: Result<T, E>,
@@ -94,4 +92,9 @@ impl<T, E> FromResidual<VersionedResult2<!, E>> for VersionedResult2<T, E> {
             inner: Err(e),
         }
     }
+}
+
+// Required due to https://github.com/rust-lang/rust/pull/154451
+impl<T, E> Residual<T> for VersionedResult2<!, E> {
+    type TryType = VersionedResult2<T, E>;
 }
