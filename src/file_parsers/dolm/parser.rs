@@ -55,6 +55,33 @@ fn vertex<'a>(vertex_format: u32) -> impl WinnowParser<&'a [u8], DolmVertex> {
     winnow::trace!("vertex", parser)
 }
 
+fn mesh<'a>(
+    num_shapes: usize,
+    num_triangles: u32,
+    num_vertices: u32,
+    vertex_format: u32,
+) -> impl WinnowParser<&'a [u8], Mesh> {
+    let shape_extents = repeat(
+        num_shapes,
+        repeat_array(le_u32).map(|[start_index, count_index]| DolmShapeExtents {
+            start_index,
+            count_index,
+        }),
+    );
+
+    let index_buffer = index_buffer(num_vertices, num_triangles);
+
+    let vertex_buffer = repeat(num_vertices as usize, vertex(vertex_format));
+
+    let parser = (shape_extents, index_buffer, vertex_buffer).map(|(e, i, v)| Mesh {
+        shape_extents: e,
+        indices: i,
+        vertices: v,
+    });
+
+    winnow::trace!("mesh", parser)
+}
+
 pub fn dolm<'a>() -> impl WinnowParser<&'a [u8], Dolm> {
     let parser = |input: &mut &[u8]| {
         let header = header().parse_next(input)?;
@@ -62,42 +89,18 @@ pub fn dolm<'a>() -> impl WinnowParser<&'a [u8], Dolm> {
         let lod_extents: Vec<_> =
             repeat(header.num_lods as usize, repeat_array(le_u32)).parse_next(input)?;
 
-        let shape_extents: Vec<_> = repeat(
-            header.num_lods as usize,
-            repeat::<_, _, Vec<_>, _, _>(
-                header.num_shapes as usize,
-                repeat_array(le_u32).map(|[start_index, count_index]| DolmShapeExtents {
-                    start_index,
-                    count_index,
-                }),
-            ),
-        )
-        .parse_next(input)?;
-
-        let index_buffers: Vec<_> = lod_extents
+        let lods = lod_extents
             .iter()
             .map(|[num_triangles, num_vertices]| {
-                index_buffer(*num_vertices, *num_triangles).parse_next(input)
+                mesh(
+                    header.num_shapes as usize,
+                    *num_triangles,
+                    *num_vertices,
+                    header.vertex_format,
+                )
+                .parse_next(input)
             })
             .collect::<winnow::Result<Vec<_>>>()?;
-
-        let vertex_buffers: Vec<_> = lod_extents
-            .iter()
-            .map(|[_, num_vertices]| {
-                repeat(*num_vertices as usize, vertex(header.vertex_format)).parse_next(input)
-            })
-            .collect::<winnow::Result<Vec<_>>>()?;
-
-        let lods = shape_extents
-            .into_iter()
-            .zip(index_buffers)
-            .zip(vertex_buffers)
-            .map(|((e, i), v)| Mesh {
-                shape_extents: e,
-                indices: i,
-                vertices: v,
-            })
-            .collect();
 
         let (extra_vformat_6, extra_vformat_6_c0h_2, extra_c0h_4) = (
             cond(
