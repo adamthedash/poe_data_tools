@@ -11,3 +11,5 @@ scratch
 perf*
 flamegraph*
 **/trace-*.json
+src/bin/benchmarks.rs
+scratch/
