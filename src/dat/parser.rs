@@ -193,6 +193,7 @@ impl ResolvedRefColumn {
 
 /// Foreign/self references, enums, and arrays of them
 ///
+///```ignore
 ///  Return values:
 ///  null   // Null scalar index
 ///  []     // Empty array / interval
@@ -216,7 +217,7 @@ impl ResolvedRefColumn {
 ///         131235,
 ///      ]
 ///  }
-///
+///```
 fn ref_column<'a>(
     column: &ColumnSchema,
     variable_section: &'static [u8],
