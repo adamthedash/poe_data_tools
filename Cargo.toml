@@ -27,7 +27,6 @@ serde = {version = "1.0.228", features = ["derive"]}
 serde_with = "3.18.0"
 serde_json = { version = "1.0.145", features = ["preserve_order"] }
 rayon = "1.11.0"
-image = { git = "https://github.com/RunDevelopment/image", branch = "new-dds-decoder" }
 iterators_extended = "0.2.0"
 itertools = "0.14.0"
 regex = "1.12.3"
@@ -48,6 +47,10 @@ winnow = { git = "https://github.com/adamthedash/winnow.git" }
 
 annotated_parser = { version = "0.1.0", features = ["f16"] }
 # annotated_parser = { path = "../annotated_parser", features = ["f16"] }
+
+# For art decoding
+image = "0.25.10"
+image-extras = { version = "0.1.1", default-features = false, features = ["dds"]}
 
 [features]
 default = []

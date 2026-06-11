@@ -7,6 +7,8 @@ use crate::fs::{FS, FileSystem};
 
 /// Extract files to disk matching a glob pattern
 pub fn extract_art(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Result<()> {
+    image_extras::register();
+
     for pattern in patterns {
         ensure!(
             pattern.as_str().ends_with(".dds"),
