@@ -49,7 +49,7 @@ annotated_parser = { version = "0.1.0", features = ["f16"] }
 # annotated_parser = { path = "../annotated_parser", features = ["f16"] }
 
 # For art decoding
-image = "0.25.10"
+image = { version = "0.25.10", default-features = false, features=  ["png"] }
 image-extras = { version = "0.1.1", default-features = false, features = ["dds"]}
 
 [features]
