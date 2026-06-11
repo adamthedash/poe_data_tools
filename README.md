@@ -296,7 +296,6 @@ PoE 2 (patch 4.4.0.12), PoE Data Tools v1.7.3
 # TODO List
 
 - Proper documentation for the lib crate
-- Swap image.rs version once [DDS support is merged](https://github.com/image-rs/image/pull/2258)
 
 # Resources
 https://gitlab.com/zao/poe-rs  

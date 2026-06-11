@@ -43,7 +43,7 @@ arrow-cast = "56.2.0"
 arrow-schema = "56.2.0"
 
 # Forked version of winnow with better debugging capabilities
-winnow = { git = "https://github.com/adamthedash/winnow.git" }
+winnow = { package = "adamthedash_winnow", version = "1.0.0" }
 
 annotated_parser = { version = "0.1.0", features = ["f16"] }
 # annotated_parser = { path = "../annotated_parser", features = ["f16"] }
