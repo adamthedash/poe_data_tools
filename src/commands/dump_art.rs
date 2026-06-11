@@ -3,7 +3,10 @@ use std::{fs, path::Path};
 use anyhow::{Context, Result, ensure};
 use glob::{MatchOptions, Pattern};
 
-use crate::fs::{FS, FileSystem};
+use crate::{
+    VERBOSE,
+    fs::{FS, FileSystem},
+};
 
 /// Extract files to disk matching a glob pattern
 pub fn extract_art(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Result<()> {
@@ -42,20 +45,29 @@ pub fn extract_art(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> R
         })
         // Attempt to read file contents
         .map(|(filename, contents)| -> Result<_, anyhow::Error> {
-            let img = image::load_from_memory(&contents).context("Failed to pares DDS image")?;
+            let img = image::load_from_memory(&contents)
+                .with_context(|| format!("Failed to parse DDS image: {filename}"))?;
 
             let out_filename = output_folder.join(filename.as_ref()).with_extension("png");
             fs::create_dir_all(out_filename.parent().unwrap())
-                .context("Failed to create folder")?;
+                .with_context(|| format!("Failed to create output folder: {out_filename:?}"))?;
 
-            img.save(out_filename).context("Failed to write file")?;
+            img.save(out_filename)
+                .with_context(|| format!("Failed to write file: {filename}"))?;
 
             Ok(filename)
         })
         // Report results
         .for_each(|result| match result {
             Ok(filename) => log::info!("Extracted file: {}", filename),
-            Err(e) => log::error!("Failed to extract file: {:?}", e),
+            Err(e) => {
+                let error_message = if *VERBOSE.get().unwrap() {
+                    format!("{e:?}")
+                } else {
+                    format!("{e}")
+                };
+                log::error!("Failed to extract file: {error_message}");
+            }
         });
 
     Ok(())
