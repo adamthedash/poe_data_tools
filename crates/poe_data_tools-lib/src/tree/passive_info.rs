@@ -11,8 +11,8 @@ use itertools::izip;
 use serde::Serialize;
 
 use crate::{
-    commands::{Patch, dump_tables_csv::load_parsed_table},
-    dat::ivy_schema::fetch_schema,
+    Patch,
+    dat::{ivy_schema::fetch_schema, table::load_parsed_table},
     fs::FS,
 };
 

@@ -3,10 +3,8 @@ use std::{io::BufWriter, path::Path};
 use anyhow::{Context, Result};
 use enum_dispatch::enum_dispatch;
 use glob::{MatchOptions, Pattern};
-use serde::Serialize;
-
-use crate::{
-    commands::Patch,
+use poe_data_tools::{
+    Patch,
     file_parsers::{
         FileParser, amd::AMDParser, ao::AOParser, arm::ARMParser, cht::CHTParser, clt::CLTParser,
         dct::DCTParser, ddt::DDTParser, dlp::DLPParser, ecf::ECFParser, epk::EPKParser,
@@ -18,6 +16,7 @@ use crate::{
     },
     fs::{FS, FileSystem},
 };
+use serde::Serialize;
 
 #[enum_dispatch]
 pub trait FileParserExt {

@@ -4,13 +4,15 @@ use anyhow::{Context, Result, ensure};
 use clap::{ArgGroup, Parser, Subcommand, ValueEnum};
 use glob::Pattern;
 use poe_data_tools::{
+    Patch,
+    fs::{FS, cdn::cdn_base_url},
+};
+use poe_data_tools_cli::{
     VERBOSE,
     commands::{
-        Patch, cat::cat_file, dump_art::extract_art, dump_tables_csv::dump_tables,
-        dump_tables_json, dump_trees::dump_trees, extract::extract_files, list::list_files,
-        translate::translate,
+        cat::cat_file, dump_art::extract_art, dump_tables_csv::dump_tables, dump_tables_json,
+        dump_trees::dump_trees, extract::extract_files, list::list_files, translate::translate,
     },
-    fs::{FS, cdn::cdn_base_url},
 };
 
 #[derive(Debug, Clone, ValueEnum)]

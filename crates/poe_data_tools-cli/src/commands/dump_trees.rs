@@ -7,10 +7,8 @@ use std::{
 
 use anyhow::{Context, Result, ensure};
 use glob::{MatchOptions, Pattern};
-
-use super::Patch;
-use crate::{
-    VERBOSE,
+use poe_data_tools::{
+    Patch,
     file_parsers::{
         FileParser,
         psg::{PSGParser, types::PSGFile},
@@ -21,6 +19,8 @@ use crate::{
         psg::PassiveSkillGraph,
     },
 };
+
+use crate::VERBOSE;
 
 fn process_file(
     contents: &[u8],

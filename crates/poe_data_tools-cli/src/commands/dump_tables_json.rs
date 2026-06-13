@@ -7,11 +7,8 @@ use std::{
 
 use anyhow::{Context, Result, ensure};
 use glob::{MatchOptions, Pattern};
-use winnow::Parser;
-
-use crate::{
-    VERBOSE,
-    commands::Patch,
+use poe_data_tools::{
+    Patch,
     dat::{
         ivy_schema::{Enumeration, SchemaCollection, fetch_schema, load_schema},
         parser::create_parser,
@@ -22,6 +19,9 @@ use crate::{
     },
     fs::{FS, FileSystem},
 };
+use winnow::Parser;
+
+use crate::VERBOSE;
 
 fn resolve_enum(schema: &Enumeration) -> Vec<serde_json::Value> {
     std::iter::repeat_n(serde_json::Value::Null, schema.indexing)

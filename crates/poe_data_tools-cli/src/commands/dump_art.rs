@@ -2,11 +2,9 @@ use std::{fs, path::Path};
 
 use anyhow::{Context, Result, ensure};
 use glob::{MatchOptions, Pattern};
+use poe_data_tools::fs::{FS, FileSystem};
 
-use crate::{
-    VERBOSE,
-    fs::{FS, FileSystem},
-};
+use crate::VERBOSE;
 
 /// Extract files to disk matching a glob pattern
 pub fn extract_art(fs: &mut FS, patterns: &[Pattern], output_folder: &Path) -> Result<()> {

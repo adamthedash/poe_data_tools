@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use anyhow::Result;
 use serde::Deserialize;
 
-use crate::commands::Patch;
+use crate::Patch;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct SchemaCollection {
