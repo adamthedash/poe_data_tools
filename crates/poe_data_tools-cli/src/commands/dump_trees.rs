@@ -1,0 +1,144 @@
+use std::{
+    collections::HashMap,
+    fs::{File, create_dir_all},
+    io::BufWriter,
+    path::Path,
+};
+
+use anyhow::{Context, Result, ensure};
+use glob::{MatchOptions, Pattern};
+use poe_data_tools::{
+    Patch,
+    file_parsers::{
+        FileParser,
+        psg::{PSGParser, types::PSGFile},
+    },
+    fs::{FS, FileSystem},
+    tree::{
+        passive_info::{PassiveSkillInfo, load_passive_info},
+        psg::PassiveSkillGraph,
+    },
+};
+
+use crate::VERBOSE;
+
+fn process_file(
+    contents: &[u8],
+    output_path: &Path,
+    version: &Patch,
+    passive_info: &HashMap<u16, PassiveSkillInfo>,
+) -> Result<()> {
+    // Parse the PSG file
+    let psg_file = PSGParser {
+        version: version.major(),
+    }
+    .parse(contents)
+    .as_anyhow()
+    .context("Failed to parse passive skill tree")?;
+
+    // Add passive info - only nodes that are in the graph
+    let passive_info = {
+        let ids = psg_file
+            .groups
+            .iter()
+            .flat_map(|g| g.passives.iter().map(|p| p.id as u16));
+        ids.map(|id| (id, passive_info[&id].clone())).collect()
+    };
+
+    let passive_tree = {
+        let PSGFile {
+            version,
+            graph_type,
+            passives_per_orbit,
+            root_passives,
+            groups,
+        } = psg_file;
+
+        PassiveSkillGraph {
+            version,
+            graph_type,
+            passives_per_orbit,
+            root_passives,
+            groups,
+            passive_info,
+        }
+    };
+
+    // Write to file
+    create_dir_all(output_path.parent().context("No parent directory")?)
+        .context("Failed to create output dirs")?;
+
+    let f = File::create(output_path)
+        .with_context(|| format!("Failed to create file {:?}", output_path))?;
+    let f = BufWriter::new(f);
+
+    serde_json::to_writer_pretty(f, &passive_tree).context("Failed to serialise tree to JSON")
+}
+
+pub fn dump_trees(
+    fs: &mut FS,
+    patterns: &[Pattern],
+    output_folder: &Path,
+    version: &Patch,
+    cache_dir: &Path,
+) -> Result<()> {
+    for pattern in patterns {
+        ensure!(
+            pattern.as_str().ends_with(".psg"),
+            "Only .psg tree export is supported."
+        );
+    }
+
+    let filenames = fs
+        .list()
+        .filter(|filename| {
+            patterns.iter().any(|pattern| {
+                pattern.matches_with(
+                    filename,
+                    MatchOptions {
+                        require_literal_separator: true,
+                        ..Default::default()
+                    },
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let passive_info = load_passive_info(fs, version, cache_dir)?
+        .into_iter()
+        .map(|p| (p.graph_passive_id, p))
+        .collect::<HashMap<_, _>>();
+
+    fs.batch_read(&filenames)
+        // Print and filter out errors
+        .filter_map(|(path, res)| match res {
+            Ok(b) => Some((path, b)),
+            Err(e) => {
+                log::error!("Failed to extract file: {:?}: {:?}", path, e);
+                None
+            }
+        })
+        // Attempt to read file contents
+        .map(|(filename, contents)| -> Result<_, anyhow::Error> {
+            // Convert the data table
+            let output_path = output_folder.join(filename.as_ref()).with_extension("json");
+            process_file(&contents, &output_path, version, &passive_info)
+                .with_context(|| format!("Failed to process file: {:?}", filename))?;
+
+            Ok(filename)
+        })
+        // Report results
+        .for_each(|result| match result {
+            Ok(filename) => log::info!("Extracted tree: {}", filename),
+            Err(e) => {
+                let error_message = if *VERBOSE.get().unwrap() {
+                    format!("{e:?}")
+                } else {
+                    format!("{e}")
+                };
+                log::error!("Failed to extract tree: {error_message}");
+            }
+        });
+
+    Ok(())
+}

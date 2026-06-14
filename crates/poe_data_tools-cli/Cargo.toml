@@ -1,0 +1,46 @@
+[package]
+name = "poe_data_tools-cli"
+version = "2.0.0"
+readme = "README.md"
+description = "A CLI for working with Path of Exile game data"
+
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+
+[[bin]]
+name = "poe_data_tools"
+path = "src/main.rs"
+
+[features]
+default = []
+debug = ["winnow/debug"]
+
+[dependencies]
+poe_data_tools = { path = "../poe_data_tools-lib", version = "1.0.0" }
+
+anyhow = "1.0.100"
+
+clap = { version = "4.5.53", features = ["derive", "string", "help"] }
+dirs = "6.0.0"
+bytes = "1.11.0"
+glob = "0.3.3"
+serde = {version = "1.0.228", features = ["derive"]}
+serde_json = { version = "1.0.145", features = ["preserve_order"] }
+itertools = "0.14.0"
+enum_dispatch = "0.3.13"
+log = "0.4.29"
+env_logger = "0.11.10"
+
+# Arrow - for dataframe stuff
+arrow-csv = "56.2.0"
+arrow-array = "56.2.0"
+arrow-cast = "56.2.0"
+arrow-schema = "56.2.0"
+
+# Forked version of winnow with better debugging capabilities
+winnow = { package = "adamthedash_winnow", version = "1.0.0" }
+
+# For art decoding
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+image-extras = { version = "0.1.1", default-features = false, features = ["dds"]}
