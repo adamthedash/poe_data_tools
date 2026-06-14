@@ -1,4 +1,10 @@
 # PoE Data Tools
+
+[![LICENSE-MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE-MIT)
+[![LICENSE-APACHE](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](../../LICENSE-APACHE)
+[![Crates.io Version](https://img.shields.io/crates/v/poe_data_tools.svg)](https://crates.io/crates/poe_data_tools)
+[![Docs](https://docs.rs/poe_data_tools/badge.svg)](https://docs.rs/poe_data_tools/latest/poe_data_tools)
+
 A library for accessing & parsing Path of Exile game files.
 
 # Features

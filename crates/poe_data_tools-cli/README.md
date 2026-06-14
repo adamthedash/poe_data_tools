@@ -1,4 +1,8 @@
 # PoE Data Tools
+[![LICENSE-MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE-MIT)
+[![LICENSE-APACHE](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](../../LICENSE-APACHE)
+[![Crates.io Version](https://img.shields.io/crates/v/poe_data_tools-cli.svg)](https://crates.io/crates/poe_data_tools-cli)
+
 A command line utility for working with Path of Exile game files.  
 
 # Commands
