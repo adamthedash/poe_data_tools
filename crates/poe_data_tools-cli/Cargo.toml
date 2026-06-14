@@ -2,6 +2,7 @@
 name = "poe_data_tools-cli"
 version = "2.0.0"
 readme = "README.md"
+description = "A CLI for working with Path of Exile game data"
 
 edition = { workspace = true }
 license = { workspace = true }
