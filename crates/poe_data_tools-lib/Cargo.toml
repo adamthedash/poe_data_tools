@@ -1,7 +1,11 @@
 [package]
 name = "poe_data_tools"
 version = "1.0.0"
-edition = "2024"
+readme = "README.md"
+
+edition = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
 
 [lib]
 name = "poe_data_tools"

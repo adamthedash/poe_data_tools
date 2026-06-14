@@ -2,6 +2,7 @@ use std::hash::{BuildHasher, Hasher};
 
 use murmurhash64::murmur_hash64a;
 
+/// Hasher used internally by GGG
 pub struct MurmurHash64A {
     seed: u64,
     data: Vec<u8>,

@@ -71,9 +71,13 @@ use trl::TRLParser;
 use tsi::TSIParser;
 use tst::TSTParser;
 
+/// A trait for parsing binary file contents into a structured type
 pub trait FileParser {
+    /// Structured output type
     type Output;
 
+    /// Attempt to parse a set of bytes. If the file contains a version before parsing fails, it is
+    /// returned along with the result.
     fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output>;
 }
 

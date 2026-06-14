@@ -5,11 +5,17 @@ See [here](./crates/poe_data_tools-cli) for more info on the CLI.
 See [here](./crates/poe_data_tools-lib) for more info on the rust crate.  
 See [here](FORMATS.md) for knowledge base of PoE file formats.  
 
-# TODO List
+### AI Disclaimer
+Everything here has been has been lovingly hand crafted, but I won't rule out the use of LLMs down the line. If/when that happens, its use will be clearly outlined here.
 
-- Proper documentation for the lib crate
+### TODO List
+- (lib) Better documentation / public API redesign
+- (lib) Anyhow -> structured errors
+- (lib) Native async API for filesystem
+- (lib) Improve download scheduling for `CDNFS::batch_read`
+- (repo) Use shared workspace dependencies, relax version reqs for lib
 
-# Resources (mostly for me)
+### Resources (mostly for me)
 https://gitlab.com/zao/poe-rs  
 https://gist.github.com/zao/96cb1869db121fbd038f8cd66f7d5736 - for .fmt/tdt/tgm  
 https://gitlab.com/zao/poe-cpp/-/tree/master/libpoe/poe/format  

@@ -5,6 +5,11 @@ members = [
 	"crates/poe_data_tools-lib"
 ]
 
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/adamthedash/poe_data_tools"
+
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
 opt-level = 1

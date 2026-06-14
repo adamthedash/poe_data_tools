@@ -20,6 +20,7 @@ use winnow::{
 
 use crate::file_parsers::shared::winnow::WinnowParser;
 
+/// Bundle loader backed by GGG's CDN + local cache
 pub struct CDNLoader {
     /// CDN Url
     base_url: Url,
@@ -49,7 +50,10 @@ fn get_fallback_cache_dirs(cache_dir: &Path) -> anyhow::Result<(Vec<PathBuf>, Ve
     // Split cache dirs into older/newer patches
     let [mut old, mut new] = parent
         .read_dir()
-        .context("Failed to read cache dir")?
+        .map(|d| d.collect::<Vec<_>>())
+        // Default to no fallback dirs
+        .unwrap_or(vec![])
+        .into_iter()
         .filter_map(Result::ok)
         .filter_map(|p| {
             let binding = p.file_name();
@@ -273,6 +277,7 @@ impl CDNLoader {
     }
 }
 
+/// Get the base URL for the CDN for the provided game version. Uses cached version if available.
 pub fn cdn_base_url(cache_dir: &Path, version: &str) -> anyhow::Result<Url> {
     // Check cache for version URL
     let cache_dir = cache_dir.join("cdn_url");

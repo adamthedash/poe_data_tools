@@ -33,7 +33,7 @@ struct FileInfo {
     length: usize,
 }
 
-/// A file system over the the Content.ggpk file
+/// File system using a local Content.ggpk file
 pub struct GGPKFS {
     file: RefCell<BufReader<File>>,
     index: GGPKFile,
@@ -73,6 +73,7 @@ fn enumerate_file_info(
 }
 
 impl GGPKFS {
+    /// Provided path should point to a Content.ggpk file
     pub fn new(ggpk_path: &Path) -> anyhow::Result<Self> {
         let mut file = BufReader::new(File::open(ggpk_path)?);
         let index = parse_ggpk(&mut file)?;

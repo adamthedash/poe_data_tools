@@ -26,13 +26,17 @@ use crate::{
 
 const HASHER: BuildMurmurHash64A = BuildMurmurHash64A { seed: 0x1337b33f };
 
+/// File system backed by GGG's CDN + local cache
 pub struct CDNFS {
+    /// Bundle loader
     cdn_loader: Arc<CDNLoader>,
     index: BundleIndexFile,
+    /// File hash -> index lookup
     lut: HashMap<u64, usize>,
 }
 
 impl CDNFS {
+    /// Create a new filesystem backed by the provided CDN and cache location
     pub fn new(base_url: &Url, cache_dir: &Path) -> Result<Self> {
         let cdn_loader = CDNLoader::new(base_url, cache_dir.to_str().unwrap())?;
 
@@ -55,7 +59,6 @@ impl CDNFS {
 }
 
 impl FileSystem for CDNFS {
-    /// Lists all paths in the index
     fn list(&self) -> Box<dyn Iterator<Item = String> + '_> {
         Box::new(
             self.index

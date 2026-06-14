@@ -21,6 +21,7 @@ use crate::{
     path::parse_paths,
 };
 
+/// File system using local Steam installation backend
 pub struct SteamFS {
     index: BundleIndexFile,
     lut: HashMap<u64, usize>,
@@ -28,7 +29,8 @@ pub struct SteamFS {
 }
 
 impl SteamFS {
-    /// Initialise a file system over a steam folder
+    /// Initialise a file system over a steam folder. Provided path should be the root Path of Exile
+    /// installation.
     pub fn new(steam_folder: PathBuf) -> Result<Self> {
         let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
         let index = load_index_file(&index_path).context("Failed to load bundle index")?;

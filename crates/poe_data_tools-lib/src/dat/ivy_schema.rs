@@ -5,6 +5,7 @@ use serde::Deserialize;
 
 use crate::Patch;
 
+/// Full set of Dat table schemas
 #[derive(Deserialize, Debug, Clone)]
 pub struct SchemaCollection {
     pub tables: Vec<DatTableSchema>,
@@ -36,11 +37,17 @@ impl SchemaCollection {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Enumeration {
+    /// PoE Version
+    /// 1 - PoE 1
+    /// 2 - PoE 2
+    /// 3 - Common
     #[serde(rename = "validFor")]
     pub valid_for: u32,
     /// Table name
     pub name: String,
+    /// 0 or 1 indexed
     pub indexing: usize,
+    /// Enum values
     pub enumerators: Vec<Option<String>>,
 }
 
@@ -94,19 +101,25 @@ impl DatTableSchema {
     }
 }
 
+/// Schema for a single column of a table
 #[derive(Deserialize, Debug, Clone)]
 pub struct ColumnSchema {
     pub name: Option<String>,
     pub description: Option<String>,
+    /// Whether this column represents an array of values
     pub array: bool,
+    /// Primitive type contained in this column
     #[serde(rename = "type")]
     pub column_type: String,
+    /// Whether values in this column are unique (i.e. can be used as a key)
     pub unique: bool,
     pub localized: bool,
+    /// Foreign table that values refer to
     pub references: Option<References>,
     pub until: Option<String>,
     pub file: Option<String>,
     pub files: Option<Vec<String>>,
+    /// Whether this column represents a numeric interval (from..to)
     pub interval: bool,
 }
 
@@ -131,17 +144,19 @@ impl ColumnSchema {
     }
 }
 
+/// Foreign table name
 #[derive(Deserialize, Debug, Clone)]
 pub struct References {
     pub table: String,
 }
 
-/// Load a schema from a local path
+/// Load a schema collection from a local path
 pub fn load_schema(path: &Path) -> Result<SchemaCollection> {
     log::info!("Loading schema from: {:?}", path);
     Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
 }
 
+/// Fetch the latest schema collection or fall back to cache
 pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
     const SCHEMA_URL: &str =
         "https://github.com/poe-tool-dev/dat-schema/releases/download/latest/schema.min.json";

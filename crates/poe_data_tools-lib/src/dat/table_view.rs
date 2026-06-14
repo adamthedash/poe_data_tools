@@ -15,6 +15,7 @@ pub fn take_utf16_string(input: &[u8]) -> String {
     String::from_utf16(&u16_data).expect("Failed to parse UTF-16 string.")
 }
 
+/// Methods for reading Dat tables column-wise
 impl DatFile {
     /// Number of bytes in a row
     pub fn width(&self) -> usize {

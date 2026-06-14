@@ -7,6 +7,10 @@ use anyhow::Context;
 
 pub type VersionedResult<T> = VersionedResult2<T, anyhow::Error>;
 
+/// Result type that optionally carries a version with it. Used in file parsing to track when there
+/// are specific file format versions which are failing. Versioned formats often have their version
+/// number at the beginning of the file, which can be successfully captured even if parsing fails
+/// later on
 pub struct VersionedResult2<T, E> {
     pub version: Option<u32>,
     pub inner: Result<T, E>,
@@ -49,6 +53,7 @@ impl<T, E> Try for VersionedResult2<T, E> {
     }
 }
 
+/// Helper trait for wrapping results with version info
 pub trait VersionedResultExt<T, E> {
     fn with_version(self, version: Option<u32>) -> VersionedResult2<T, E>;
     fn unversioned(self) -> VersionedResult2<T, E>;

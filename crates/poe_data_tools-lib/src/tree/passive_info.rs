@@ -16,6 +16,7 @@ use crate::{
     fs::FS,
 };
 
+/// Helper to interpret Arrow dataframe columns
 trait ColumnHelper {
     fn get_column_as<T: ArrowPrimitiveType>(&self, column: &str) -> Result<&PrimitiveArray<T>>;
 
@@ -313,6 +314,7 @@ pub fn load_passive_info(
     Ok(passive_skills)
 }
 
+/// Zip many iterators together
 struct Zip<I> {
     iters: Vec<I>,
 }

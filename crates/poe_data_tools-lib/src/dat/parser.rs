@@ -123,19 +123,25 @@ fn plain_column<'a>(
     }
 }
 
+/// A single reference that has been resolved
 enum ResolvedRef {
     Null,
+    /// Dereferenced value
     Valid(Value),
-    // Row index
+    /// Fall back to row index
     Invalid(usize),
 }
 
+/// A single table cell with references that have been resolved
 enum ResolvedRefColumn {
+    /// Single ref
     Scalar(ResolvedRef),
+    /// Array-like of refs
     Multi(Vec<ResolvedRef>),
 }
 
 impl ResolvedRefColumn {
+    /// Serialise the cell to a JSON value
     fn serialise(&self, table_name: Option<&str>, has_keys: bool) -> Value {
         match self {
             ResolvedRefColumn::Scalar(resolved_ref) => match resolved_ref {

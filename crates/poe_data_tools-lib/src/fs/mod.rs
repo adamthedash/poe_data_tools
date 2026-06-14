@@ -31,10 +31,14 @@ pub trait FileSystem {
     fn read(&self, path: &str) -> anyhow::Result<Bytes>;
 }
 
+/// File system over one of several data sources
 #[enum_dispatch(FileSystem)]
 pub enum FS {
+    /// Locally installed game via Steam
     Steam(SteamFS),
+    /// Remote data source with local cache using GGG's CDN
     CDN(CDNFS),
+    /// Locally installed game via standalone installer
     GGPK(GGPKBundleFS),
 }
 
