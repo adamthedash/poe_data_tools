@@ -20,7 +20,7 @@ use bytes::Bytes;
 use glob::{MatchOptions, Pattern};
 use poe_data_tools::{
     Patch,
-    dat::ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection, fetch_schema, load_schema},
+    dat::ivy_schema::{ColumnSchema, DatTableSchema, fetch_schema, load_schema},
     file_parsers::{
         FileParser,
         dat::{DatParser, types::DatFile},
@@ -526,7 +526,7 @@ pub fn dump_tables(
                 .find(|t| {
                     *t.name.to_lowercase() == *PathBuf::from(filename.as_ref()).file_stem().unwrap()
                 })
-                .with_context(|| format!("Couldn't find schema for {:?}", &filename))?;
+                .with_context(|| format!("Couldn't find schema for {:?}", filename))?;
 
             // Convert the data table
             let output_path = output_folder.join(filename.as_ref()).with_extension("csv");

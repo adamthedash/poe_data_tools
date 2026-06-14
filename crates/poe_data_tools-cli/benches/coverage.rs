@@ -3,9 +3,9 @@ use std::{collections::HashMap, path::Path};
 use itertools::Itertools;
 use poe_data_tools::{
     Patch,
+    file_parsers::{FileParserExt, Parser},
     fs::{FS, FileSystem, cdn::cdn_base_url},
 };
-use poe_data_tools_cli::commands::translate::{FileParserExt, Parser};
 
 fn bench_version(version: Patch) {
     // Set up file system

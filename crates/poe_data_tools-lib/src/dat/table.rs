@@ -396,7 +396,7 @@ pub fn load_parsed_table(
         // valid_for == 3 is common between both games
         .filter(|t| t.valid_for == version || t.valid_for == 3)
         .find(|t| *t.name.to_lowercase() == *PathBuf::from(&filename).file_stem().unwrap())
-        .with_context(|| format!("Couldn't find schema for {:?}", &filename))?;
+        .with_context(|| format!("Couldn't find schema for {:?}", filename))?;
 
     // Load dat file
     let bytes = fs.read(filename)?;
