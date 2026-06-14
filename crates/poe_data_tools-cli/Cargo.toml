@@ -35,14 +35,3 @@ winnow = { package = "adamthedash_winnow", version = "1.0.0" }
 # For art decoding
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 image-extras = { version = "0.1.1", default-features = false, features = ["dds"]}
-
-[dev-dependencies]
-criterion = { version = "0.3", features = ["html_reports"] }
-
-[[bench]]
-name = "fs"
-harness = false
-
-[[bench]]
-name = "coverage"
-harness = false
