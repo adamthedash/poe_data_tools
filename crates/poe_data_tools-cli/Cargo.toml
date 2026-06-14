@@ -3,12 +3,16 @@ name = "poe_data_tools-cli"
 version = "2.0.0"
 edition = "2024"
 
+[[bin]]
+name = "poe_data_tools"
+path = "src/main.rs"
+
 [features]
 default = []
 debug = ["winnow/debug"]
 
 [dependencies]
-poe_data_tools = { path = "../poe_data_tools-lib" }
+poe_data_tools = { path = "../poe_data_tools-lib", version = "1.0.0" }
 
 anyhow = "1.0.100"
 
