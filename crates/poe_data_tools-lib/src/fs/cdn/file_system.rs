@@ -37,7 +37,7 @@ pub struct CDNFS {
 
 impl CDNFS {
     /// Create a new filesystem backed by the provided CDN and cache location
-    pub fn new(base_url: &Url, cache_dir: &Path) -> Result<Self> {
+    pub fn new(base_url: &Url, cache_dir: &Path) -> anyhow::Result<Self> {
         let cdn_loader = CDNLoader::new(base_url, cache_dir.to_str().unwrap())?;
 
         let index = fetch_index_file(&cdn_loader, PathBuf::from("Bundles2/_.index.bin").as_ref())

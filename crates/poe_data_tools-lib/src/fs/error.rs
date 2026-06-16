@@ -13,9 +13,13 @@ pub enum Error {
     #[error(transparent)]
     Reqwest(#[from] Arc<reqwest::Error>),
 
-    /// Non-existent or malformed game version
-    #[error("invalid game version: {0:?}")]
-    InvalidGameVersion(String),
+    /// Catchall for any failures when processing network responses
+    #[error("received invalid response: {0}")]
+    InvalidResponse(String),
+
+    /// Bad user-provided config value catchall
+    #[error("invalid config: {0}")]
+    InvalidConfig(String),
 
     /// Path does not exist in the virtual file system
     #[error("file not found in virtual file system: {0:?}")]
