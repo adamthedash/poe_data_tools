@@ -4,7 +4,6 @@
 #![feature(try_trait_v2_residual)]
 #![feature(never_type)]
 #![feature(f16)]
-#![feature(try_find)]
 #![feature(option_reference_flattening)]
 
 pub mod bundle;

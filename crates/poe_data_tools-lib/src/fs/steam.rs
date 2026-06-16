@@ -2,7 +2,6 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fs,
-    hash::BuildHasher,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -17,7 +16,7 @@ use crate::{
         bundle::{BundleParser, types::BundleFile},
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
     },
-    hasher::murmur64a::BuildMurmurHash64A,
+    hasher::murmur64a::{BuildHasherEx, BuildMurmurHash64A},
     path::parse_paths,
 };
 
@@ -74,7 +73,7 @@ impl FileSystem for SteamFS {
             .map(|path| {
                 let path = path.as_ref();
                 // Compute hash
-                let hash = HASHER.hash_one(path.to_lowercase());
+                let hash = HASHER.hash_one_str(&path.to_lowercase());
 
                 // Look up the file info for this file
                 match self.lut.get(&hash).map(|i| &self.index.files[*i]) {
@@ -131,7 +130,7 @@ impl FileSystem for SteamFS {
 
     fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
-        let hash = HASHER.hash_one(path.to_lowercase());
+        let hash = HASHER.hash_one_str(&path.to_lowercase());
 
         // Look up the file info for this file
         let file_index = self

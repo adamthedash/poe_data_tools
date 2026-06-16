@@ -6,6 +6,8 @@ use poe_data_tools::{
 };
 
 fn main() {
+    env_logger::init();
+
     let cache_dir = Path::new("./cache");
     let base_url = cdn_base_url(cache_dir, "2").expect("couldn't get CDN URL");
     let fs = FS::from_cdn(&base_url, cache_dir).expect("couldn't create filesystem");
@@ -15,6 +17,7 @@ fn main() {
         .list()
         .filter(|f| f.ends_with(".psg"))
         .collect::<Vec<_>>();
+
     for (file, bytes) in fs.batch_read(&tree_files) {
         let Ok(bytes) = bytes else {
             eprintln!("Error reading {file:?}");

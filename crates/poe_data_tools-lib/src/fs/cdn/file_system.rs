@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, hash::BuildHasher, path::Path, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, path::Path, sync::Arc};
 
 use bytes::Bytes;
 use futures::StreamExt;
@@ -13,7 +13,7 @@ use crate::{
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
     },
     fs::{FileSystem, Result, error::Error as FSError},
-    hasher::murmur64a::BuildMurmurHash64A,
+    hasher::murmur64a::{BuildHasherEx, BuildMurmurHash64A},
     path::parse_paths,
 };
 
@@ -67,7 +67,7 @@ impl FileSystem for CDNFS {
 
     fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
-        let hash = HASHER.hash_one(path.to_lowercase());
+        let hash = HASHER.hash_one_str(&path.to_lowercase());
 
         // Look up the file info for this file
         let file_index = self
@@ -96,7 +96,7 @@ impl FileSystem for CDNFS {
             .iter()
             .map(|path| {
                 let path = path.as_ref().to_owned();
-                let hash = HASHER.hash_one(path.to_lowercase());
+                let hash = HASHER.hash_one_str(&path.to_lowercase());
 
                 // Look up the file info for this file
                 match self.lut.get(&hash).map(|i| self.index.files[*i].clone()) {

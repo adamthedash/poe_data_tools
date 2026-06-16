@@ -3,7 +3,6 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     fs::File,
-    hash::BuildHasher,
     io::{BufReader, Read, Seek, SeekFrom},
     path::Path,
     sync::Arc,
@@ -23,7 +22,7 @@ use crate::{
         },
     },
     fs::{FileSystem, Result, error::Error as FSError},
-    hasher::murmur64a::BuildMurmurHash64A,
+    hasher::murmur64a::{BuildHasherEx, BuildMurmurHash64A},
     path::parse_paths,
 };
 
@@ -65,7 +64,7 @@ fn enumerate_file_info(
                 &EntryData::File { offset, length } => {
                     // NOTE: Using our own full path hashes rather than stored MurmurHash2 values from GGPK
                     // as there are duplicate file name hashes that refer to distinct files
-                    let hash = HASHER.hash_one(name.to_lowercase().as_bytes());
+                    let hash = HASHER.hash_one_str(&name.to_lowercase());
                     Box::new(std::iter::once((hash, FileInfo { offset, length })))
                 }
             }
@@ -139,7 +138,7 @@ impl FileSystem for GGPKFS {
             .map(|path| {
                 let path = path.as_ref();
                 // Compute hash
-                let hash = HASHER.hash_one(path.to_lowercase().as_bytes());
+                let hash = HASHER.hash_one_str(&path.to_lowercase());
 
                 // Look up the file info for this file
                 match self.lut.get(&hash) {
@@ -170,7 +169,7 @@ impl FileSystem for GGPKFS {
 
     fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
-        let hash = HASHER.hash_one(path.to_lowercase().as_bytes());
+        let hash = HASHER.hash_one_str(&path.to_lowercase());
 
         // Look up the file info for this file
         let fileinfo = self
@@ -238,7 +237,7 @@ impl FileSystem for GGPKBundleFS {
             .iter()
             .map(|path| {
                 let path = path.as_ref();
-                let hash = HASHER.hash_one(path.to_lowercase());
+                let hash = HASHER.hash_one_str(&path.to_lowercase());
 
                 // Look up the file info for this file
                 match self.lut.get(&hash).map(|i| &self.index.files[*i]) {
@@ -301,7 +300,7 @@ impl FileSystem for GGPKBundleFS {
 
     fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
-        let hash = HASHER.hash_one(path.to_lowercase());
+        let hash = HASHER.hash_one_str(&path.to_lowercase());
 
         // Look up the file info for this file
         let index = self
