@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
 /// Errors for the file system
 // NOTE: Need to wrap non-clone variants in Arc so we can return the same error
 // for all files when a batch read fails

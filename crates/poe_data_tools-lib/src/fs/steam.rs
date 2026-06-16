@@ -7,11 +7,11 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
 
-use super::{FileSystem, error::Error as FSError};
+use super::{FileSystem, Result, error::Error as FSError};
 use crate::{
     file_parsers::{
         FileParser,
@@ -32,7 +32,7 @@ pub struct SteamFS {
 impl SteamFS {
     /// Initialise a file system over a steam folder. Provided path should be the root Path of Exile
     /// installation.
-    pub fn new(steam_folder: PathBuf) -> Result<Self, FSError> {
+    pub fn new(steam_folder: PathBuf) -> Result<Self> {
         let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
         let index = load_index_file(&index_path)?;
 
@@ -132,7 +132,7 @@ impl FileSystem for SteamFS {
         }))
     }
 
-    fn read(&self, path: &str) -> Result<Bytes> {
+    fn read(&self, path: &str) -> anyhow::Result<Bytes> {
         // TODO: Remove try block when we change return type
         try {
             // Compute the hash of this file path
@@ -163,7 +163,7 @@ impl FileSystem for SteamFS {
 }
 
 /// Load an index file from disk
-fn load_index_file(path: &Path) -> Result<BundleIndexFile, FSError> {
+fn load_index_file(path: &Path) -> Result<BundleIndexFile> {
     let index_content = load_bundle_content(path)?.read_all()?;
 
     BundleIndexParser
@@ -173,7 +173,7 @@ fn load_index_file(path: &Path) -> Result<BundleIndexFile, FSError> {
 }
 
 /// Load a bundle file from disk
-fn load_bundle_content(path: &Path) -> Result<BundleFile, FSError> {
+fn load_bundle_content(path: &Path) -> Result<BundleFile> {
     let bundle_content = fs::read(path)?;
 
     BundleParser

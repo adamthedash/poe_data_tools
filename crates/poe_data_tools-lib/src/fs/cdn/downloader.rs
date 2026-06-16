@@ -19,7 +19,10 @@ use winnow::{
     token::take,
 };
 
-use crate::{file_parsers::shared::winnow::WinnowParser, fs::error::Error as FSError};
+use crate::{
+    file_parsers::shared::winnow::WinnowParser,
+    fs::{Result, error::Error as FSError},
+};
 
 /// Bundle loader backed by GGG's CDN + local cache
 pub struct CDNLoader {
@@ -34,7 +37,7 @@ pub struct CDNLoader {
 }
 
 /// "1.2.3.4" -> [1, 2, 3, 4]
-fn parse_patch_parts(filename: &str) -> Result<Vec<u64>, FSError> {
+fn parse_patch_parts(filename: &str) -> Result<Vec<u64>> {
     filename
         .split('.')
         .map(|x| {
@@ -93,7 +96,7 @@ fn get_fallback_cache_dirs(cache_dir: &Path) -> (Vec<PathBuf>, Vec<PathBuf>) {
 }
 
 impl CDNLoader {
-    pub fn new(base_url: &Url, cache_dir: &str) -> Result<Self, FSError> {
+    pub fn new(base_url: &Url, cache_dir: &str) -> Result<Self> {
         // <cache_path>/<cdn_url>/<patch>
         let cache_dir = PathBuf::from(cache_dir).join(format!(
             "{}{}",
@@ -133,7 +136,7 @@ impl CDNLoader {
             })
     }
 
-    fn build_url(&self, path_stub: &Path) -> Result<Url, FSError> {
+    fn build_url(&self, path_stub: &Path) -> Result<Url> {
         self.base_url
             .join(path_stub.to_str().ok_or_else(|| {
                 FSError::InvalidConfig(format!("path stub contains non-UTF8 chars: {path_stub:?}"))
@@ -143,7 +146,7 @@ impl CDNLoader {
 
     /// Loads the contents of the bundle file. Either reads from the local cache or from the CDN if
     /// it's not cached.
-    pub fn load(&self, path_stub: &Path) -> Result<Bytes, FSError> {
+    pub fn load(&self, path_stub: &Path) -> Result<Bytes> {
         let url = self.build_url(path_stub)?;
 
         // If already cached, assume nothing has changed due to version immutability
@@ -237,7 +240,7 @@ impl CDNLoader {
     /// Async version of load
     // TODO: Mutex to prevent multiple concurrent downloads of same file. Shouldn't happen under
     // normal circumstances
-    pub async fn load_async(&self, path_stub: &Path) -> Result<Bytes, FSError> {
+    pub async fn load_async(&self, path_stub: &Path) -> Result<Bytes> {
         let url = self.build_url(path_stub)?;
 
         // Short timeout for initial connection, but none for transfer to allow for fetching large
@@ -332,7 +335,7 @@ impl CDNLoader {
 }
 
 /// Get the base URL for the CDN for the provided game version. Uses cached version if available.
-pub fn cdn_base_url(cache_dir: &Path, version: &str) -> Result<Url, FSError> {
+pub fn cdn_base_url(cache_dir: &Path, version: &str) -> Result<Url> {
     // Check cache for version URL
     let cache_dir = cache_dir.join("cdn_url");
     let cache_file = cache_dir.join(version);
@@ -392,7 +395,7 @@ fn parse_utf16_string<'a>() -> impl WinnowParser<&'a [u8], String> {
 }
 
 /// Fetch the current latest version of the game
-fn cur_url(host: String, send: &[u8]) -> Result<Url, FSError> {
+fn cur_url(host: String, send: &[u8]) -> Result<Url> {
     // Fetch data from the CDN
     let mut stream = TcpStream::connect(host)?;
     stream.write_all(send)?;

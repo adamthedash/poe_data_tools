@@ -19,7 +19,7 @@ use crate::{
         bundle::{BundleParser, types::BundleFile},
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
     },
-    fs::FileSystem,
+    fs::{FileSystem, error::Error as FSError},
     hasher::murmur64a::BuildMurmurHash64A,
     path::parse_paths,
 };
