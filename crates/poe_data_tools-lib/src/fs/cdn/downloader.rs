@@ -10,7 +10,7 @@ use std::{
 use anyhow::Context;
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
-use reqwest::{StatusCode, blocking::Client};
+use reqwest::blocking::Client;
 use url::Url;
 use winnow::{
     Parser,
@@ -24,16 +24,63 @@ use crate::{
     fs::{Result, error::Error as FSError},
 };
 
-/// Bundle loader backed by GGG's CDN + local cache
-pub struct CDNLoader {
-    /// CDN Url
-    base_url: Url,
-    /// Place where any new files will be downloaded to
-    // TODO: Pre-process config stuff once into struct so we don't need to keep checking on use?
-    cache_dir: PathBuf,
-    /// Caches for previous game versions to search before downloading new files
-    fallback_cache_dirs_old: Vec<PathBuf>,
-    fallback_cache_dirs_new: Vec<PathBuf>,
+/// A cache folder for a specific game version
+#[derive(Debug)]
+struct CacheFolder {
+    path: PathBuf,
+    /// patch version components [major, minor, patch, ...]
+    patch_parts: Vec<u64>,
+}
+
+impl PartialEq for CacheFolder {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
+    }
+}
+
+impl Eq for CacheFolder {}
+
+impl PartialOrd for CacheFolder {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for CacheFolder {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.patch_parts.cmp(&other.patch_parts)
+    }
+}
+
+impl CacheFolder {
+    fn from_path(path: PathBuf) -> Result<Self> {
+        let folder_name = path.file_name().and_then(|f| f.to_str()).ok_or_else(|| {
+            FSError::InvalidConfig(format!("Cache path has no/non-utf8 folder: {path:?}"))
+        })?;
+
+        let patch_parts = parse_patch_parts(folder_name).map_err(|_| {
+            FSError::InvalidConfig(format!(
+                "cache folder could not be parsed as patch version: {folder_name:?}"
+            ))
+        })?;
+
+        Ok(Self { path, patch_parts })
+    }
+
+    /// Get the cache path for a file
+    fn get_path(&self, path_stub: &Path) -> (PathBuf, PathBuf) {
+        let file_path = self.path.join(path_stub);
+        let etag_path = file_path.with_added_extension("etag");
+
+        (file_path, etag_path)
+    }
+
+    /// Search for the file in this cache
+    fn search(&self, path_stub: &Path) -> Option<(PathBuf, PathBuf)> {
+        let (file_path, etag_path) = self.get_path(path_stub);
+
+        (file_path.exists() && etag_path.exists()).then_some((file_path, etag_path))
+    }
 }
 
 /// "1.2.3.4" -> [1, 2, 3, 4]
@@ -48,25 +95,61 @@ fn parse_patch_parts(filename: &str) -> Result<Vec<u64>> {
         .collect()
 }
 
+struct CacheConfig {
+    /// Folder containing all patch-specific folders
+    root: PathBuf,
+    /// Cache for the targetted game version
+    primary: CacheFolder,
+    /// Folders to search when primary cache misses
+    fallbacks_old: Vec<CacheFolder>,
+    fallbacks_new: Vec<CacheFolder>,
+}
+
+impl CacheConfig {
+    fn from_primary_cache_path(path: PathBuf) -> Result<Self> {
+        let primary = CacheFolder::from_path(path.clone())?;
+
+        let root = path.parent().ok_or_else(|| {
+            FSError::InvalidConfig(format!("cache folder has no parent: {path:?}"))
+        })?;
+
+        let (fallbacks_old, fallbacks_new) = get_fallback_cache_dirs(root, &primary);
+
+        Ok(Self {
+            root: root.to_owned(),
+            primary,
+            fallbacks_old,
+            fallbacks_new,
+        })
+    }
+
+    /// Search for the given path stub in all cache folders
+    /// Returns all file & etag paths in order: primary, old, new
+    fn search(&self, path_stub: &Path) -> impl Iterator<Item = (PathBuf, PathBuf)> {
+        self.caches().flat_map(|c| c.search(path_stub))
+    }
+
+    fn search_fallbacks(&self, path_stub: &Path) -> impl Iterator<Item = (PathBuf, PathBuf)> {
+        self.fallback_caches().flat_map(|c| c.search(path_stub))
+    }
+
+    fn fallback_caches(&self) -> impl Iterator<Item = &CacheFolder> {
+        self.fallbacks_old.iter().chain(&self.fallbacks_new)
+    }
+
+    /// Iterate over all caches in order: primary, old, new
+    fn caches(&self) -> impl Iterator<Item = &CacheFolder> {
+        std::iter::once(&self.primary).chain(self.fallback_caches())
+    }
+}
+
 /// Prepares two lists of backup cache dirs, both ordered by recency to the current patch
-fn get_fallback_cache_dirs(cache_dir: &Path) -> (Vec<PathBuf>, Vec<PathBuf>) {
-    let Some(cache_folder_name) = cache_dir.file_name().and_then(|f| f.to_str()) else {
-        log::warn!("invalid cache path: {cache_dir:?}");
-        return (vec![], vec![]);
-    };
-
-    let Ok(current_patch) = parse_patch_parts(cache_folder_name) else {
-        log::warn!("invalid cache folder name: {cache_dir:?}");
-        return (vec![], vec![]);
-    };
-
-    let Some(parent) = cache_dir.parent() else {
-        log::warn!("cache has no parent folder: {cache_dir:?}");
-        return (vec![], vec![]);
-    };
-
+fn get_fallback_cache_dirs(
+    root_dir: &Path,
+    primary_cache: &CacheFolder,
+) -> (Vec<CacheFolder>, Vec<CacheFolder>) {
     // Read adjacent paths, skip any that fail
-    let sibling_paths = parent
+    let sibling_paths = root_dir
         .read_dir()
         .into_iter()
         .flat_map(|r| r.into_iter())
@@ -74,25 +157,25 @@ fn get_fallback_cache_dirs(cache_dir: &Path) -> (Vec<PathBuf>, Vec<PathBuf>) {
 
     // Split cache dirs into older/newer patches
     let [mut old, mut new] = sibling_paths
-        .filter_map(|p| {
-            let binding = p.file_name();
-            let filename = binding.to_str().unwrap();
-            parse_patch_parts(filename)
-                .ok()
-                .map(|patch| (patch, p.path()))
-        })
-        .filter(|(patch, _)| *patch != current_patch)
-        .bucket_arr(|(patch, _)| if *patch < current_patch { 0 } else { 1 });
+        .filter_map(|p| CacheFolder::from_path(p.path()).ok())
+        // Don't include primary in fallbacks
+        .filter(|cache| cache != primary_cache)
+        .bucket_arr(|cache| if cache < primary_cache { 0 } else { 1 });
 
     // Sort in chronoligical order away from current path dir
-    old.sort_unstable_by_key(|(patch, _)| patch.clone());
+    old.sort();
     old.reverse();
-    let old = old.into_iter().map(|(_, path)| path).collect();
-
-    new.sort_unstable_by_key(|(patch, _)| patch.clone());
-    let new = new.into_iter().map(|(_, path)| path).collect();
+    new.sort();
 
     (old, new)
+}
+
+/// Bundle loader backed by GGG's CDN + local cache
+pub struct CDNLoader {
+    /// CDN Url
+    base_url: Url,
+    /// Place where any new files will be downloaded to
+    cache: CacheConfig,
 }
 
 impl CDNLoader {
@@ -106,36 +189,15 @@ impl CDNLoader {
             base_url.path()
         ));
 
-        let (fallback_cache_dirs_old, fallback_cache_dirs_new) =
-            get_fallback_cache_dirs(&cache_dir);
+        let cache = CacheConfig::from_primary_cache_path(cache_dir)?;
 
         Ok(Self {
             base_url: base_url.clone(),
-            cache_dir,
-            fallback_cache_dirs_old,
-            fallback_cache_dirs_new,
+            cache,
         })
     }
 
-    /// Finds cached files from previous versions
-    fn get_fallbacks(&self, path_stub: &Path) -> impl Iterator<Item = (PathBuf, String)> {
-        [&self.fallback_cache_dirs_old, &self.fallback_cache_dirs_new]
-            .into_iter()
-            .flat_map(move |cache_dirs| {
-                cache_dirs
-                    .iter()
-                    .flat_map(|cache_dir| {
-                        let file_path = cache_dir.join(path_stub);
-                        let etag_path = file_path.with_added_extension("etag");
-
-                        fs::read_to_string(&etag_path)
-                            .ok()
-                            .map(|etag| (file_path, etag))
-                    })
-                    .next()
-            })
-    }
-
+    /// Get the CDN url for a file
     fn build_url(&self, path_stub: &Path) -> Result<Url> {
         self.base_url
             .join(path_stub.to_str().ok_or_else(|| {
@@ -150,9 +212,9 @@ impl CDNLoader {
         let url = self.build_url(path_stub)?;
 
         // If already cached, assume nothing has changed due to version immutability
-        let cache_path = self.cache_dir.join(path_stub);
-        if let Ok(bytes) = fs::read(&cache_path) {
+        if let Some((cache_path, _)) = self.cache.primary.search(path_stub) {
             log::debug!("Using cached bundle: {:?}", cache_path);
+            let bytes = fs::read(&cache_path)?;
             return Ok(Bytes::from(bytes));
         }
 
@@ -163,52 +225,56 @@ impl CDNLoader {
             .timeout(None)
             .build()?;
 
-        // Look at fallback caches and see if there's any that match the CDN's
-        let fallback =
-            self.get_fallbacks(path_stub)
-                .try_find(|(_, fallback_etag)| -> Result<_, FSError> {
-                    let resp = client
-                        .head(url.clone())
-                        .header("If-None-Match", fallback_etag.clone())
-                        .send()?
-                        .error_for_status()?;
+        // Ask server for the etag so we can check against cache
+        let etag = {
+            let resp = client
+                .head(url.clone())
+                // TODO: Maybe be a little friendlier if we can do this? But would be more complex
+                // code
+                // .header("If-None-Match", fallback_etag.clone())
+                .send()?
+                .error_for_status()?;
 
-                    let resp_etag = resp
-                        .headers()
-                        .get("etag")
-                        .ok_or_else(|| {
-                            FSError::InvalidResponse("response has no etag header".to_owned())
-                        })?
-                        .to_str()
-                        .map_err(|e| {
-                            FSError::InvalidResponse(format!(
-                                "response contains invalid etag: {e:?}"
-                            ))
-                        })?;
+            // TODO: (above)
+            // Also with this
+            // let is_match = resp.status() == StatusCode::NOT_MODIFIED
+            //     || (resp.status() == StatusCode::OK && resp_etag == fallback_etag);
 
-                    let is_match = resp.status() == StatusCode::NOT_MODIFIED
-                        || (resp.status() == StatusCode::OK && resp_etag == fallback_etag);
+            resp.headers()
+                .get("etag")
+                .ok_or_else(|| FSError::InvalidResponse("response has no etag header".to_owned()))?
+                .to_str()
+                .map_err(|e| {
+                    FSError::InvalidResponse(format!("response contains invalid etag: {e:?}"))
+                })?
+                .to_owned()
+        };
 
-                    Ok(is_match)
-                })?;
+        let fallback = self
+            .cache
+            .search_fallbacks(path_stub)
+            .find(|(_, etag_path)| {
+                fs::read_to_string(etag_path).is_ok_and(|fallback_etag| fallback_etag == etag)
+            });
 
-        let bytes = if let Some((fallback_path, _)) = fallback {
+        let (cache_file_path, cache_etag_path) = self.cache.primary.get_path(path_stub);
+
+        let bytes = if let Some((fallback_file_path, fallback_etag_path)) = fallback {
             // Our cached version is the same, copy it to the current version's directory
             log::debug!(
                 "Using cached bundle from different patch: {:?}",
-                fallback_path
+                fallback_file_path
             );
-            fs::create_dir_all(cache_path.parent().ok_or_else(|| {
-                FSError::InvalidConfig(format!("cache has no parent folder: {cache_path:?}"))
-            })?)?;
-
-            fs::copy(&fallback_path, &cache_path)?;
-            fs::copy(
-                fallback_path.with_added_extension("etag"),
-                cache_path.with_added_extension("etag"),
+            fs::create_dir_all(
+                cache_file_path
+                    .parent()
+                    .expect("path inside cache always has a parent folder"),
             )?;
 
-            Bytes::from(fs::read(&cache_path)?)
+            fs::copy(&fallback_file_path, &cache_file_path)?;
+            fs::copy(fallback_etag_path, cache_etag_path)?;
+
+            Bytes::from(fs::read(&cache_file_path)?)
         } else {
             // No candidate cached version, download from CDN
             log::info!("Downloading bundle: {}", url);
@@ -225,11 +291,15 @@ impl CDNLoader {
                 .to_owned();
 
             let bytes = resp.bytes()?;
-            fs::create_dir_all(cache_path.parent().ok_or_else(|| {
-                FSError::InvalidConfig(format!("cache has no parent folder: {cache_path:?}"))
-            })?)?;
-            fs::write(&cache_path, &bytes)?;
-            fs::write(cache_path.with_added_extension("etag"), etag.as_bytes())?;
+
+            fs::create_dir_all(
+                cache_file_path
+                    .parent()
+                    .expect("path inside cache always has a parent folder"),
+            )?;
+
+            fs::write(&cache_file_path, &bytes)?;
+            fs::write(cache_etag_path, etag.as_bytes())?;
 
             bytes
         };
@@ -250,63 +320,67 @@ impl CDNLoader {
             .build()?;
 
         // If already cached, assume nothing has changed due to version immutability
-        let cache_path = self.cache_dir.join(path_stub);
-        if let Ok(bytes) = tokio::fs::read(&cache_path).await {
+        if let Some((cache_path, _)) = self.cache.primary.search(path_stub) {
             log::debug!("Using cached bundle: {:?}", cache_path);
+            let bytes = tokio::fs::read(&cache_path).await?;
             return Ok(Bytes::from(bytes));
         }
 
-        // Look at fallback caches and see if there's any that match the CDN's
-        let mut fallbacks = self.get_fallbacks(path_stub);
-        let fallback = loop {
-            let Some((fallback_path, fallback_etag)) = fallbacks.next() else {
-                break None;
-            };
-
+        // Ask server for the etag so we can check against cache
+        let etag = {
             let resp = client
                 .head(url.clone())
-                .header("If-None-Match", fallback_etag.clone())
+                // TODO: Maybe be a little friendlier if we can do this? But would be more complex
+                // code
+                // .header("If-None-Match", fallback_etag.clone())
                 .send()
                 .await?
                 .error_for_status()?;
 
-            let resp_etag = resp
-                .headers()
+            // TODO: (above)
+            // Also with this
+            // let is_match = resp.status() == StatusCode::NOT_MODIFIED
+            //     || (resp.status() == StatusCode::OK && resp_etag == fallback_etag);
+
+            resp.headers()
                 .get("etag")
                 .ok_or_else(|| FSError::InvalidResponse("response has no etag header".to_owned()))?
                 .to_str()
                 .map_err(|e| {
                     FSError::InvalidResponse(format!("response contains invalid etag: {e:?}"))
-                })?;
-
-            if resp.status() == StatusCode::NOT_MODIFIED
-                || (resp.status() == StatusCode::OK && resp_etag == fallback_etag)
-            {
-                break Some((fallback_path, fallback_etag));
-            }
+                })?
+                .to_owned()
         };
 
-        let bytes = if let Some((fallback_path, _)) = fallback {
+        let fallback = self
+            .cache
+            .search_fallbacks(path_stub)
+            .find(|(_, etag_path)| {
+                fs::read_to_string(etag_path).is_ok_and(|fallback_etag| fallback_etag == etag)
+            });
+
+        let (cache_file_path, cache_etag_path) = self.cache.primary.get_path(path_stub);
+
+        let bytes = if let Some((fallback_file_path, fallback_etag_path)) = fallback {
             // Our cached version is the same, copy it to the current version's directory
             log::debug!(
                 "Using cached bundle from different patch: {:?}",
-                fallback_path
+                fallback_file_path
             );
-            tokio::fs::create_dir_all(cache_path.parent().ok_or_else(|| {
-                FSError::InvalidConfig(format!("cache has no parent folder: {cache_path:?}"))
-            })?)
-            .await?;
-            tokio::fs::copy(&fallback_path, &cache_path).await?;
-            tokio::fs::copy(
-                fallback_path.with_added_extension("etag"),
-                cache_path.with_added_extension("etag"),
+            tokio::fs::create_dir_all(
+                cache_file_path
+                    .parent()
+                    .expect("path inside cache always has a parent folder"),
             )
             .await?;
 
-            Bytes::from(fs::read(&cache_path)?)
+            tokio::fs::copy(&fallback_file_path, &cache_file_path).await?;
+            tokio::fs::copy(fallback_etag_path, cache_etag_path).await?;
+
+            Bytes::from(fs::read(&cache_file_path)?)
         } else {
             // No candidate cached version, download from CDN
-            log::debug!("Downloading bundle: {}", url);
+            log::info!("Downloading bundle: {}", url);
             let resp = client.get(url).send().await?;
 
             let etag = resp
@@ -320,12 +394,16 @@ impl CDNLoader {
                 .to_owned();
 
             let bytes = resp.bytes().await?;
-            tokio::fs::create_dir_all(cache_path.parent().ok_or_else(|| {
-                FSError::InvalidConfig(format!("cache has no parent folder: {cache_path:?}"))
-            })?)
+
+            tokio::fs::create_dir_all(
+                cache_file_path
+                    .parent()
+                    .expect("path inside cache always has a parent folder"),
+            )
             .await?;
-            tokio::fs::write(&cache_path, &bytes).await?;
-            tokio::fs::write(cache_path.with_added_extension("etag"), etag.as_bytes()).await?;
+
+            tokio::fs::write(&cache_file_path, &bytes).await?;
+            tokio::fs::write(cache_etag_path, etag.as_bytes()).await?;
 
             bytes
         };
@@ -416,4 +494,74 @@ fn cur_url(host: String, send: &[u8]) -> Result<Url> {
         .ok_or(FSError::InvalidResponse(
             "No valid URLs returned from CDN".to_owned(),
         ))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs, path::Path};
+
+    use tempfile::TempDir;
+
+    use super::*;
+
+    fn write_file(path: &Path, contents: &str) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, contents).unwrap();
+    }
+
+    fn setup_fake_cache() -> TempDir {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path();
+        let cache1 = root.join("1.1.1.1");
+        let cache2 = root.join("2.2.2.2");
+        let stub1 = Path::new("hello/world.txt");
+        let stub2 = Path::new("bing.bong");
+
+        write_file(&cache1.join(stub1), "");
+        write_file(
+            &cache1.join(stub1).with_added_extension("etag"),
+            "hello world",
+        );
+
+        write_file(&cache2.join(stub2), "");
+        write_file(
+            &cache2.join(stub2).with_added_extension("etag"),
+            "hello world",
+        );
+
+        temp
+    }
+
+    #[test]
+    fn test_cache_folder() {
+        let temp = setup_fake_cache();
+
+        let cache_path = temp.path().join("1.1.1.1");
+        let cache = CacheFolder::from_path(cache_path).unwrap();
+
+        assert_eq!(cache.patch_parts, [1, 1, 1, 1]);
+
+        assert!(cache.search(Path::new("hello/world.txt")).is_some());
+        assert!(cache.search(Path::new("bing.bong")).is_none());
+
+        drop(temp);
+    }
+
+    #[test]
+    fn test_cache() {
+        let temp = setup_fake_cache();
+
+        let primary_cache_path = temp.path().join("1.1.1.1");
+        let cache = CacheConfig::from_primary_cache_path(primary_cache_path).unwrap();
+
+        assert_eq!(cache.caches().count(), 2);
+        assert_eq!(cache.fallback_caches().count(), 1);
+
+        assert_eq!(cache.search(Path::new("hello/world.txt")).count(), 1);
+        assert_eq!(
+            cache.search_fallbacks(Path::new("hello/world.txt")).count(),
+            0
+        );
+        assert_eq!(cache.search(Path::new("bing.bong")).count(), 1);
+    }
 }

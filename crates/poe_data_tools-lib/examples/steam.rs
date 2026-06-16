@@ -20,10 +20,11 @@ fn main() {
         .filter(|f| f.ends_with(".psg"))
         .collect::<Vec<_>>();
     for (file, bytes) in fs.batch_read(&tree_files) {
-        let Ok(bytes) = bytes else {
-            eprintln!("Error reading {file:?}");
-            continue;
-        };
+        // let Ok(bytes) = bytes else {
+        //     eprintln!("Error reading {file:?}");
+        //     continue;
+        // };
+        let bytes = bytes.context("blah").unwrap();
 
         let parser = PSGParser { version: 2 };
         let Ok(tree) = parser.parse(&bytes).inner else {
