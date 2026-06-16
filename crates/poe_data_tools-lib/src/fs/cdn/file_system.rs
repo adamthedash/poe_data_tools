@@ -2,11 +2,11 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     hash::{BuildHasher, Hasher},
-    path::{Path, PathBuf},
+    path::Path,
     sync::Arc,
 };
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::Context;
 use bytes::Bytes;
 use futures::StreamExt;
 use iterators_extended::bucket::Bucket;
@@ -19,7 +19,7 @@ use crate::{
         bundle::{BundleParser, types::BundleFile},
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
     },
-    fs::{FileSystem, error::Error as FSError},
+    fs::{FileSystem, Result, error::Error as FSError},
     hasher::murmur64a::BuildMurmurHash64A,
     path::parse_paths,
 };
@@ -37,11 +37,15 @@ pub struct CDNFS {
 
 impl CDNFS {
     /// Create a new filesystem backed by the provided CDN and cache location
-    pub fn new(base_url: &Url, cache_dir: &Path) -> anyhow::Result<Self> {
-        let cdn_loader = CDNLoader::new(base_url, cache_dir.to_str().unwrap())?;
+    pub fn new(base_url: &Url, cache_dir: &Path) -> Result<Self> {
+        let cdn_loader = CDNLoader::new(
+            base_url,
+            cache_dir.to_str().ok_or_else(|| {
+                FSError::InvalidConfig(format!("invalid cache path: {cache_dir:?}"))
+            })?,
+        )?;
 
-        let index = fetch_index_file(&cdn_loader, PathBuf::from("Bundles2/_.index.bin").as_ref())
-            .context("Failed to load bundle index")?;
+        let index = fetch_index_file(&cdn_loader, Path::new("Bundles2/_.index.bin"))?;
 
         let lut = index
             .files
@@ -68,7 +72,7 @@ impl FileSystem for CDNFS {
         )
     }
 
-    fn read(&self, path: &str) -> Result<Bytes> {
+    fn read(&self, path: &str) -> anyhow::Result<Bytes> {
         // Compute the hash of this file path
         let mut hasher = HASHER.build_hasher();
         hasher.write(path.to_lowercase().as_bytes());
@@ -78,7 +82,7 @@ impl FileSystem for CDNFS {
         let file_index = self
             .lut
             .get(&hash)
-            .with_context(|| format!("Path not found in index: {}", path))?;
+            .ok_or_else(|| FSError::FileNotFound(path.to_owned()))?;
         let file = &self.index.files[*file_index];
 
         // Load the bundle
@@ -86,8 +90,7 @@ impl FileSystem for CDNFS {
             "Bundles2/{}.bundle.bin",
             self.index.bundles[file.bundle_index as usize].name
         );
-        let bundle = fetch_bundle_content(&self.cdn_loader, Path::new(&bundle_path))
-            .with_context(|| format!("Failed to fetch bundle file: {:?}", bundle_path))?;
+        let bundle = fetch_bundle_content(&self.cdn_loader, Path::new(&bundle_path))?;
 
         // Pull out the file's contents
         let content = bundle.read_range(file.offset as usize, file.size as usize)?;
@@ -112,7 +115,7 @@ impl FileSystem for CDNFS {
                 match self.lut.get(&hash).map(|i| self.index.files[*i].clone()) {
                     Some(f) => Ok((path, f)),
                     None => {
-                        let e = anyhow!("Path not found in index: {}", path);
+                        let e = FSError::FileNotFound(path.clone());
                         Err((path, Err(e)))
                     }
                 }
@@ -146,10 +149,7 @@ impl FileSystem for CDNFS {
                 let cdn_loader = Arc::clone(&self.cdn_loader);
                 async move {
                     // Load the bundle
-                    let res = cdn_loader
-                        .load_async(Path::new(&bundle_path))
-                        .await
-                        .context("Failed to load bundle");
+                    let res = cdn_loader.load_async(Path::new(&bundle_path)).await;
 
                     (bundle_path, res, files)
                 }
@@ -164,13 +164,14 @@ impl FileSystem for CDNFS {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
-                .unwrap();
+                .expect("failed to create async runtime");
 
             let sender = futures::stream::iter(file_infos)
                 .buffer_unordered(CONCURRENCY)
                 .for_each(|v| async {
-                    tx.send(v).unwrap();
+                    tx.send(v).expect("failed to send message");
                 });
+
             rt.block_on(sender);
         });
 
@@ -179,21 +180,17 @@ impl FileSystem for CDNFS {
                 BundleParser
                     .parse(&bytes)
                     .as_anyhow()
-                    .context("Failed to parse bundle")
+                    .map_err(|e| FSError::Parse(Arc::new(e)))
             });
 
             let contents: Box<dyn Iterator<Item = _>> = match bundle {
                 Ok(b) => Box::new(files.into_iter().map(move |(path, file)| {
-                    (
-                        path,
-                        b.read_range(file.offset as usize, file.size as usize)
-                            .context("failed to read byte range"),
-                    )
+                    (path, b.read_range(file.offset as usize, file.size as usize))
                 })),
                 Err(e) => Box::new(
                     files
                         .into_iter()
-                        .map(move |(path, _)| (path, Err(anyhow!("{:?}", e)))),
+                        .map(move |(path, _)| (path, Err(e.clone()))),
                 ),
             };
 
@@ -201,35 +198,32 @@ impl FileSystem for CDNFS {
         });
 
         // Add on previous errors
-        Box::new(
-            errors
-                .into_iter()
-                .chain(file_contents)
-                .map(|(path, r)| (Cow::Owned(path), r)),
-        )
+        Box::new(errors.into_iter().chain(file_contents).map(|(path, r)| {
+            (
+                Cow::Owned(path),
+                // TODO: Remove context once anyhow is removed from interface
+                r.context("failed to read file"),
+            )
+        }))
     }
 }
 
 /// Fetch an index file from the CDN (or cache)
 fn fetch_index_file(cdn_loader: &CDNLoader, path: &Path) -> Result<BundleIndexFile> {
-    let index_content = fetch_bundle_content(cdn_loader, path)
-        .context("Failed to fetch bundle index")?
-        .read_all()?;
+    let index_content = fetch_bundle_content(cdn_loader, path)?.read_all()?;
 
     BundleIndexParser
         .parse(&index_content)
         .as_anyhow()
-        .context("Failed to parse bundle as index")
+        .map_err(|e| FSError::Parse(Arc::new(e)))
 }
 
 // Fetch a bundle file from the CDN (or cache)
 fn fetch_bundle_content(cdn_loader: &CDNLoader, path: &Path) -> Result<BundleFile> {
-    let bundle_content = cdn_loader.load(path).context("Failed to load bundle")?;
+    let bundle_content = cdn_loader.load(path)?;
 
-    let bundle = BundleParser
+    BundleParser
         .parse(&bundle_content)
         .as_anyhow()
-        .context("Failed to parse bundle")?;
-
-    Ok(bundle)
+        .map_err(|e| FSError::Parse(Arc::new(e)))
 }

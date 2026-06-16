@@ -133,32 +133,30 @@ impl FileSystem for SteamFS {
     }
 
     fn read(&self, path: &str) -> anyhow::Result<Bytes> {
-        // TODO: Remove try block when we change return type
-        try {
-            // Compute the hash of this file path
-            let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
-            let mut hasher = hash_builder.build_hasher();
-            hasher.write(path.to_lowercase().as_bytes());
-            let hash = hasher.finish();
+        // Compute the hash of this file path
+        let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
+        let mut hasher = hash_builder.build_hasher();
+        hasher.write(path.to_lowercase().as_bytes());
+        let hash = hasher.finish();
 
-            // Look up the file info for this file
-            let file_index = self
-                .lut
-                .get(&hash)
-                .ok_or_else(|| FSError::FileNotFound(path.to_owned()))?;
-            let file = &self.index.files[*file_index];
+        // Look up the file info for this file
+        let file_index = self
+            .lut
+            .get(&hash)
+            .ok_or_else(|| FSError::FileNotFound(path.to_owned()))?;
+        let file = &self.index.files[*file_index];
 
-            // Load the bundle
-            let bundle_path = self.steam_folder.join(format!(
-                "Bundles2/{}.bundle.bin",
-                self.index.bundles[file.bundle_index as usize].name
-            ));
-            let bundle = load_bundle_content(&bundle_path)?;
+        // Load the bundle
+        let bundle_path = self.steam_folder.join(format!(
+            "Bundles2/{}.bundle.bin",
+            self.index.bundles[file.bundle_index as usize].name
+        ));
+        let bundle = load_bundle_content(&bundle_path)?;
 
-            // Pull out the file's contents
-            bundle.read_range(file.offset as usize, file.size as usize)?
-        }
-        .context("failed to read file")
+        // Pull out the file's contents
+        let bytes = bundle.read_range(file.offset as usize, file.size as usize)?;
+
+        Ok(bytes)
     }
 }
 
