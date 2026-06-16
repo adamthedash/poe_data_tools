@@ -1,10 +1,4 @@
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    hash::{BuildHasher, Hasher},
-    path::Path,
-    sync::Arc,
-};
+use std::{borrow::Cow, collections::HashMap, hash::BuildHasher, path::Path, sync::Arc};
 
 use bytes::Bytes;
 use futures::StreamExt;
@@ -73,9 +67,7 @@ impl FileSystem for CDNFS {
 
     fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
-        let mut hasher = HASHER.build_hasher();
-        hasher.write(path.to_lowercase().as_bytes());
-        let hash = hasher.finish();
+        let hash = HASHER.hash_one(path.to_lowercase());
 
         // Look up the file info for this file
         let file_index = self
@@ -104,10 +96,7 @@ impl FileSystem for CDNFS {
             .iter()
             .map(|path| {
                 let path = path.as_ref().to_owned();
-                // Compute hash
-                let mut hasher = HASHER.build_hasher();
-                hasher.write(path.to_lowercase().as_bytes());
-                let hash = hasher.finish();
+                let hash = HASHER.hash_one(path.to_lowercase());
 
                 // Look up the file info for this file
                 match self.lut.get(&hash).map(|i| self.index.files[*i].clone()) {

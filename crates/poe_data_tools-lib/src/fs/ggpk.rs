@@ -3,7 +3,7 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     fs::File,
-    hash::{BuildHasher, Hasher},
+    hash::BuildHasher,
     io::{BufReader, Read, Seek, SeekFrom},
     path::Path,
     sync::Arc,
@@ -238,10 +238,7 @@ impl FileSystem for GGPKBundleFS {
             .iter()
             .map(|path| {
                 let path = path.as_ref();
-                // Compute hash
-                let mut hasher = HASHER.build_hasher();
-                hasher.write(path.to_lowercase().as_bytes());
-                let hash = hasher.finish();
+                let hash = HASHER.hash_one(path.to_lowercase());
 
                 // Look up the file info for this file
                 match self.lut.get(&hash).map(|i| &self.index.files[*i]) {
@@ -304,10 +301,7 @@ impl FileSystem for GGPKBundleFS {
 
     fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
-        // TODO: Use HASHER::hash_one for all instances of this pattern
-        let mut hasher = HASHER.build_hasher();
-        hasher.write(path.to_lowercase().as_bytes());
-        let hash = hasher.finish();
+        let hash = HASHER.hash_one(path.to_lowercase());
 
         // Look up the file info for this file
         let index = self

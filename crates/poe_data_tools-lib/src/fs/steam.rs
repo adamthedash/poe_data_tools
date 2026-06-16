@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fs,
-    hash::{BuildHasher, Hasher},
+    hash::BuildHasher,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -20,6 +20,8 @@ use crate::{
     hasher::murmur64a::BuildMurmurHash64A,
     path::parse_paths,
 };
+
+const HASHER: BuildMurmurHash64A = BuildMurmurHash64A { seed: 0x1337b33f };
 
 /// File system using local Steam installation backend
 pub struct SteamFS {
@@ -67,15 +69,12 @@ impl FileSystem for SteamFS {
         paths: &'a [impl AsRef<str>],
     ) -> Box<dyn Iterator<Item = (Cow<'a, str>, Result<Bytes>)> + 'a> {
         // Get FileInfo's
-        let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let (fileinfos, errors) = paths
             .iter()
             .map(|path| {
                 let path = path.as_ref();
                 // Compute hash
-                let mut hasher = hash_builder.build_hasher();
-                hasher.write(path.to_lowercase().as_bytes());
-                let hash = hasher.finish();
+                let hash = HASHER.hash_one(path.to_lowercase());
 
                 // Look up the file info for this file
                 match self.lut.get(&hash).map(|i| &self.index.files[*i]) {
@@ -132,10 +131,7 @@ impl FileSystem for SteamFS {
 
     fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
-        let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
-        let mut hasher = hash_builder.build_hasher();
-        hasher.write(path.to_lowercase().as_bytes());
-        let hash = hasher.finish();
+        let hash = HASHER.hash_one(path.to_lowercase());
 
         // Look up the file info for this file
         let file_index = self
