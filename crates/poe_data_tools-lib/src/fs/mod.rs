@@ -27,10 +27,10 @@ pub trait FileSystem {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, anyhow::Result<Bytes>)> + 'a>;
+    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, Result<Bytes>)> + 'a>;
 
     /// Read a single file's contents
-    fn read(&self, path: &str) -> anyhow::Result<Bytes>;
+    fn read(&self, path: &str) -> Result<Bytes>;
 }
 
 /// File system over one of several data sources

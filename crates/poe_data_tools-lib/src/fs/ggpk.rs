@@ -9,7 +9,6 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::Context;
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
 
@@ -133,7 +132,7 @@ impl FileSystem for GGPKFS {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, anyhow::Result<Bytes>)> + 'a> {
+    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, Result<Bytes>)> + 'a> {
         // Get FileInfo's
         let (mut fileinfos, errors) = paths
             .iter()
@@ -161,16 +160,15 @@ impl FileSystem for GGPKFS {
         });
 
         // Add on previous errors
-        Box::new(errors.into_iter().chain(file_contents).map(|(path, r)| {
-            (
-                Cow::Borrowed(path),
-                // TODO: Remove when interface changes
-                r.context("failed to read file"),
-            )
-        }))
+        Box::new(
+            errors
+                .into_iter()
+                .chain(file_contents)
+                .map(|(path, r)| (Cow::Borrowed(path), r)),
+        )
     }
 
-    fn read(&self, path: &str) -> anyhow::Result<Bytes> {
+    fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
         let hash = HASHER.hash_one(path.to_lowercase().as_bytes());
 
@@ -181,9 +179,9 @@ impl FileSystem for GGPKFS {
             .ok_or_else(|| FSError::FileNotFound(path.to_owned()))?;
 
         // Read the contents
-        let buf = self._read(fileinfo.offset, fileinfo.length)?;
+        let bytes = self._read(fileinfo.offset, fileinfo.length)?;
 
-        Ok(buf)
+        Ok(bytes)
     }
 }
 
@@ -198,9 +196,7 @@ impl GGPKBundleFS {
     pub fn new(ggpk_path: &Path) -> Result<Self> {
         let ggpk = GGPKFS::new(ggpk_path)?;
 
-        let index_bytes = ggpk
-            .read("/Bundles2/_.index.bin")
-            .map_err(|e| FSError::TempAnyhow(Arc::new(e)))?;
+        let index_bytes = ggpk.read("/Bundles2/_.index.bin")?;
         let index_bundle = BundleParser
             .parse(&index_bytes)
             .as_anyhow()
@@ -236,7 +232,7 @@ impl FileSystem for GGPKBundleFS {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, anyhow::Result<Bytes>)> + 'a> {
+    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, Result<Bytes>)> + 'a> {
         // Get FileInfo's
         let (fileinfos, errors) = paths
             .iter()
@@ -275,16 +271,12 @@ impl FileSystem for GGPKBundleFS {
                 self.index.bundles[bundle_index as usize].name
             );
 
-            let bundle = self
-                .ggpk
-                .read(&bundle_path)
-                .map_err(|e| FSError::TempAnyhow(Arc::new(e)))
-                .and_then(|bytes| {
-                    BundleParser
-                        .parse(&bytes)
-                        .as_anyhow()
-                        .map_err(|e| FSError::Parse(Arc::new(e)))
-                });
+            let bundle = self.ggpk.read(&bundle_path).and_then(|bytes| {
+                BundleParser
+                    .parse(&bytes)
+                    .as_anyhow()
+                    .map_err(|e| FSError::Parse(Arc::new(e)))
+            });
 
             // Read the file contents
             let contents: Box<dyn Iterator<Item = _>> = match bundle {
@@ -302,17 +294,17 @@ impl FileSystem for GGPKBundleFS {
         });
 
         // Add on previous errors
-        Box::new(errors.into_iter().chain(file_contents).map(|(path, r)| {
-            (
-                Cow::Borrowed(path),
-                // TODO: Remove when interface changes
-                r.context("failed to read file"),
-            )
-        }))
+        Box::new(
+            errors
+                .into_iter()
+                .chain(file_contents)
+                .map(|(path, r)| (Cow::Borrowed(path), r)),
+        )
     }
 
-    fn read(&self, path: &str) -> anyhow::Result<Bytes> {
+    fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
+        // TODO: Use HASHER::hash_one for all instances of this pattern
         let mut hasher = HASHER.build_hasher();
         hasher.write(path.to_lowercase().as_bytes());
         let hash = hasher.finish();
@@ -329,10 +321,7 @@ impl FileSystem for GGPKBundleFS {
             "/Bundles2/{}.bundle.bin",
             self.index.bundles[file.bundle_index as usize].name
         );
-        let bundle_contents = self
-            .ggpk
-            .read(&bundle_path)
-            .map_err(|e| FSError::TempAnyhow(Arc::new(e)))?;
+        let bundle_contents = self.ggpk.read(&bundle_path)?;
         let bundle = BundleParser
             .parse(&bundle_contents)
             .as_anyhow()

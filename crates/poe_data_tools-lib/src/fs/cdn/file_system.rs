@@ -6,7 +6,6 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::Context;
 use bytes::Bytes;
 use futures::StreamExt;
 use iterators_extended::bucket::Bucket;
@@ -72,7 +71,7 @@ impl FileSystem for CDNFS {
         )
     }
 
-    fn read(&self, path: &str) -> anyhow::Result<Bytes> {
+    fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
         let mut hasher = HASHER.build_hasher();
         hasher.write(path.to_lowercase().as_bytes());
@@ -93,14 +92,13 @@ impl FileSystem for CDNFS {
         let bundle = fetch_bundle_content(&self.cdn_loader, Path::new(&bundle_path))?;
 
         // Pull out the file's contents
-        let content = bundle.read_range(file.offset as usize, file.size as usize)?;
-        Ok(content)
+        bundle.read_range(file.offset as usize, file.size as usize)
     }
 
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, anyhow::Result<Bytes>)> + 'a> {
+    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, Result<Bytes>)> + 'a> {
         // Get FileInfo's
         let (fileinfos, errors) = paths
             .iter()
@@ -198,13 +196,12 @@ impl FileSystem for CDNFS {
         });
 
         // Add on previous errors
-        Box::new(errors.into_iter().chain(file_contents).map(|(path, r)| {
-            (
-                Cow::Owned(path),
-                // TODO: Remove context once anyhow is removed from interface
-                r.context("failed to read file"),
-            )
-        }))
+        Box::new(
+            errors
+                .into_iter()
+                .chain(file_contents)
+                .map(|(path, r)| (Cow::Owned(path), r)),
+        )
     }
 }
 

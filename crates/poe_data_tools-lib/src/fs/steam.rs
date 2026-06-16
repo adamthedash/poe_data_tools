@@ -7,7 +7,6 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::Context;
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
 
@@ -66,7 +65,7 @@ impl FileSystem for SteamFS {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, anyhow::Result<Bytes>)> + 'a> {
+    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, Result<Bytes>)> + 'a> {
         // Get FileInfo's
         let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let (fileinfos, errors) = paths
@@ -123,16 +122,15 @@ impl FileSystem for SteamFS {
         });
 
         // Add on previous errors
-        Box::new(errors.into_iter().chain(file_contents).map(|(path, r)| {
-            (
-                Cow::Borrowed(path),
-                // TODO: Remove .context when we change return type
-                r.context("failed to read file"),
-            )
-        }))
+        Box::new(
+            errors
+                .into_iter()
+                .chain(file_contents)
+                .map(|(path, r)| (Cow::Borrowed(path), r)),
+        )
     }
 
-    fn read(&self, path: &str) -> anyhow::Result<Bytes> {
+    fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
         let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
         let mut hasher = hash_builder.build_hasher();
