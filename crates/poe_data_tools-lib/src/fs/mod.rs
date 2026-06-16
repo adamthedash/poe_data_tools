@@ -56,7 +56,7 @@ impl FS {
     }
 
     /// Initialise a file system over a standalone GGPK file
-    pub fn from_ggpk(ggpk_path: &Path) -> anyhow::Result<FS> {
+    pub fn from_ggpk(ggpk_path: &Path) -> Result<FS> {
         GGPKBundleFS::new(ggpk_path).map(Self::GGPK)
     }
 }

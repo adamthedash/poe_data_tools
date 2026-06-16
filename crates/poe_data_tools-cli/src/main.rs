@@ -200,11 +200,8 @@ fn main() -> Result<()> {
                 Patch::Specific(v) => v,
             };
             FS::from_cdn(&cdn_base_url(&cache_dir, version_string)?, &cache_dir)
-                .context("Failed to init CDN FS")
         }
-        Source::Steam { steam_folder } => {
-            FS::from_steam(steam_folder).context("Failed to init steam FS")
-        }
+        Source::Steam { steam_folder } => FS::from_steam(steam_folder),
         Source::Ggpk { ggpk_path } => FS::from_ggpk(&ggpk_path),
     }
     .context("Failed to initialise file system")?;

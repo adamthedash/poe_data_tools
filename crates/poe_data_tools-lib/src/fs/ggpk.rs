@@ -6,9 +6,10 @@ use std::{
     hash::{BuildHasher, Hasher},
     io::{BufReader, Read, Seek, SeekFrom},
     path::Path,
+    sync::Arc,
 };
 
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
 
@@ -22,7 +23,7 @@ use crate::{
             types::{Entry, EntryData, GGPKFile},
         },
     },
-    fs::FileSystem,
+    fs::{FileSystem, Result, error::Error as FSError},
     hasher::murmur64a::BuildMurmurHash64A,
     path::parse_paths,
 };
@@ -74,9 +75,9 @@ fn enumerate_file_info(
 
 impl GGPKFS {
     /// Provided path should point to a Content.ggpk file
-    pub fn new(ggpk_path: &Path) -> anyhow::Result<Self> {
+    pub fn new(ggpk_path: &Path) -> Result<Self> {
         let mut file = BufReader::new(File::open(ggpk_path)?);
-        let index = parse_ggpk(&mut file)?;
+        let index = parse_ggpk(&mut file).map_err(|e| FSError::Parse(Arc::new(e)))?;
 
         // Build LUT
         let lut = HashMap::from_iter(enumerate_file_info(&index.entries, None));
@@ -88,6 +89,7 @@ impl GGPKFS {
         })
     }
 
+    /// Seek + Read from underlying file
     fn _read(&self, offset: usize, length: usize) -> std::io::Result<Bytes> {
         let mut file = self.file.borrow_mut();
         file.seek(SeekFrom::Start(offset as u64))?;
@@ -143,7 +145,7 @@ impl FileSystem for GGPKFS {
                 // Look up the file info for this file
                 match self.lut.get(&hash) {
                     Some(f) => Ok((path, f)),
-                    None => Err((path, Err(anyhow!("Path not found in index: {}", path)))),
+                    None => Err((path, Err(FSError::FileNotFound(path.to_owned())))),
                 }
             })
             .bucket_result();
@@ -154,17 +156,18 @@ impl FileSystem for GGPKFS {
         let file_contents = fileinfos.into_iter().map(|(path, fileinfo)| {
             let res = self
                 ._read(fileinfo.offset, fileinfo.length)
-                .context("Failed to read file");
+                .map_err(FSError::from);
             (path, res)
         });
 
         // Add on previous errors
-        Box::new(
-            errors
-                .into_iter()
-                .chain(file_contents)
-                .map(|(path, r)| (Cow::Borrowed(path), r)),
-        )
+        Box::new(errors.into_iter().chain(file_contents).map(|(path, r)| {
+            (
+                Cow::Borrowed(path),
+                // TODO: Remove when interface changes
+                r.context("failed to read file"),
+            )
+        }))
     }
 
     fn read(&self, path: &str) -> anyhow::Result<Bytes> {
@@ -175,7 +178,7 @@ impl FileSystem for GGPKFS {
         let fileinfo = self
             .lut
             .get(&hash)
-            .with_context(|| format!("Path not found in index: {}", path))?;
+            .ok_or_else(|| FSError::FileNotFound(path.to_owned()))?;
 
         // Read the contents
         let buf = self._read(fileinfo.offset, fileinfo.length)?;
@@ -192,20 +195,20 @@ pub struct GGPKBundleFS {
 }
 
 impl GGPKBundleFS {
-    pub fn new(ggpk_path: &Path) -> anyhow::Result<Self> {
+    pub fn new(ggpk_path: &Path) -> Result<Self> {
         let ggpk = GGPKFS::new(ggpk_path)?;
 
         let index_bytes = ggpk
             .read("/Bundles2/_.index.bin")
-            .context("Failed to load bundle index from GGPK")?;
+            .map_err(|e| FSError::TempAnyhow(Arc::new(e)))?;
         let index_bundle = BundleParser
             .parse(&index_bytes)
             .as_anyhow()
-            .context("Failed to parse bundle")?;
+            .map_err(|e| FSError::Parse(Arc::new(e)))?;
         let index = BundleIndexParser
             .parse(&index_bundle.read_all()?)
             .as_anyhow()
-            .context("Failed to parse bundle as index")?;
+            .map_err(|e| FSError::Parse(Arc::new(e)))?;
 
         let lut = index
             .files
@@ -247,7 +250,7 @@ impl FileSystem for GGPKBundleFS {
                 // Look up the file info for this file
                 match self.lut.get(&hash).map(|i| &self.index.files[*i]) {
                     Some(f) => Ok((path, f)),
-                    None => Err((path, Err(anyhow!("Path not found in index: {}", path)))),
+                    None => Err((path, Err(FSError::FileNotFound(path.to_owned())))),
                 }
             })
             .bucket_result();
@@ -271,30 +274,27 @@ impl FileSystem for GGPKBundleFS {
                 "/Bundles2/{}.bundle.bin",
                 self.index.bundles[bundle_index as usize].name
             );
+
             let bundle = self
                 .ggpk
                 .read(&bundle_path)
-                .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path))
-                .and_then(|bundle_contents| {
+                .map_err(|e| FSError::TempAnyhow(Arc::new(e)))
+                .and_then(|bytes| {
                     BundleParser
-                        .parse(&bundle_contents)
+                        .parse(&bytes)
                         .as_anyhow()
-                        .context("Failed to parse bundle")
+                        .map_err(|e| FSError::Parse(Arc::new(e)))
                 });
 
             // Read the file contents
             let contents: Box<dyn Iterator<Item = _>> = match bundle {
                 Ok(b) => Box::new(files.into_iter().map(move |(path, file)| {
-                    (
-                        path,
-                        b.read_range(file.offset as usize, file.size as usize)
-                            .context("failed to read byte range"),
-                    )
+                    (path, b.read_range(file.offset as usize, file.size as usize))
                 })),
                 Err(e) => Box::new(
                     files
                         .into_iter()
-                        .map(move |(path, _)| (path, Err(anyhow!("{:?}", e)))),
+                        .map(move |(path, _)| (path, Err(e.clone()))),
                 ),
             };
 
@@ -302,12 +302,13 @@ impl FileSystem for GGPKBundleFS {
         });
 
         // Add on previous errors
-        Box::new(
-            errors
-                .into_iter()
-                .chain(file_contents)
-                .map(|(path, r)| (Cow::Borrowed(path), r)),
-        )
+        Box::new(errors.into_iter().chain(file_contents).map(|(path, r)| {
+            (
+                Cow::Borrowed(path),
+                // TODO: Remove when interface changes
+                r.context("failed to read file"),
+            )
+        }))
     }
 
     fn read(&self, path: &str) -> anyhow::Result<Bytes> {
@@ -320,7 +321,7 @@ impl FileSystem for GGPKBundleFS {
         let index = self
             .lut
             .get(&hash)
-            .with_context(|| format!("Path not found in index: {}", path))?;
+            .ok_or_else(|| FSError::FileNotFound(path.to_owned()))?;
         let file = &self.index.files[*index];
 
         // Load the bundle
@@ -331,11 +332,11 @@ impl FileSystem for GGPKBundleFS {
         let bundle_contents = self
             .ggpk
             .read(&bundle_path)
-            .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path))?;
+            .map_err(|e| FSError::TempAnyhow(Arc::new(e)))?;
         let bundle = BundleParser
             .parse(&bundle_contents)
             .as_anyhow()
-            .context("Failed to parse bundle")?;
+            .map_err(|e| FSError::Parse(Arc::new(e)))?;
 
         // Pull out the file's contents
         let content = bundle.read_range(file.offset as usize, file.size as usize)?;

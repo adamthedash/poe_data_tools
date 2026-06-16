@@ -31,6 +31,10 @@ pub enum Error {
     // TODO: Get rid of anyhow once we have proper parser errors
     #[error("failed to parse data")]
     Parse(#[from] Arc<anyhow::Error>),
+
+    /// Temporary catchall for bubbled up errors
+    #[error("TEMP ERROR")]
+    TempAnyhow(Arc<anyhow::Error>),
 }
 
 impl From<std::io::Error> for Error {
