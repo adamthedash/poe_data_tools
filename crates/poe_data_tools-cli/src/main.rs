@@ -201,7 +201,9 @@ fn main() -> Result<()> {
             };
             FS::from_cdn(&cdn_base_url(&cache_dir, version_string)?, &cache_dir)
         }
-        Source::Steam { steam_folder } => FS::from_steam(steam_folder),
+        Source::Steam { steam_folder } => {
+            FS::from_steam(steam_folder).context("Failed to init steam FS")
+        }
         Source::Ggpk { ggpk_path } => FS::from_ggpk(&ggpk_path),
     }
     .context("Failed to initialise file system")?;

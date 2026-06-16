@@ -184,7 +184,11 @@ impl FileSystem for CDNFS {
 
             let contents: Box<dyn Iterator<Item = _>> = match bundle {
                 Ok(b) => Box::new(files.into_iter().map(move |(path, file)| {
-                    (path, b.read_range(file.offset as usize, file.size as usize))
+                    (
+                        path,
+                        b.read_range(file.offset as usize, file.size as usize)
+                            .context("failed to read byte range"),
+                    )
                 })),
                 Err(e) => Box::new(
                     files

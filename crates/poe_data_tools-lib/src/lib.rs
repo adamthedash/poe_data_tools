@@ -6,6 +6,7 @@
 #![feature(f16)]
 #![feature(try_find)]
 #![feature(option_reference_flattening)]
+#![feature(try_blocks)]
 
 pub mod bundle;
 pub mod dat;

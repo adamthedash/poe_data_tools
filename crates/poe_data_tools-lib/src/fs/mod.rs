@@ -1,4 +1,5 @@
 pub mod cdn;
+pub mod error;
 pub mod ggpk;
 pub mod steam;
 
@@ -10,6 +11,7 @@ use std::{
 use bytes::Bytes;
 use cdn::CDNFS;
 use enum_dispatch::enum_dispatch;
+use error::Error as FSError;
 use steam::SteamFS;
 use url::Url;
 
@@ -44,7 +46,7 @@ pub enum FS {
 
 impl FS {
     /// Initialise a file system over a steam folder
-    pub fn from_steam(steam_folder: PathBuf) -> anyhow::Result<Self> {
+    pub fn from_steam(steam_folder: PathBuf) -> Result<Self, FSError> {
         SteamFS::new(steam_folder).map(Self::Steam)
     }
 

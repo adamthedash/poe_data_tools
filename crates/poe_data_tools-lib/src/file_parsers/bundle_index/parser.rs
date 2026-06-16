@@ -65,7 +65,7 @@ pub fn parse_bundle_index_bytes(contents: &[u8]) -> Result<BundleIndexFile> {
         length_repeat(le_u32, bundle_info()),
         length_repeat(le_u32, file_info()),
         length_repeat(le_u32, path_rep()),
-        bundle().try_map(|b| b.read_all().map_err(AnyhowError)),
+        bundle().try_map(|b| b.read_all().map_err(|e| AnyhowError(anyhow!("{e}")))),
     )
         .map(|(bundles, files, paths, path_rep_bundle)| BundleIndexFile {
             bundles,

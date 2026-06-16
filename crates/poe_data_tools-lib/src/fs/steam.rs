@@ -4,13 +4,14 @@ use std::{
     fs,
     hash::{BuildHasher, Hasher},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
 
-use super::FileSystem;
+use super::{FileSystem, error::Error as FSError};
 use crate::{
     file_parsers::{
         FileParser,
@@ -31,9 +32,9 @@ pub struct SteamFS {
 impl SteamFS {
     /// Initialise a file system over a steam folder. Provided path should be the root Path of Exile
     /// installation.
-    pub fn new(steam_folder: PathBuf) -> Result<Self> {
+    pub fn new(steam_folder: PathBuf) -> Result<Self, FSError> {
         let index_path = steam_folder.as_path().join("Bundles2/_.index.bin");
-        let index = load_index_file(&index_path).context("Failed to load bundle index")?;
+        let index = load_index_file(&index_path)?;
 
         let lut = index
             .files
@@ -80,7 +81,7 @@ impl FileSystem for SteamFS {
                 // Look up the file info for this file
                 match self.lut.get(&hash).map(|i| &self.index.files[*i]) {
                     Some(f) => Ok((path, f)),
-                    None => Err((path, Err(anyhow!("Path not found in index: {}", path)))),
+                    None => Err((path, Err(FSError::FileNotFound(path.to_owned())))),
                 }
             })
             .bucket_result();
@@ -104,8 +105,7 @@ impl FileSystem for SteamFS {
                 "Bundles2/{}.bundle.bin",
                 self.index.bundles[bundle_index as usize].name
             ));
-            let bundle = load_bundle_content(&bundle_path)
-                .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path));
+            let bundle = load_bundle_content(&bundle_path);
 
             // Read the file contents
             let contents: Box<dyn Iterator<Item = _>> = match bundle {
@@ -115,7 +115,7 @@ impl FileSystem for SteamFS {
                 Err(e) => Box::new(
                     files
                         .into_iter()
-                        .map(move |(path, _)| (path, Err(anyhow!("{:?}", e)))),
+                        .map(move |(path, _)| (path, Err(e.clone()))),
                 ),
             };
 
@@ -123,67 +123,63 @@ impl FileSystem for SteamFS {
         });
 
         // Add on previous errors
-        Box::new(
-            errors
-                .into_iter()
-                .chain(file_contents)
-                .map(|(path, r)| (Cow::Borrowed(path), r)),
-        )
+        Box::new(errors.into_iter().chain(file_contents).map(|(path, r)| {
+            (
+                Cow::Borrowed(path),
+                // TODO: Remove .context when we change return type
+                r.context("failed to read file"),
+            )
+        }))
     }
 
     fn read(&self, path: &str) -> Result<Bytes> {
-        // Compute the hash of this file path
-        let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
-        let mut hasher = hash_builder.build_hasher();
-        hasher.write(path.to_lowercase().as_bytes());
-        let hash = hasher.finish();
+        // TODO: Remove try block when we change return type
+        try {
+            // Compute the hash of this file path
+            let hash_builder = BuildMurmurHash64A { seed: 0x1337b33f };
+            let mut hasher = hash_builder.build_hasher();
+            hasher.write(path.to_lowercase().as_bytes());
+            let hash = hasher.finish();
 
-        // Look up the file info for this file
-        let file_index = self
-            .lut
-            .get(&hash)
-            .with_context(|| format!("Path not found in index: {}", path))?;
-        let file = &self.index.files[*file_index];
+            // Look up the file info for this file
+            let file_index = self
+                .lut
+                .get(&hash)
+                .ok_or_else(|| FSError::FileNotFound(path.to_owned()))?;
+            let file = &self.index.files[*file_index];
 
-        // Load the bundle
-        let bundle_path = self.steam_folder.join(format!(
-            "Bundles2/{}.bundle.bin",
-            self.index.bundles[file.bundle_index as usize].name
-        ));
-        let bundle = load_bundle_content(&bundle_path)
-            .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path))?;
+            // Load the bundle
+            let bundle_path = self.steam_folder.join(format!(
+                "Bundles2/{}.bundle.bin",
+                self.index.bundles[file.bundle_index as usize].name
+            ));
+            let bundle = load_bundle_content(&bundle_path)?;
 
-        // Pull out the file's contents
-        let content = bundle
-            .read_range(file.offset as usize, file.size as usize)
-            .context("Failed to read bytes from bundle")?;
-        Ok(content)
+            // Pull out the file's contents
+            bundle.read_range(file.offset as usize, file.size as usize)?
+        }
+        .context("failed to read file")
     }
 }
 
 /// Load an index file from disk
-fn load_index_file(path: &Path) -> Result<BundleIndexFile> {
-    let index_content = load_bundle_content(path)
-        .context("Failed to read bundle index")?
-        .read_all()
-        .context("Failed to read bytes from bundle")?;
+fn load_index_file(path: &Path) -> Result<BundleIndexFile, FSError> {
+    let index_content = load_bundle_content(path)?.read_all()?;
 
     BundleIndexParser
         .parse(&index_content)
         .as_anyhow()
-        .context("Failed to parse bundle as index")
+        .map_err(|e| FSError::Parse(Arc::new(e)))
 }
 
 /// Load a bundle file from disk
-fn load_bundle_content(path: &Path) -> Result<BundleFile> {
-    let bundle_content = fs::read(path).context("Failed to read bundle file")?;
+fn load_bundle_content(path: &Path) -> Result<BundleFile, FSError> {
+    let bundle_content = fs::read(path)?;
 
-    let bundle = BundleParser
+    BundleParser
         .parse(&bundle_content)
         .as_anyhow()
-        .context("Failed to parse bundle")?;
-
-    Ok(bundle)
+        .map_err(|e| FSError::Parse(Arc::new(e)))
 }
 
 /// Helper to find steam installs in common locations
