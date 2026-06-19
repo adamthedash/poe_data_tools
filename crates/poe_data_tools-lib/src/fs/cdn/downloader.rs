@@ -97,7 +97,7 @@ fn parse_patch_parts(filename: &str) -> Result<Vec<u64>> {
 
 struct CacheConfig {
     /// Folder containing all patch-specific folders
-    root: PathBuf,
+    _root: PathBuf,
     /// Cache for the targetted game version
     primary: CacheFolder,
     /// Folders to search when primary cache misses
@@ -116,30 +116,23 @@ impl CacheConfig {
         let (fallbacks_old, fallbacks_new) = get_fallback_cache_dirs(root, &primary);
 
         Ok(Self {
-            root: root.to_owned(),
+            _root: root.to_owned(),
             primary,
             fallbacks_old,
             fallbacks_new,
         })
     }
 
-    /// Search for the given path stub in all cache folders
-    /// Returns all file & etag paths in order: primary, old, new
-    fn search(&self, path_stub: &Path) -> impl Iterator<Item = (PathBuf, PathBuf)> {
-        self.caches().flat_map(|c| c.search(path_stub))
-    }
-
+    /// Search for the given path stub in fallback cache folders
+    /// Returns all matching file & etag paths
     fn search_fallbacks(&self, path_stub: &Path) -> impl Iterator<Item = (PathBuf, PathBuf)> {
         self.fallback_caches().flat_map(|c| c.search(path_stub))
     }
 
+    /// Iterate over all cache folders in order: past (new->old) then future (old -> new)
+    // TODO: Interleave fallbacks in "distance from current patch" order
     fn fallback_caches(&self) -> impl Iterator<Item = &CacheFolder> {
         self.fallbacks_old.iter().chain(&self.fallbacks_new)
-    }
-
-    /// Iterate over all caches in order: primary, old, new
-    fn caches(&self) -> impl Iterator<Item = &CacheFolder> {
-        std::iter::once(&self.primary).chain(self.fallback_caches())
     }
 }
 
@@ -554,14 +547,12 @@ mod tests {
         let primary_cache_path = temp.path().join("1.1.1.1");
         let cache = CacheConfig::from_primary_cache_path(primary_cache_path).unwrap();
 
-        assert_eq!(cache.caches().count(), 2);
         assert_eq!(cache.fallback_caches().count(), 1);
 
-        assert_eq!(cache.search(Path::new("hello/world.txt")).count(), 1);
         assert_eq!(
             cache.search_fallbacks(Path::new("hello/world.txt")).count(),
             0
         );
-        assert_eq!(cache.search(Path::new("bing.bong")).count(), 1);
+        assert_eq!(cache.search_fallbacks(Path::new("bing.bong")).count(), 1);
     }
 }
