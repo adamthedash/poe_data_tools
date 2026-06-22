@@ -1,16 +1,19 @@
-use crate::file_parsers::{FileParser, VersionedResult, VersionedResultExt};
+use crate::file_parsers::{
+    FileParser2,
+    error::{AsParseError, Result},
+};
 
 pub mod parser;
 pub mod types;
-use parser::parse_bundle_bytes;
 use types::BundleFile;
+use winnow::Parser;
 
 pub struct BundleParser;
 
-impl FileParser for BundleParser {
+impl FileParser2 for BundleParser {
     type Output = BundleFile;
 
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
-        parse_bundle_bytes(bytes).unversioned()
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        parser::bundle().parse(bytes).as_parse_error()
     }
 }

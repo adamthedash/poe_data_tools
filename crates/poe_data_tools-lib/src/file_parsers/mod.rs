@@ -12,6 +12,7 @@ pub mod dlp;
 pub mod dolm;
 pub mod ecf;
 pub mod epk;
+pub mod error;
 pub mod et;
 pub mod fmt;
 pub mod gcf;
@@ -71,6 +72,15 @@ use trl::TRLParser;
 use tsi::TSIParser;
 use tst::TSTParser;
 
+pub trait FileParser2 {
+    /// Structured output type
+    type Output;
+
+    /// Attempt to parse a set of bytes. If the file contains a version before parsing fails, it is
+    /// returned along with the result.
+    fn parse(&self, bytes: &[u8]) -> error::Result<Self::Output>;
+}
+
 /// A trait for parsing binary file contents into a structured type
 pub trait FileParser {
     /// Structured output type
@@ -79,6 +89,27 @@ pub trait FileParser {
     /// Attempt to parse a set of bytes. If the file contains a version before parsing fails, it is
     /// returned along with the result.
     fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output>;
+}
+
+impl<P> FileParser for P
+where
+    P: FileParser2,
+{
+    type Output = P::Output;
+
+    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
+        match self.parse(bytes) {
+            Ok(val) => VersionedResult {
+                // TODO: Use VersionedFile trait
+                version: None,
+                inner: Ok(val),
+            },
+            Err(e) => VersionedResult {
+                version: e.version,
+                inner: Err(anyhow::anyhow!("{e}")),
+            },
+        }
+    }
 }
 
 #[enum_dispatch]
