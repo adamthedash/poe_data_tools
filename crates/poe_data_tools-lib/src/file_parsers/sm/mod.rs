@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2,
+    FileParser2, VersionedFile,
     error::{ParseError, Result},
 };
 
@@ -17,5 +17,11 @@ impl FileParser2 for SMParser {
         let contents = String::from_utf16le(bytes).map_err(ParseError::processing)?;
 
         parse_sm_str(&contents)
+    }
+}
+
+impl VersionedFile for SMFile {
+    fn version(&self) -> Option<u32> {
+        Some(self.version)
     }
 }

@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2,
+    FileParser2, VersionedFile,
     error::{AsParseError, Result},
 };
 
@@ -15,5 +15,11 @@ impl FileParser2 for BundleIndexParser {
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         parser::bundle_index_file().parse(bytes).to_parse_error()
+    }
+}
+
+impl VersionedFile for BundleIndexFile {
+    fn version(&self) -> Option<u32> {
+        None
     }
 }

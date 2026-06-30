@@ -4,7 +4,7 @@ use parser::parse_mat_str;
 use types::MATFile;
 
 use crate::file_parsers::{
-    FileParser2,
+    FileParser2, VersionedFile,
     error::{ParseError, Result},
     shared::utf16_bom_to_string,
 };
@@ -20,5 +20,11 @@ impl FileParser2 for MATParser {
             .map_err(ParseError::processing)?;
 
         parse_mat_str(&contents)
+    }
+}
+
+impl VersionedFile for MATFile {
+    fn version(&self) -> Option<u32> {
+        None
     }
 }

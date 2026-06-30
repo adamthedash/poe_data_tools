@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2,
+    FileParser2, VersionedFile,
     error::{AsParseError, Result},
 };
 
@@ -16,5 +16,11 @@ impl FileParser2 for DatParser {
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         dat().parse(bytes).to_parse_error()
+    }
+}
+
+impl VersionedFile for DatFile {
+    fn version(&self) -> Option<u32> {
+        None
     }
 }

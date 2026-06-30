@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2,
+    FileParser2, VersionedFile,
     error::{AsParseError, ParseError, Result},
     shared::utf16_bom_to_string,
 };
@@ -22,5 +22,11 @@ impl FileParser2 for EPKParser {
         };
 
         parse_epk_str(&contents)
+    }
+}
+
+impl VersionedFile for EPKFile {
+    fn version(&self) -> Option<u32> {
+        None
     }
 }

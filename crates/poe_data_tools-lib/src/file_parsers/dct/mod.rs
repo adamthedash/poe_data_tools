@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2,
+    FileParser2, VersionedFile,
     error::{AsParseError, Result},
     shared::utf16_bom_to_string,
 };
@@ -18,5 +18,11 @@ impl FileParser2 for DCTParser {
         let contents = utf16_bom_to_string(bytes).to_parse_error()?;
 
         parse_dct_str(&contents)
+    }
+}
+
+impl VersionedFile for DCTFile {
+    fn version(&self) -> Option<u32> {
+        Some(self.version)
     }
 }

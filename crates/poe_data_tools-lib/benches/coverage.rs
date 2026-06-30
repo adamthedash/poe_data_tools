@@ -39,20 +39,20 @@ fn bench_version(version: Patch) {
 
             (ext.to_owned(), res)
         })
-        .fold(HashMap::new(), |mut hm, (ext, res)| {
+        .fold(HashMap::new(), |mut hm, (ext, (success, version))| {
             let version_counts = if let Some(version_counts) = hm.get_mut(&ext) {
                 version_counts
             } else {
                 hm.entry(ext.to_string()).or_insert(HashMap::new())
             };
 
-            let counts = if let Some(counts) = version_counts.get_mut(&res.version) {
+            let counts = if let Some(counts) = version_counts.get_mut(&version) {
                 counts
             } else {
-                version_counts.entry(res.version).or_insert([0_usize; 2])
+                version_counts.entry(version).or_insert([0_usize; 2])
             };
 
-            counts[res.inner.is_ok() as usize] += 1;
+            counts[success as usize] += 1;
 
             hm
         });

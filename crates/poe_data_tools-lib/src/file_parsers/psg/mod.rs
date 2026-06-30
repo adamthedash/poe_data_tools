@@ -1,4 +1,4 @@
-use crate::file_parsers::{FileParser2, error::Result};
+use crate::file_parsers::{FileParser2, VersionedFile, error::Result};
 
 pub mod parser;
 pub mod types;
@@ -15,5 +15,11 @@ impl FileParser2 for PSGParser {
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         parse_psg_bytes(bytes, self.version)
+    }
+}
+
+impl VersionedFile for PSGFile {
+    fn version(&self) -> Option<u32> {
+        Some(self.version as u32)
     }
 }

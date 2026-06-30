@@ -60,7 +60,6 @@ use pet::PETParser;
 use psg::PSGParser;
 use rs::RSParser;
 use serde::Serialize;
-use shared::versioned_result::VersionedResult2;
 pub use shared::versioned_result::{VersionedResult, VersionedResultExt};
 use sm::SMParser;
 use smd::SMDParser;
@@ -81,35 +80,8 @@ pub trait FileParser2 {
     fn parse(&self, bytes: &[u8]) -> error::Result<Self::Output>;
 }
 
-/// A trait for parsing binary file contents into a structured type
-pub trait FileParser {
-    /// Structured output type
-    type Output;
-
-    /// Attempt to parse a set of bytes. If the file contains a version before parsing fails, it is
-    /// returned along with the result.
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output>;
-}
-
-impl<P> FileParser for P
-where
-    P: FileParser2,
-{
-    type Output = P::Output;
-
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
-        match self.parse(bytes) {
-            Ok(val) => VersionedResult {
-                // TODO: Use VersionedFile trait
-                version: None,
-                inner: Ok(val),
-            },
-            Err(e) => VersionedResult {
-                version: e.version,
-                inner: Err(anyhow::anyhow!(e)),
-            },
-        }
-    }
+pub trait VersionedFile {
+    fn version(&self) -> Option<u32>;
 }
 
 #[enum_dispatch]
@@ -118,16 +90,17 @@ pub trait FileParserExt {
     fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()>;
 
     /// Checks whether the file has been parsed successfully
-    fn validate(&self, bytes: &[u8]) -> VersionedResult2<(), ()>;
+    /// Also returns the file version if available
+    fn validate(&self, bytes: &[u8]) -> (bool, Option<u32>);
 }
 
 impl<P> FileParserExt for P
 where
-    P: FileParser,
-    P::Output: Serialize,
+    P: FileParser2,
+    P::Output: Serialize + VersionedFile,
 {
     fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()> {
-        let parsed = self.parse(bytes).as_anyhow()?;
+        let parsed = self.parse(bytes).context("failed to parse file")?;
 
         std::fs::create_dir_all(output_path.parent().unwrap())
             .context("Failed to create folder")?;
@@ -141,14 +114,12 @@ where
         Ok(())
     }
 
-    fn validate(&self, bytes: &[u8]) -> VersionedResult2<(), ()> {
+    fn validate(&self, bytes: &[u8]) -> (bool, Option<u32>) {
         let res = self.parse(bytes);
-        VersionedResult2 {
-            version: res.version,
-            inner: match res.inner {
-                Ok(_) => Ok(()),
-                Err(_) => Err(()),
-            },
+
+        match res {
+            Ok(file) => (true, file.version()),
+            Err(e) => (false, e.version),
         }
     }
 }

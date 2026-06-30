@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2,
+    FileParser2, VersionedFile,
     error::{AsParseError, Result},
     shared::utf16_bom_to_string,
 };
@@ -18,5 +18,11 @@ impl FileParser2 for DLPParser {
         let contents = utf16_bom_to_string(bytes).to_parse_error()?;
 
         parse_dlp_str(&contents)
+    }
+}
+
+impl VersionedFile for DLPFile {
+    fn version(&self) -> Option<u32> {
+        self.version
     }
 }

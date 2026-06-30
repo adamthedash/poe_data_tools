@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2,
+    FileParser2, VersionedFile,
     error::{ParseError, Result},
     shared::utf16_bom_to_string,
 };
@@ -20,5 +20,11 @@ impl FileParser2 for TSTParser {
             .map_err(ParseError::processing)?;
 
         parse_tst_str(&contents)
+    }
+}
+
+impl VersionedFile for TSTFile {
+    fn version(&self) -> Option<u32> {
+        None
     }
 }
