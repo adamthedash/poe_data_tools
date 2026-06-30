@@ -11,7 +11,7 @@ use iterators_extended::bucket::Bucket;
 use super::{FileSystem, Result, error::Error as FSError};
 use crate::{
     file_parsers::{
-        FileParser2,
+        FileParser,
         bundle::{BundleParser, types::BundleFile},
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
     },

@@ -8,7 +8,7 @@ use url::Url;
 use super::CDNLoader;
 use crate::{
     file_parsers::{
-        FileParser2,
+        FileParser,
         bundle::{BundleParser, types::BundleFile},
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
     },

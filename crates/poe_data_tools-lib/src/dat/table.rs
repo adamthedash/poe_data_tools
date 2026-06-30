@@ -13,7 +13,7 @@ use arrow_array::{
 use crate::{
     dat::ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
     file_parsers::{
-        FileParser2,
+        FileParser,
         dat::{DatParser, types::DatFile},
     },
     fs::{FS, FileSystem},

@@ -5,14 +5,14 @@ use parser::parse_ddt_str;
 use types::*;
 
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, Result},
     shared::utf16_bom_to_string,
 };
 
 pub struct DDTParser;
 
-impl FileParser2 for DDTParser {
+impl FileParser for DDTParser {
     type Output = DDTFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

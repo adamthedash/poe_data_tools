@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, Result},
 };
 
@@ -11,7 +11,7 @@ use winnow::Parser;
 
 pub struct DatParser;
 
-impl FileParser2 for DatParser {
+impl FileParser for DatParser {
     type Output = DatFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

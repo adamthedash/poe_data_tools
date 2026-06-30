@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{ParseError, Result},
 };
 
@@ -10,7 +10,7 @@ use types::*;
 
 pub struct TGTParser;
 
-impl FileParser2 for TGTParser {
+impl FileParser for TGTParser {
     type Output = TGTFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

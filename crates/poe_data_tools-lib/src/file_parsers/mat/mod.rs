@@ -4,14 +4,14 @@ use parser::parse_mat_str;
 use types::MATFile;
 
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{ParseError, Result},
     shared::utf16_bom_to_string,
 };
 
 pub struct MATParser;
 
-impl FileParser2 for MATParser {
+impl FileParser for MATParser {
     type Output = MATFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

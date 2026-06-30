@@ -14,7 +14,7 @@ use poe_data_tools::{
         parser::create_parser,
     },
     file_parsers::{
-        FileParser2,
+        FileParser,
         dat::{DatParser, types::DatFile},
     },
     fs::{FS, FileSystem},

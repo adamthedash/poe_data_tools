@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::Context;
 use poe_data_tools::{
-    file_parsers::{FileParser2, psg::PSGParser},
+    file_parsers::{FileParser, psg::PSGParser},
     fs::{FS, FileSystem},
 };
 

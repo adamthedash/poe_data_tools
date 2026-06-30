@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{ParseError, Result},
 };
 
@@ -10,7 +10,7 @@ use types::AMDFile;
 
 pub struct AMDParser;
 
-impl FileParser2 for AMDParser {
+impl FileParser for AMDParser {
     type Output = AMDFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

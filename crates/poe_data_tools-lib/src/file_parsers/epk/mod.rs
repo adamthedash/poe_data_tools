@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, ParseError, Result},
     shared::utf16_bom_to_string,
 };
@@ -11,7 +11,7 @@ use types::EPKFile;
 
 pub struct EPKParser;
 
-impl FileParser2 for EPKParser {
+impl FileParser for EPKParser {
     type Output = EPKFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

@@ -10,7 +10,7 @@ use glob::{MatchOptions, Pattern};
 use poe_data_tools::{
     Patch,
     file_parsers::{
-        FileParser2,
+        FileParser,
         psg::{PSGParser, types::PSGFile},
     },
     fs::{FS, FileSystem},

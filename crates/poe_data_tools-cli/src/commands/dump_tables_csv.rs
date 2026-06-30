@@ -22,7 +22,7 @@ use poe_data_tools::{
     Patch,
     dat::ivy_schema::{ColumnSchema, DatTableSchema, fetch_schema, load_schema},
     file_parsers::{
-        FileParser2,
+        FileParser,
         dat::{DatParser, types::DatFile},
     },
     fs::{FS, FileSystem},

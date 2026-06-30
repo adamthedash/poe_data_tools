@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, Result},
     shared::utf16_bom_to_string,
 };
@@ -12,7 +12,7 @@ pub use types::*;
 
 pub struct TSIParser;
 
-impl FileParser2 for TSIParser {
+impl FileParser for TSIParser {
     type Output = TSIFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

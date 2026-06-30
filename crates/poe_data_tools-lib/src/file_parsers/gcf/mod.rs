@@ -4,14 +4,14 @@ use parser::parse_gcf_str;
 use types::*;
 
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, Result},
     shared::utf16_bom_to_string,
 };
 
 pub struct GCFParser;
 
-impl FileParser2 for GCFParser {
+impl FileParser for GCFParser {
     type Output = GcfFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

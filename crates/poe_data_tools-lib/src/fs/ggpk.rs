@@ -12,7 +12,7 @@ use iterators_extended::bucket::Bucket;
 
 use crate::{
     file_parsers::{
-        FileParser2,
+        FileParser,
         bundle::BundleParser,
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
         ggpk::{

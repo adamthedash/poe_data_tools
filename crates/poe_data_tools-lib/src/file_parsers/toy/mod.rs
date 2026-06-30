@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, Result},
     shared::utf16_bom_to_string,
 };
@@ -11,7 +11,7 @@ use types::*;
 
 pub struct TOYParser;
 
-impl FileParser2 for TOYParser {
+impl FileParser for TOYParser {
     type Output = TOYFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

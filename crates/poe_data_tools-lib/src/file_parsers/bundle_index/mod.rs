@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, Result},
 };
 
@@ -10,7 +10,7 @@ use winnow::Parser;
 
 pub struct BundleIndexParser;
 
-impl FileParser2 for BundleIndexParser {
+impl FileParser for BundleIndexParser {
     type Output = BundleIndexFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

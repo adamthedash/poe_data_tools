@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, Result},
     shared::utf16_bom_to_string,
 };
@@ -11,7 +11,7 @@ use types::CLTFile;
 
 pub struct CLTParser;
 
-impl FileParser2 for CLTParser {
+impl FileParser for CLTParser {
     type Output = CLTFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

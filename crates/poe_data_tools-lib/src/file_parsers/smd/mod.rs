@@ -4,11 +4,11 @@ pub mod types;
 use parser::parse_smd;
 use types::SMDFile;
 
-use crate::file_parsers::{FileParser2, VersionedFile, error::Result};
+use crate::file_parsers::{FileParser, VersionedFile, error::Result};
 
 pub struct SMDParser;
 
-impl FileParser2 for SMDParser {
+impl FileParser for SMDParser {
     type Output = SMDFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

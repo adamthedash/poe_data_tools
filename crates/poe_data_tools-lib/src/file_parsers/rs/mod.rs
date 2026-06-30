@@ -5,14 +5,14 @@ use parser::parse_rs_str;
 use types::*;
 
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, Result},
     shared::utf16_bom_to_string,
 };
 
 pub struct RSParser;
 
-impl FileParser2 for RSParser {
+impl FileParser for RSParser {
     type Output = RSFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

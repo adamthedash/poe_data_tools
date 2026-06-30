@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{ParseError, Result},
 };
 
@@ -10,7 +10,7 @@ use types::*;
 
 pub struct SMParser;
 
-impl FileParser2 for SMParser {
+impl FileParser for SMParser {
     type Output = SMFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

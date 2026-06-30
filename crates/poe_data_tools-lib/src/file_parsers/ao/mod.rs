@@ -5,14 +5,14 @@ use parser::parse_ao_str;
 use types::*;
 
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, Result},
     shared::utf16_bom_to_string,
 };
 
 pub struct AOParser;
 
-impl FileParser2 for AOParser {
+impl FileParser for AOParser {
     type Output = AOFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

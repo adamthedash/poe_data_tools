@@ -71,7 +71,7 @@ use trl::TRLParser;
 use tsi::TSIParser;
 use tst::TSTParser;
 
-pub trait FileParser2 {
+pub trait FileParser {
     /// Structured output type
     type Output;
 
@@ -96,7 +96,7 @@ pub trait FileParserExt {
 
 impl<P> FileParserExt for P
 where
-    P: FileParser2,
+    P: FileParser,
     P::Output: Serialize + VersionedFile,
 {
     fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()> {

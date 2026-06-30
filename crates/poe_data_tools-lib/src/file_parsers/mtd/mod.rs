@@ -4,14 +4,14 @@ use parser::parse_mtd_str;
 use types::MTDFile;
 
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{AsParseError, Result},
     shared::utf16_bom_to_string,
 };
 
 pub struct MTDParser;
 
-impl FileParser2 for MTDParser {
+impl FileParser for MTDParser {
     type Output = MTDFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {

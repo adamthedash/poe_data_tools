@@ -1,5 +1,5 @@
 use crate::file_parsers::{
-    FileParser2, VersionedFile,
+    FileParser, VersionedFile,
     error::{ParseError, Result},
     shared::utf16_bom_to_string,
 };
@@ -11,7 +11,7 @@ use types::TSTFile;
 
 pub struct TSTParser;
 
-impl FileParser2 for TSTParser {
+impl FileParser for TSTParser {
     type Output = TSTFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
