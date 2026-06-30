@@ -1,6 +1,6 @@
 use crate::file_parsers::{
     FileParser2,
-    error::{ParseErrorInner, Result},
+    error::{ParseError, Result},
 };
 
 pub mod parser;
@@ -14,8 +14,7 @@ impl FileParser2 for TGTParser {
     type Output = TGTFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
-        let contents =
-            String::from_utf16le(bytes).map_err(|e| ParseErrorInner::Preprocessing(e.into()))?;
+        let contents = String::from_utf16le(bytes).map_err(ParseError::processing)?;
 
         parse_tgt_str(&contents)
     }

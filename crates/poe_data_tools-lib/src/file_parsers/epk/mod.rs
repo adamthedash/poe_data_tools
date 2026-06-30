@@ -1,6 +1,6 @@
 use crate::file_parsers::{
     FileParser2,
-    error::{AsParseError, ParseErrorInner, Result},
+    error::{AsParseError, ParseError, Result},
     shared::utf16_bom_to_string,
 };
 
@@ -18,8 +18,7 @@ impl FileParser2 for EPKParser {
         let contents = if let Ok(s) = utf16_bom_to_string(bytes).to_parse_error() {
             s
         } else {
-            String::from_utf8(bytes.to_vec())
-                .map_err(|e| ParseErrorInner::Preprocessing(e.into()))?
+            String::from_utf8(bytes.to_vec()).map_err(ParseError::processing)?
         };
 
         parse_epk_str(&contents)
