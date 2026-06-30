@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use poe_data_tools::{
-    file_parsers::{FileParser, psg::PSGParser},
+    file_parsers::{FileParser2, psg::PSGParser},
     fs::{FS, FileSystem, cdn::cdn_base_url},
 };
 
@@ -25,7 +25,7 @@ fn main() {
         };
 
         let parser = PSGParser { version: 2 };
-        let Ok(tree) = parser.parse(&bytes).inner else {
+        let Ok(tree) = parser.parse(&bytes) else {
             eprintln!("Error parsing tree {file:?}");
             continue;
         };

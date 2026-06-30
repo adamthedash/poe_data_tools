@@ -10,7 +10,7 @@ use glob::{MatchOptions, Pattern};
 use poe_data_tools::{
     Patch,
     file_parsers::{
-        FileParser,
+        FileParser2,
         psg::{PSGParser, types::PSGFile},
     },
     fs::{FS, FileSystem},
@@ -33,7 +33,6 @@ fn process_file(
         version: version.major(),
     }
     .parse(contents)
-    .as_anyhow()
     .context("Failed to parse passive skill tree")?;
 
     // Add passive info - only nodes that are in the graph

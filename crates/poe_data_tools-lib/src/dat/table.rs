@@ -13,7 +13,7 @@ use arrow_array::{
 use crate::{
     dat::ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
     file_parsers::{
-        FileParser,
+        FileParser2,
         dat::{DatParser, types::DatFile},
     },
     fs::{FS, FileSystem},
@@ -403,7 +403,6 @@ pub fn load_parsed_table(
     // Load dat file
     let table = DatParser
         .parse(&bytes)
-        .as_anyhow()
         .context("Failed to parse table data")?;
 
     ensure!(!table.rows.is_empty(), "Empty table");

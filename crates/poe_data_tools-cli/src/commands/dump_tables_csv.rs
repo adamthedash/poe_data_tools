@@ -22,7 +22,7 @@ use poe_data_tools::{
     Patch,
     dat::ivy_schema::{ColumnSchema, DatTableSchema, fetch_schema, load_schema},
     file_parsers::{
-        FileParser,
+        FileParser2,
         dat::{DatParser, types::DatFile},
     },
     fs::{FS, FileSystem},
@@ -448,7 +448,6 @@ fn process_file(bytes: &Bytes, output_path: &Path, schema: &DatTableSchema) -> R
     // Load dat file
     let table = DatParser
         .parse(bytes)
-        .as_anyhow()
         .context("Failed to parse table data")?;
 
     ensure!(!table.rows.is_empty(), "Empty table");

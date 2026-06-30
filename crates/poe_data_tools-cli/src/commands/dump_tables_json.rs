@@ -14,7 +14,7 @@ use poe_data_tools::{
         parser::create_parser,
     },
     file_parsers::{
-        FileParser,
+        FileParser2,
         dat::{DatParser, types::DatFile},
     },
     fs::{FS, FileSystem},
@@ -94,7 +94,6 @@ fn resolve_keys(
     let bytes = fs.read(&filename).context("Failed to read file contents")?;
     let contents = DatParser
         .parse(&bytes)
-        .as_anyhow()
         .context("Failed to parse dat file")?;
 
     let DatFile {
@@ -182,7 +181,6 @@ fn resolve_table(
     let bytes = fs.read(&filename).context("Failed to read file contents")?;
     let contents = DatParser
         .parse(&bytes)
-        .as_anyhow()
         .context("Failed to parse dat file")?;
 
     let DatFile {
