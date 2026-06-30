@@ -14,6 +14,6 @@ impl FileParser2 for BundleParser {
     type Output = BundleFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
-        parser::bundle().parse(bytes).as_parse_error()
+        parser::bundle().parse(bytes).to_parse_error()
     }
 }

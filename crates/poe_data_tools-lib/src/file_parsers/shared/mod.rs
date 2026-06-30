@@ -4,23 +4,44 @@ pub mod serialise;
 pub mod versioned_result;
 pub mod winnow;
 
-use anyhow::{Context, bail};
+use std::string::FromUtf16Error;
+
+use anyhow::Context;
 use regex::Regex;
+
+use crate::file_parsers::error::Result;
+
+/// Errors related to parsing UTF-16 encoded bytes with Byte Order Marker
+#[derive(Debug, thiserror::Error)]
+pub enum BOMError {
+    #[error("not enough bytes for BOM")]
+    NotEnoughBytes,
+    #[error("invalid BOM btyes: {0:?}")]
+    InvalidBytes([u8; 2]),
+    #[error(transparent)]
+    InvalidUTF16(#[from] FromUtf16Error),
+}
 
 /// Parse the bytes of a UTF-16 file with BOM
 /// https://en.wikipedia.org/wiki/Byte_order_mark#UTF-16
-pub fn utf16_bom_to_string(contents: &[u8]) -> anyhow::Result<String> {
-    let (first, rest) = contents
-        .split_at_checked(2)
-        .context("Not enough bytes for BOM")?;
+pub fn utf16_bom_to_string2(contents: &[u8]) -> Result<String, BOMError> {
+    let Some((first, rest)) = contents.split_first_chunk() else {
+        return Err(BOMError::NotEnoughBytes);
+    };
 
     let parse_utf16 = match first {
         [0xff, 0xfe] => String::from_utf16le,
         [0xfe, 0xff] => String::from_utf16be,
-        bytes => bail!("Invalid BOM found: {:?}", bytes),
+        bytes => return Err(BOMError::InvalidBytes(*bytes)),
     };
 
-    parse_utf16(rest).context("Failed to parse contents as UTF-16 string")
+    Ok(parse_utf16(rest)?)
+}
+
+/// Parse the bytes of a UTF-16 file with BOM
+/// https://en.wikipedia.org/wiki/Byte_order_mark#UTF-16
+pub fn utf16_bom_to_string(contents: &[u8]) -> anyhow::Result<String> {
+    utf16_bom_to_string2(contents).context("Failed to parse contents as UTF-16 string")
 }
 
 /// Remove trailing commas so serde can parse it

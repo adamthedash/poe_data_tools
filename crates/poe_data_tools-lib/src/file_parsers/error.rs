@@ -1,4 +1,4 @@
-use winnow::error::ContextError;
+use crate::file_parsers::shared::BOMError;
 
 pub type Result<T, E = ParseError> = std::result::Result<T, E>;
 
@@ -14,7 +14,8 @@ pub struct ParseError {
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum ParseErrorInner {
     /// Errors from winnow parsers
-    #[error(transparent)]
+    // TODO: Figure out how to properly bubble up context for winnow parsers
+    #[error("error originating from winnow parser: {0:?}")]
     Winnow(#[from] winnow::error::ContextError),
 
     /// Errors from annotated_parser
@@ -24,7 +25,7 @@ pub(crate) enum ParseErrorInner {
 
     /// Error from anything before a parser is applied
     #[error("error during file pre-processing: {0}")]
-    Preprocessing(Box<dyn std::error::Error>),
+    Preprocessing(Box<dyn std::error::Error + Send + Sync>),
 
     /// Catchall
     #[error("parsing error: {0}")]
@@ -40,12 +41,18 @@ where
     }
 }
 
+impl From<BOMError> for ParseErrorInner {
+    fn from(value: BOMError) -> Self {
+        Self::Preprocessing(Box::new(value))
+    }
+}
+
 // ==============================================================
 
 /// Wrap an error in an unversioned ParseError
 pub(crate) trait AsParseError {
     type Output;
-    fn as_parse_error(self) -> Self::Output;
+    fn to_parse_error(self) -> Self::Output;
 }
 
 impl<T, E> AsParseError for Result<T, E>
@@ -54,7 +61,7 @@ where
 {
     type Output = Result<T, ParseError>;
 
-    fn as_parse_error(self) -> Self::Output {
+    fn to_parse_error(self) -> Self::Output {
         self.map_err(|e| ParseError {
             version: None,
             inner: e.into(),

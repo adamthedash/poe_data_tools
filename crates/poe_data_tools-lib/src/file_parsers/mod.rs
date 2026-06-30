@@ -104,10 +104,13 @@ where
                 version: None,
                 inner: Ok(val),
             },
-            Err(e) => VersionedResult {
-                version: e.version,
-                inner: Err(anyhow::anyhow!("{e}")),
-            },
+            Err(e) => {
+                println!("{e:?}");
+                VersionedResult {
+                    version: e.version,
+                    inner: Err(anyhow::anyhow!(e)),
+                }
+            }
         }
     }
 }
