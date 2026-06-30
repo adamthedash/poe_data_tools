@@ -77,6 +77,20 @@ pub trait FileParser {
     /// Attempt to parse a set of bytes. If the file contains a version before parsing fails, it is
     /// returned along with the result.
     fn parse(&self, bytes: &[u8]) -> error::Result<Self::Output>;
+
+    /// Checks whether the file has been parsed successfully
+    /// Also returns the file version if available
+    fn validate(&self, bytes: &[u8]) -> (bool, Option<u32>)
+    where
+        Self::Output: VersionedFile,
+    {
+        let res = self.parse(bytes);
+
+        match res {
+            Ok(file) => (true, file.version()),
+            Err(e) => (false, e.version),
+        }
+    }
 }
 
 pub trait VersionedFile {
@@ -87,10 +101,6 @@ pub trait VersionedFile {
 pub trait FileParserExt {
     /// Parse and serialise to JSON
     fn parse_to_json_file(&self, bytes: &[u8], output_path: &Path) -> Result<()>;
-
-    /// Checks whether the file has been parsed successfully
-    /// Also returns the file version if available
-    fn validate(&self, bytes: &[u8]) -> (bool, Option<u32>);
 }
 
 impl<P> FileParserExt for P
@@ -111,15 +121,6 @@ where
         serde_json::to_writer(f, &parsed).context("Failed to serialise")?;
 
         Ok(())
-    }
-
-    fn validate(&self, bytes: &[u8]) -> (bool, Option<u32>) {
-        let res = self.parse(bytes);
-
-        match res {
-            Ok(file) => (true, file.version()),
-            Err(e) => (false, e.version),
-        }
     }
 }
 
