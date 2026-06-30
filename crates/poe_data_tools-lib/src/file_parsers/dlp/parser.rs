@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
@@ -11,7 +10,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::{SliceParser, lift},
         winnow::{WinnowParser, filename, parse_bool, quoted, unquoted, version_line},
@@ -118,7 +117,7 @@ fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
     )
 }
 
-pub fn parse_dlp_str(contents: &str) -> VersionedResult<DLPFile> {
+pub fn parse_dlp_str(contents: &str) -> Result<DLPFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -128,7 +127,7 @@ pub fn parse_dlp_str(contents: &str) -> VersionedResult<DLPFile> {
 
     let version = opt(lift(version_line()))
         .parse_next(&mut lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .to_parse_error()?;
 
     let mut parser = (
         dispatch! {
@@ -146,6 +145,6 @@ pub fn parse_dlp_str(contents: &str) -> VersionedResult<DLPFile> {
 
     parser
         .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(version)
+        .to_parse_error()
+        .with_maybe_version(version)
 }

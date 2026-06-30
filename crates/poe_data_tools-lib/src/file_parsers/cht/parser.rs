@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
@@ -7,7 +6,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::{SliceParser, lift},
         winnow::{WinnowParser, quoted_comma_separated, version_line},
@@ -78,7 +77,7 @@ fn group<'a, const NAMED: bool>(version: u32) -> impl SliceParser<'a, &'a str, G
     )
 }
 
-pub fn parse_cht_str(contents: &str) -> VersionedResult<CHTFile> {
+pub fn parse_cht_str(contents: &str) -> Result<CHTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -88,7 +87,7 @@ pub fn parse_cht_str(contents: &str) -> VersionedResult<CHTFile> {
 
     let version = lift(version_line())
         .parse_next(&mut lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .to_parse_error()?;
 
     let mut parser = (
         winnow::trace!("default_group", group::<false>(version)),
@@ -99,8 +98,5 @@ pub fn parse_cht_str(contents: &str) -> VersionedResult<CHTFile> {
             CHTFile { version, groups }
         });
 
-    parser
-        .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))
+    parser.parse(lines).to_parse_error().with_version(version)
 }

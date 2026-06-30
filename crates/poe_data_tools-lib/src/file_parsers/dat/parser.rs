@@ -1,4 +1,3 @@
-use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     binary::le_u32,
@@ -16,7 +15,7 @@ fn table_section<'a>() -> impl WinnowParser<&'a [u8], &'a [u8]> {
     )
 }
 
-fn dat<'a>() -> impl WinnowParser<&'a [u8], DatFile> {
+pub fn dat<'a>() -> impl WinnowParser<&'a [u8], DatFile> {
     (
         le_u32, //
         table_section(),
@@ -39,10 +38,4 @@ fn dat<'a>() -> impl WinnowParser<&'a [u8], DatFile> {
                 variable_data: variable_data.to_vec(),
             }
         })
-}
-
-pub fn parse_dat_bytes(contents: &[u8]) -> Result<DatFile> {
-    dat()
-        .parse(contents)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
 }

@@ -12,7 +12,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::{SliceParser, lift},
         winnow::{
@@ -514,18 +514,18 @@ fn thingy<'a>(strings: &[String]) -> impl WinnowParser<&'a str, Thingy> {
     )
 }
 
-pub fn parse_arm_str(input: &str) -> VersionedResult<ARMFile> {
+pub fn parse_arm_str(input: &str) -> Result<ARMFile> {
     let lines = input.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>();
     let mut lines = lines.as_slice();
 
     let version = lift(version_line())
         .parse_next(&mut lines)
-        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))?;
+        .to_parse_error()?;
 
     let strings = string_section()
         .parse_next(&mut lines)
-        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))
-        .with_version(Some(version))?;
+        .to_parse_error()
+        .with_version(version)?;
 
     let (dimensions, numbers1, tag1, bools, root_slot) = (
         lift(dimensions(version)),
@@ -535,8 +535,8 @@ pub fn parse_arm_str(input: &str) -> VersionedResult<ARMFile> {
         lift(slot(&strings)),
     )
         .parse_next(&mut lines)
-        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))
-        .with_version(Some(version))?;
+        .to_parse_error()
+        .with_version(version)?;
 
     let (grid_height, grid_width) = if let Slot::K(slot) = &root_slot {
         (slot.height as usize, slot.width as usize)
@@ -573,10 +573,7 @@ pub fn parse_arm_str(input: &str) -> VersionedResult<ARMFile> {
         zones,
         tags,
         ground_overrides,
-    ) = parser
-        .parse(lines)
-        .map_err(|e| anyhow::anyhow!("Failed to parse file: {:?}", e))
-        .with_version(Some(version))?;
+    ) = parser.parse(lines).to_parse_error().with_version(version)?;
 
     let arm_file = ARMFile {
         version,
@@ -599,5 +596,5 @@ pub fn parse_arm_str(input: &str) -> VersionedResult<ARMFile> {
         ground_overrides,
     };
 
-    Ok(arm_file).with_version(Some(version))
+    Ok(arm_file)
 }

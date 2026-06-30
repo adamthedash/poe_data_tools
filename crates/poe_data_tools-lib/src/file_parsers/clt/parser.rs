@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
@@ -7,7 +6,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::{SliceParser, lift},
         winnow::{WinnowParser, filename, quoted, quoted_str, unquoted_str, version_line},
@@ -60,7 +59,7 @@ pub fn group<'a>(version: u32) -> impl SliceParser<'a, &'a str, Group> {
     )
 }
 
-pub fn parse_clt_str(contents: &str) -> VersionedResult<CLTFile> {
+pub fn parse_clt_str(contents: &str) -> Result<CLTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -70,7 +69,7 @@ pub fn parse_clt_str(contents: &str) -> VersionedResult<CLTFile> {
 
     let version = lift(version_line())
         .parse_next(&mut lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .to_parse_error()?;
 
     let mut parser = (
         lift(float), //
@@ -82,8 +81,5 @@ pub fn parse_clt_str(contents: &str) -> VersionedResult<CLTFile> {
             groups,
         });
 
-    parser
-        .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))
+    parser.parse(lines).to_parse_error().with_version(version)
 }
