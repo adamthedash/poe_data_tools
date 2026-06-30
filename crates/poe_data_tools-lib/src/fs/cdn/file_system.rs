@@ -8,7 +8,7 @@ use url::Url;
 use super::CDNLoader;
 use crate::{
     file_parsers::{
-        FileParser,
+        FileParser2,
         bundle::{BundleParser, types::BundleFile},
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
     },
@@ -163,12 +163,7 @@ impl FileSystem for CDNFS {
         });
 
         let file_contents = rx.into_iter().flat_map(|(_bundle_path, bundle, files)| {
-            let bundle = bundle.and_then(|bytes| {
-                BundleParser
-                    .parse(&bytes)
-                    .as_anyhow()
-                    .map_err(|e| FSError::Parse(Arc::new(e)))
-            });
+            let bundle = bundle.and_then(|bytes| BundleParser.parse(&bytes).map_err(FSError::from));
 
             let contents: Box<dyn Iterator<Item = _>> = match bundle {
                 Ok(b) => Box::new(files.into_iter().map(move |(path, file)| {
@@ -198,18 +193,12 @@ impl FileSystem for CDNFS {
 fn fetch_index_file(cdn_loader: &CDNLoader, path: &Path) -> Result<BundleIndexFile> {
     let index_content = fetch_bundle_content(cdn_loader, path)?.read_all()?;
 
-    BundleIndexParser
-        .parse(&index_content)
-        .as_anyhow()
-        .map_err(|e| FSError::Parse(Arc::new(e)))
+    Ok(BundleIndexParser.parse(&index_content)?)
 }
 
 // Fetch a bundle file from the CDN (or cache)
 fn fetch_bundle_content(cdn_loader: &CDNLoader, path: &Path) -> Result<BundleFile> {
     let bundle_content = cdn_loader.load(path)?;
 
-    BundleParser
-        .parse(&bundle_content)
-        .as_anyhow()
-        .map_err(|e| FSError::Parse(Arc::new(e)))
+    Ok(BundleParser.parse(&bundle_content)?)
 }

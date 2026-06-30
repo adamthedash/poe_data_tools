@@ -28,13 +28,8 @@ pub enum Error {
     FileNotFound(String),
 
     /// Issue with interpreting bytes as structured data
-    // TODO: Get rid of anyhow once we have proper parser errors
-    #[error("failed to parse data")]
-    Parse(#[from] Arc<anyhow::Error>),
-
-    // TODO: replace above with this
     #[error(transparent)]
-    Parse2(#[from] Arc<crate::file_parsers::error::ParseError>),
+    Parse(#[from] Arc<crate::file_parsers::error::ParseError>),
 }
 
 impl From<std::io::Error> for Error {

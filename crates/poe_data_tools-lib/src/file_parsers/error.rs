@@ -15,6 +15,16 @@ pub struct ParseError {
     inner: ParseErrorInner,
 }
 
+impl ParseError {
+    pub(crate) fn other(e: impl std::error::Error + Send + Sync + 'static) -> Self {
+        ParseErrorInner::Other(e.into()).into()
+    }
+
+    pub(crate) fn processing(e: impl std::error::Error + Send + Sync + 'static) -> Self {
+        ParseErrorInner::Preprocessing(e.into()).into()
+    }
+}
+
 impl From<ParseErrorInner> for ParseError {
     fn from(value: ParseErrorInner) -> Self {
         Self {

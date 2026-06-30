@@ -5,7 +5,6 @@ use std::{
     fs::File,
     io::{BufReader, Read, Seek, SeekFrom},
     path::Path,
-    sync::Arc,
 };
 
 use bytes::Bytes;
@@ -13,7 +12,7 @@ use iterators_extended::bucket::Bucket;
 
 use crate::{
     file_parsers::{
-        FileParser,
+        FileParser2,
         bundle::BundleParser,
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
         ggpk::{
@@ -196,14 +195,8 @@ impl GGPKBundleFS {
         let ggpk = GGPKFS::new(ggpk_path)?;
 
         let index_bytes = ggpk.read("/Bundles2/_.index.bin")?;
-        let index_bundle = BundleParser
-            .parse(&index_bytes)
-            .as_anyhow()
-            .map_err(|e| FSError::Parse(Arc::new(e)))?;
-        let index = BundleIndexParser
-            .parse(&index_bundle.read_all()?)
-            .as_anyhow()
-            .map_err(|e| FSError::Parse(Arc::new(e)))?;
+        let index_bundle = BundleParser.parse(&index_bytes)?;
+        let index = BundleIndexParser.parse(&index_bundle.read_all()?)?;
 
         let lut = index
             .files
@@ -267,12 +260,10 @@ impl FileSystem for GGPKBundleFS {
                 self.index.bundles[bundle_index as usize].name
             );
 
-            let bundle = self.ggpk.read(&bundle_path).and_then(|bytes| {
-                BundleParser
-                    .parse(&bytes)
-                    .as_anyhow()
-                    .map_err(|e| FSError::Parse(Arc::new(e)))
-            });
+            let bundle = self
+                .ggpk
+                .read(&bundle_path)
+                .and_then(|bytes| Ok(BundleParser.parse(&bytes)?));
 
             // Read the file contents
             let contents: Box<dyn Iterator<Item = _>> = match bundle {
@@ -315,10 +306,7 @@ impl FileSystem for GGPKBundleFS {
             self.index.bundles[file.bundle_index as usize].name
         );
         let bundle_contents = self.ggpk.read(&bundle_path)?;
-        let bundle = BundleParser
-            .parse(&bundle_contents)
-            .as_anyhow()
-            .map_err(|e| FSError::Parse(Arc::new(e)))?;
+        let bundle = BundleParser.parse(&bundle_contents)?;
 
         // Pull out the file's contents
         let content = bundle.read_range(file.offset as usize, file.size as usize)?;

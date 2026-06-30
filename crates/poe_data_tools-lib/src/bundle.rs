@@ -1,11 +1,11 @@
-use std::sync::Arc;
-
-use anyhow::Context;
 use bytes::Bytes;
 use oozextract::Extractor;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
-use crate::{file_parsers::bundle::types::BundleFile, fs::error::Error as FSError};
+use crate::{
+    file_parsers::{bundle::types::BundleFile, error::ParseError},
+    fs::error::Error as FSError,
+};
 
 impl BundleFile {
     /// Return the entire content of the bundle
@@ -33,11 +33,9 @@ impl BundleFile {
             .try_for_each(|(chunk, block)| {
                 let mut ext = Extractor::new();
 
-                ext.read_from_slice(block, chunk)
-                    .map(|_| ())
-                    .context("decoder error")
-                    .map_err(|e| FSError::Parse(Arc::new(e)))
-            })?;
+                ext.read_from_slice(block, chunk).map(|_| ())
+            })
+            .map_err(ParseError::other)?;
 
         // Grab subset form block aligned buffer
         let slice = Bytes::from(buf).slice(offset % block_size..offset % block_size + len);

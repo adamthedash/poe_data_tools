@@ -3,11 +3,9 @@ use std::{
     io::{Read, Write},
     net::TcpStream,
     path::{Path, PathBuf},
-    sync::Arc,
     time::Duration,
 };
 
-use anyhow::Context;
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
 use reqwest::blocking::Client;
@@ -20,7 +18,7 @@ use winnow::{
 };
 
 use crate::{
-    file_parsers::shared::winnow::WinnowParser,
+    file_parsers::{error::ParseError, shared::winnow::WinnowParser},
     fs::{Result, error::Error as FSError},
 };
 
@@ -84,14 +82,10 @@ impl CacheFolder {
 }
 
 /// "1.2.3.4" -> [1, 2, 3, 4]
-fn parse_patch_parts(filename: &str) -> Result<Vec<u64>> {
+fn parse_patch_parts(filename: &str) -> Result<Vec<u64>, ParseError> {
     filename
         .split('.')
-        .map(|x| {
-            x.parse::<u64>()
-                .with_context(|| format!("Failed to parse filename part as u64: {x:?}"))
-                .map_err(|e| FSError::Parse(Arc::new(e)))
-        })
+        .map(|x| x.parse::<u64>().map_err(ParseError::other))
         .collect()
 }
 
@@ -419,9 +413,8 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> Result<Url> {
             .map(|d| d.as_secs() < 3600)
             .unwrap_or(false)
     {
-        let url = Url::parse(fs::read_to_string(&cache_file)?.as_str())
-            .with_context(|| "Failed to parse URL")
-            .map_err(|e| FSError::Parse(Arc::new(e)))?;
+        let url =
+            Url::parse(fs::read_to_string(&cache_file)?.as_str()).map_err(ParseError::other)?;
         log::debug!("Using cached CDN URL: {}", url);
         return Ok(url);
     }
@@ -433,13 +426,11 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> Result<Url> {
         "2" => cur_url("patch.pathofexile2.com:13060".to_string(), &[1, 7])?,
         // Specific PoE 1 patch
         v if v.starts_with("3.") => Url::parse(format!("https://patch.poecdn.com/{}/", v).as_str())
-            .with_context(|| "Failed to parse URL")
-            .map_err(|e| FSError::Parse(Arc::new(e)))?,
+            .map_err(ParseError::other)?,
         // Specific PoE 2 patch
         v if v.starts_with("4.") => {
             Url::parse(format!("https://patch-poe2.poecdn.com/{}/", v).as_str())
-                .with_context(|| "Failed to parse URL")
-                .map_err(|e| FSError::Parse(Arc::new(e)))?
+                .map_err(ParseError::other)?
         }
         // Invalid patch
         _ => panic!("Invalid version provided"),

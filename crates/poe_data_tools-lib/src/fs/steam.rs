@@ -3,7 +3,6 @@ use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use bytes::Bytes;
@@ -12,7 +11,7 @@ use iterators_extended::bucket::Bucket;
 use super::{FileSystem, Result, error::Error as FSError};
 use crate::{
     file_parsers::{
-        FileParser,
+        FileParser2,
         bundle::{BundleParser, types::BundleFile},
         bundle_index::{BundleIndexParser, types::BundleIndexFile},
     },
@@ -157,20 +156,14 @@ impl FileSystem for SteamFS {
 fn load_index_file(path: &Path) -> Result<BundleIndexFile> {
     let index_content = load_bundle_content(path)?.read_all()?;
 
-    BundleIndexParser
-        .parse(&index_content)
-        .as_anyhow()
-        .map_err(|e| FSError::Parse(Arc::new(e)))
+    Ok(BundleIndexParser.parse(&index_content)?)
 }
 
 /// Load a bundle file from disk
 fn load_bundle_content(path: &Path) -> Result<BundleFile> {
     let bundle_content = fs::read(path)?;
 
-    BundleParser
-        .parse(&bundle_content)
-        .as_anyhow()
-        .map_err(|e| FSError::Parse(Arc::new(e)))
+    Ok(BundleParser.parse(&bundle_content)?)
 }
 
 /// Helper to find steam installs in common locations
