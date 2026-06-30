@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     binary::{le_f32, le_u8, le_u16, le_u32, length_repeat},
@@ -9,8 +8,8 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
     dolm::parser::{dolm, index_buffer},
+    error::{AsParseError, ParseErrorInner, ParseResultEx, Result},
     shared::winnow::{WinnowParser, le_f16, repeat_array, take_array},
 };
 
@@ -114,18 +113,31 @@ fn string_table<'a>() -> impl WinnowParser<&'a [u8], String> {
     )
 }
 
+#[derive(Debug, thiserror::Error)]
+enum StringTableError {
+    #[error("string table index out of bounds: index {offset}, len {length}")]
+    IndexOutOfBounds { offset: usize, length: usize },
+    #[error("no null terminator found")]
+    NullTerminatorNotFound,
+}
+
+impl From<StringTableError> for ParseErrorInner {
+    fn from(value: StringTableError) -> Self {
+        ParseErrorInner::Other(Box::new(value))
+    }
+}
+
 /// Read a string from the string table
-fn read_string(table: &str, offset: usize) -> Result<String, String> {
+fn read_string(table: &str, offset: usize) -> Result<String, StringTableError> {
     if offset >= table.len() {
-        return Err(format!(
-            "String table index out of bounds: {}, len: {}",
+        return Err(StringTableError::IndexOutOfBounds {
             offset,
-            table.len()
-        ));
+            length: table.len(),
+        });
     }
 
     let Some(length) = table.chars().skip(offset).position(|c| c == '\0') else {
-        return Err("No null terminator found".to_owned());
+        return Err(StringTableError::NullTerminatorNotFound);
     };
 
     let string = table.chars().skip(offset).take(length).collect::<String>();
@@ -158,14 +170,13 @@ fn header<'a>(version: u8) -> impl WinnowParser<&'a [u8], Header> {
         })
 }
 
-pub fn parse_fmt(mut contents: &[u8]) -> VersionedResult<FMTFile> {
-    let version =
-        le_u8(&mut contents).map_err(|e: ContextError| anyhow!("Failed to parse file: {e:?}"))?;
+pub fn parse_fmt(mut contents: &[u8]) -> Result<FMTFile> {
+    let version = le_u8::<_, ContextError>(&mut contents).to_parse_error()?;
 
     let header = header(version)
         .parse_next(&mut contents)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version as u32))?;
+        .to_parse_error()
+        .with_version(version as u32)?;
 
     let (bbox, (section, shapes, subcomponents)) = (
         repeat_array(le_f32), //
@@ -179,15 +190,15 @@ pub fn parse_fmt(mut contents: &[u8]) -> VersionedResult<FMTFile> {
         },
     )
         .parse_next(&mut contents)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version as u32))?;
+        .to_parse_error()
+        .with_version(version as u32)?;
 
     let d1s: Vec<_> = subcomponents
         .iter()
         .map(|s| repeat(s.num_d1s as usize, take_array::<12, _>()).parse_next(&mut contents))
         .collect::<winnow::Result<Vec<_>>>()
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version as u32))?;
+        .to_parse_error()
+        .with_version(version as u32)?;
 
     let d3_width = match version {
         ..1 => 45_usize,
@@ -205,8 +216,8 @@ pub fn parse_fmt(mut contents: &[u8]) -> VersionedResult<FMTFile> {
         string_table(),
     )
         .parse(contents)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version as u32))?;
+        .to_parse_error()
+        .with_version(version as u32)?;
 
     // Resolve shape strings
     let shapes = shapes
@@ -220,9 +231,9 @@ pub fn parse_fmt(mut contents: &[u8]) -> VersionedResult<FMTFile> {
 
             Ok(shape)
         })
-        .collect::<Result<Vec<_>, String>>()
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version as u32))?;
+        .collect::<Result<Vec<_>, StringTableError>>()
+        .to_parse_error()
+        .with_version(version as u32)?;
 
     // Resolve subcomponents
     let subcomponents = subcomponents
@@ -236,9 +247,9 @@ pub fn parse_fmt(mut contents: &[u8]) -> VersionedResult<FMTFile> {
             };
             Ok(s)
         })
-        .collect::<Result<Vec<_>, String>>()
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version as u32))?;
+        .collect::<Result<Vec<_>, StringTableError>>()
+        .to_parse_error()
+        .with_version(version as u32)?;
 
     let fmt_file = FMTFile {
         version,
@@ -250,5 +261,5 @@ pub fn parse_fmt(mut contents: &[u8]) -> VersionedResult<FMTFile> {
         string_table,
     };
 
-    Ok(fmt_file).with_version(Some(version as u32))
+    Ok(fmt_file)
 }

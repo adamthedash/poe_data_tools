@@ -41,7 +41,7 @@ pub(crate) enum ParseErrorInner {
 
     /// Catchall
     #[error("parsing error: {0}")]
-    Other(String),
+    Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl<I, E> From<winnow::error::ParseError<I, E>> for ParseErrorInner

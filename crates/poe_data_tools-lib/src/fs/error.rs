@@ -31,6 +31,10 @@ pub enum Error {
     // TODO: Get rid of anyhow once we have proper parser errors
     #[error("failed to parse data")]
     Parse(#[from] Arc<anyhow::Error>),
+
+    // TODO: replace above with this
+    #[error(transparent)]
+    Parse2(#[from] Arc<crate::file_parsers::error::ParseError>),
 }
 
 impl From<std::io::Error> for Error {
@@ -41,6 +45,12 @@ impl From<std::io::Error> for Error {
 
 impl From<reqwest::Error> for Error {
     fn from(value: reqwest::Error) -> Self {
+        Arc::new(value).into()
+    }
+}
+
+impl From<crate::file_parsers::error::ParseError> for Error {
+    fn from(value: crate::file_parsers::error::ParseError) -> Self {
         Arc::new(value).into()
     }
 }

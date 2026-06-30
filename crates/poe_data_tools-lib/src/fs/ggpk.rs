@@ -75,7 +75,7 @@ impl GGPKFS {
     /// Provided path should point to a Content.ggpk file
     pub fn new(ggpk_path: &Path) -> Result<Self> {
         let mut file = BufReader::new(File::open(ggpk_path)?);
-        let index = parse_ggpk(&mut file).map_err(|e| FSError::Parse(Arc::new(e)))?;
+        let index = parse_ggpk(&mut file)?;
 
         // Build LUT
         let lut = HashMap::from_iter(enumerate_file_info(&index.entries, None));

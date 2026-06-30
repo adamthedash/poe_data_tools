@@ -1,9 +1,8 @@
-use anyhow::anyhow;
 use winnow::{Parser, ascii::space1, combinator::repeat};
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::lift,
         winnow::{WinnowParser, filename, quoted, separated_array, version_line},
@@ -18,7 +17,7 @@ fn combination<'a>() -> impl WinnowParser<&'a str, GcfCombination> {
     )
 }
 
-pub fn parse_gcf_str(contents: &str) -> VersionedResult<GcfFile> {
+pub fn parse_gcf_str(contents: &str) -> Result<GcfFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -28,15 +27,12 @@ pub fn parse_gcf_str(contents: &str) -> VersionedResult<GcfFile> {
 
     let version = lift(version_line())
         .parse_next(&mut lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .to_parse_error()?;
 
     let mut parser = repeat(0.., lift(combination())).map(|combinations| GcfFile {
         version,
         combinations,
     });
 
-    parser
-        .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))
+    parser.parse(lines).to_parse_error().with_version(version)
 }
