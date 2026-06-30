@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{space0, space1},
@@ -7,7 +6,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::lift,
         winnow::{WinnowParser, filename, quoted, uint, unquoted_str, version_line},
@@ -30,7 +29,7 @@ fn room<'a>() -> impl WinnowParser<&'a str, Room> {
     )
 }
 
-pub fn parse_rs_str(contents: &str) -> VersionedResult<RSFile> {
+pub fn parse_rs_str(contents: &str) -> Result<RSFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -40,12 +39,9 @@ pub fn parse_rs_str(contents: &str) -> VersionedResult<RSFile> {
 
     let version = lift(version_line())
         .parse_next(&mut lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .to_parse_error()?;
 
     let mut parser = repeat(0.., lift(room())).map(|rooms| RSFile { version, rooms });
 
-    parser
-        .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))
+    parser.parse(lines).to_parse_error().with_version(version)
 }

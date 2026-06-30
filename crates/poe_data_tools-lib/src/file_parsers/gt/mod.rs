@@ -1,5 +1,7 @@
 use crate::file_parsers::{
-    FileParser, VersionedResult, VersionedResultExt, shared::utf16_bom_to_string,
+    FileParser2,
+    error::{AsParseError, Result},
+    shared::utf16_bom_to_string2,
 };
 
 pub mod parser;
@@ -9,12 +11,12 @@ use types::*;
 
 pub struct GTParser;
 
-impl FileParser for GTParser {
+impl FileParser2 for GTParser {
     type Output = GTFile;
 
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
-        let contents = utf16_bom_to_string(bytes)?;
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        let contents = utf16_bom_to_string2(bytes).to_parse_error()?;
 
-        parse_gt_str(&contents).unversioned()
+        parse_gt_str(&contents)
     }
 }

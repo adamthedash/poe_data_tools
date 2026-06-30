@@ -1,4 +1,3 @@
-use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     ascii::space1,
@@ -7,9 +6,12 @@ use winnow::{
 };
 
 use super::types::TSIFile;
-use crate::file_parsers::shared::{
-    lift::lift,
-    winnow::{WinnowParser, quoted_str, unquoted_str},
+use crate::file_parsers::{
+    error::{AsParseError, Result},
+    shared::{
+        lift::lift,
+        winnow::{WinnowParser, quoted_str, unquoted_str},
+    },
 };
 
 fn key_value<'a>() -> impl WinnowParser<&'a str, (String, String)> {
@@ -36,9 +38,5 @@ pub fn parse_tsi_str(contents: &str) -> Result<TSIFile> {
 
     let mut parser = repeat(0.., lift(key_value()));
 
-    let tsi_file = parser
-        .parse(lines.as_slice())
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-    Ok(tsi_file)
+    parser.parse(lines.as_slice()).to_parse_error()
 }

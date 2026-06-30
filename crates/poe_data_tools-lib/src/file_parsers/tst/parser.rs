@@ -1,4 +1,3 @@
-use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     ascii::{dec_uint, space0, space1},
@@ -6,9 +5,12 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::lift,
-    winnow::{WinnowParser, filename, quoted, unquoted_str},
+use crate::file_parsers::{
+    error::{AsParseError, Result},
+    shared::{
+        lift::lift,
+        winnow::{WinnowParser, filename, quoted, unquoted_str},
+    },
 };
 
 fn entry<'a>() -> impl WinnowParser<&'a str, Entry> {
@@ -50,9 +52,5 @@ pub fn parse_tst_str(contents: &str) -> Result<TSTFile> {
             tdt_files,
         });
 
-    let tst_file = parser
-        .parse(lines.as_slice())
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-    Ok(tst_file)
+    parser.parse(lines.as_slice()).to_parse_error()
 }

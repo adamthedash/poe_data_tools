@@ -1,17 +1,17 @@
 use annotated_parser::{
-    AnnotationMode, ForwardRef,
+    ForwardRef,
     parsers::{EoF, TakeArray, TakeVec, byte::F16LE},
     prelude::*,
 };
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
     dolm::{
         parser_annotated::{dolm, index_buffer},
         types::DolmVertex,
     },
-    shared::annotated_parser::{ToAnyhow, U8Parser},
+    error::{AsParseError, ParseResultEx, Result},
+    shared::annotated_parser::U8Parser,
 };
 
 #[derive(Debug, Clone)]
@@ -306,11 +306,13 @@ pub fn tgm_parser() -> (impl U8Parser<Output = TGMFile>, ForwardRef<u32>) {
     (parser, version_u32)
 }
 
-pub fn parse_tgm_bytes(mut input: &[u8]) -> VersionedResult<TGMFile> {
+pub fn parse_tgm_bytes(mut input: &[u8]) -> Result<TGMFile> {
     let (mut parser, version) = tgm_parser();
 
-    let res = parser.parse_with(&mut input, AnnotationMode::FAIL);
-    let version = *version.try_get();
+    let (tgm_file, _) = parser
+        .parse(&mut input)
+        .to_parse_error()
+        .with_maybe_version(*version.try_get())?;
 
-    res.to_anyhow().with_version(version)
+    Ok(tgm_file)
 }

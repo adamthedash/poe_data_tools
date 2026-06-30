@@ -1,7 +1,7 @@
-use anyhow::Context;
-
 use crate::file_parsers::{
-    FileParser, VersionedResult, VersionedResultExt, shared::utf16_bom_to_string,
+    FileParser2,
+    error::{ParseErrorInner, Result},
+    shared::utf16_bom_to_string2,
 };
 
 pub mod parser;
@@ -11,13 +11,14 @@ use types::TSTFile;
 
 pub struct TSTParser;
 
-impl FileParser for TSTParser {
+impl FileParser2 for TSTParser {
     type Output = TSTFile;
 
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
-        let contents = utf16_bom_to_string(bytes)
-            .or_else(|_| String::from_utf16le(bytes).context("Failed to parse as UTF16-LE"))?;
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        let contents = utf16_bom_to_string2(bytes)
+            .or_else(|_| String::from_utf16le(bytes))
+            .map_err(|e| ParseErrorInner::Preprocessing(e.into()))?;
 
-        parse_tst_str(&contents).unversioned()
+        parse_tst_str(&contents)
     }
 }

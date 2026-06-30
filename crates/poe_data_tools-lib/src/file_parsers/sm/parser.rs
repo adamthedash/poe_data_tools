@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
@@ -9,7 +8,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::{SliceParser, lift},
         winnow::{
@@ -64,7 +63,7 @@ fn bone_groups<'a>() -> impl SliceParser<'a, &'a str, Vec<BoneGroup>> {
     )
 }
 
-pub fn parse_sm_str(contents: &str) -> VersionedResult<SMFile> {
+pub fn parse_sm_str(contents: &str) -> Result<SMFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -74,7 +73,7 @@ pub fn parse_sm_str(contents: &str) -> VersionedResult<SMFile> {
 
     let version = lift(version_line())
         .parse_next(&mut lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .to_parse_error()?;
 
     let mut parser = (
         lift(P("SkinnedMeshData ", quoted('"').and_then(filename("smd")))), //
@@ -93,8 +92,5 @@ pub fn parse_sm_str(contents: &str) -> VersionedResult<SMFile> {
             bone_groups,
         });
 
-    parser
-        .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))
+    parser.parse(lines).to_parse_error().with_version(version)
 }

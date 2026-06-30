@@ -1,4 +1,8 @@
-use crate::file_parsers::{FileParser, VersionedResult, shared::utf16_bom_to_string};
+use crate::file_parsers::{
+    FileParser2,
+    error::{AsParseError, Result},
+    shared::utf16_bom_to_string2,
+};
 
 pub mod parser;
 pub mod types;
@@ -7,11 +11,11 @@ use types::*;
 
 pub struct TOYParser;
 
-impl FileParser for TOYParser {
+impl FileParser2 for TOYParser {
     type Output = TOYFile;
 
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
-        let contents = utf16_bom_to_string(bytes)?;
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        let contents = utf16_bom_to_string2(bytes).to_parse_error()?;
 
         parse_toy_str(&contents)
     }
