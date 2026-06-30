@@ -1,7 +1,7 @@
 use crate::file_parsers::{
     FileParser2,
     error::{ParseErrorInner, Result},
-    shared::utf16_bom_to_string2,
+    shared::utf16_bom_to_string,
 };
 
 pub mod parser;
@@ -15,7 +15,7 @@ impl FileParser2 for TSTParser {
     type Output = TSTFile;
 
     fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
-        let contents = utf16_bom_to_string2(bytes)
+        let contents = utf16_bom_to_string(bytes)
             .or_else(|_| String::from_utf16le(bytes))
             .map_err(|e| ParseErrorInner::Preprocessing(e.into()))?;
 
