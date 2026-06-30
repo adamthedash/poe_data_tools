@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::Path};
 use itertools::Itertools;
 use poe_data_tools::{
     Patch,
-    file_parsers::{FileParserExt, Parser},
+    file_parsers::{FileParser, Parser},
     fs::{FS, FileSystem, cdn::cdn_base_url},
 };
 

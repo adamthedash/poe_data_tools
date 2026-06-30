@@ -4,9 +4,11 @@ use anyhow::{Context, Result};
 use glob::{MatchOptions, Pattern};
 use poe_data_tools::{
     Patch,
-    file_parsers::{FileParserExt, Parser},
+    file_parsers::Parser,
     fs::{FS, FileSystem},
 };
+
+use crate::file_parser::FileParserExt;
 
 /// Extract, parse and transform files into easier to parse alternatives
 pub fn translate(
