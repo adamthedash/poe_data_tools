@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::space1,
@@ -9,7 +8,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::winnow::{
         WinnowParser, quoted_str, single_quoted_str, spaces_or_comments, unquoted_str, version_line,
     },
@@ -93,10 +92,8 @@ enum StructKind {
     Client(Vec<Struct>),
 }
 
-pub fn parse_ao_str(mut contents: &str) -> VersionedResult<AOFile> {
-    let version = version_line()
-        .parse_next(&mut contents)
-        .map_err(|e| anyhow!("Failed to parse ao file: {e:?}"))?;
+pub fn parse_ao_str(mut contents: &str) -> Result<AOFile> {
+    let version = version_line().parse_next(&mut contents).to_parse_error()?;
 
     let parser = (
         opt(P(spaces_or_comments(), literal("abstract"))),
@@ -143,6 +140,6 @@ pub fn parse_ao_str(mut contents: &str) -> VersionedResult<AOFile> {
 
     parser
         .parse(contents)
-        .map_err(|e| anyhow!("Failed to parse ao file: {e:?}"))
-        .with_version(Some(version))
+        .to_parse_error()
+        .with_version(version)
 }
