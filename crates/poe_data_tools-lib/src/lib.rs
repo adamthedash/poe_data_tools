@@ -9,7 +9,6 @@ pub mod file_parsers;
 pub mod fs;
 pub mod hasher;
 pub mod path;
-pub mod tree;
 
 #[derive(Debug, Clone)]
 pub enum Patch {

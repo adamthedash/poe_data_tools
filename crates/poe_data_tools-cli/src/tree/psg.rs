@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
+use poe_data_tools::file_parsers::psg::types::Group;
 use serde::Serialize;
 
-use crate::{file_parsers::psg::types::Group, tree::passive_info::PassiveSkillInfo};
+use crate::tree::passive_info::PassiveSkillInfo;
 
 /// Same format as what's exported by RePoE
 #[derive(Debug, Serialize)]

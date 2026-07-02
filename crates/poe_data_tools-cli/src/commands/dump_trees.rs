@@ -14,13 +14,15 @@ use poe_data_tools::{
         psg::{PSGParser, types::PSGFile},
     },
     fs::{FS, FileSystem},
+};
+
+use crate::{
+    VERBOSE,
     tree::{
         passive_info::{PassiveSkillInfo, load_passive_info},
         psg::PassiveSkillGraph,
     },
 };
-
-use crate::VERBOSE;
 
 fn process_file(
     contents: &[u8],
