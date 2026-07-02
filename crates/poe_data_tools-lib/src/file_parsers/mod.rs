@@ -195,7 +195,7 @@ impl FileParser for Parser {
 
 /// All possible parsed file types
 /// Some are boxes due to their size
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(untagged)]
 #[non_exhaustive]
 pub enum ParserOutput {

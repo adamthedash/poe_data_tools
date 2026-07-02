@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Entry {
     pub fmt_file: String,
     pub float: f32,
@@ -23,10 +23,10 @@ pub enum Header {
     Other { key: String, rest: String },
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct HeadersV3(pub Vec<Header>);
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct HeadersV2 {
     pub scale_min: f32,
     pub scale_max: f32,
@@ -40,13 +40,13 @@ pub struct HeadersV2 {
     pub float2: Option<f32>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub enum Headers {
     V2(HeadersV2),
     V3(HeadersV3),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct DLPFile {
     pub version: Option<u32>,
     pub headers: Headers,

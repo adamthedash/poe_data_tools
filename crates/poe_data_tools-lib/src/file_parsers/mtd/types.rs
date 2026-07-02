@@ -1,12 +1,12 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct MTDFile {
     pub version: u32,
     pub groups: Vec<Group>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Group {
     pub name: Option<String>,
     pub entries: Vec<Entry>,
@@ -15,7 +15,7 @@ pub struct Group {
     pub extra_entries: Vec<Entry>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Entry {
     pub mat_file: String,
     pub dlp_files: Vec<String>,

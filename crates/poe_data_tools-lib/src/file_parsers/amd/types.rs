@@ -1,26 +1,26 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct AnimationStage {
     pub name: String,
     pub time: u32,
     pub floats: [f32; 3],
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct BoneGroup {
     pub name: String,
     pub bones: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct BoneRotation {
     pub bone: String,
     pub coord_order: String,
     pub coords: Vec<f32>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Group {
     pub name: String,
     pub animation_type: String,
@@ -31,7 +31,7 @@ pub struct Group {
     pub extra_ints: Option<[Option<u32>; 2]>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct AMDFile {
     pub version: u32,
     pub groups: Vec<Group>,

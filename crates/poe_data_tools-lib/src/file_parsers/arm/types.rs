@@ -65,7 +65,7 @@ pub enum Slot {
     O,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct PoI {
     pub x: u32,
     pub y: u32,
@@ -73,7 +73,7 @@ pub struct PoI {
     pub tag: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Doodad {
     pub x: u32,
     pub y: u32,
@@ -99,14 +99,14 @@ pub struct Doodad {
     pub key_values: Option<HashMap<String, String>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct DoodadConnection {
     pub from: u32,
     pub to: u32,
     pub tag: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Decal {
     pub x: f32,
     pub y: f32,
@@ -117,7 +117,7 @@ pub struct Decal {
     pub tag: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Zone {
     pub name: String,
     pub x_min: i32,
@@ -129,7 +129,7 @@ pub struct Zone {
     pub uint1: Option<u32>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Thingy {
     pub et_file: Option<String>,
     pub int: i32,
@@ -138,13 +138,13 @@ pub struct Thingy {
     pub bool3: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Default)]
+#[derive(Debug, Serialize, Default, Clone)]
 pub struct Dimension {
     pub side_length: u32,
     pub uint1: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Default)]
+#[derive(Debug, Serialize, Default, Clone)]
 pub struct ARMFile {
     pub version: u32,
     pub strings: Vec<String>,

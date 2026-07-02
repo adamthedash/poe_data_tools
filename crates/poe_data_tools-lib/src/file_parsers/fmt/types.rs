@@ -6,14 +6,14 @@ use crate::file_parsers::{
     shared::serialise::SerF16,
 };
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Subcomponent {
     pub unk1: u8,
     pub d1s: Vec<[u8; 12]>,
     pub tag: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct FMTFile {
     pub version: u8,
     pub bbox: [f32; 6],
@@ -26,13 +26,13 @@ pub struct FMTFile {
     pub string_table: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub enum Section {
     V8(V8Section),
     V9(Dolm),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct V8Section {
     pub vertex_format: Option<u32>,
     pub index_buffer: IndexBuffer,
@@ -40,7 +40,7 @@ pub struct V8Section {
 }
 
 #[serde_as]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Vertex {
     pub pos: [f32; 3],
     pub unk: [u8; 8],
@@ -50,7 +50,7 @@ pub struct Vertex {
     pub uv2: Option<[f16; 2]>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Shape {
     pub name: String,
     pub material: String,

@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Item {
     pub uint1: u32,
     pub stub: String,
@@ -11,14 +11,14 @@ pub struct Item {
     pub uint3: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Group {
     pub name: String,
     pub float: Option<f32>,
     pub items: Vec<Item>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct CLTFile {
     pub version: u32,
     pub float1: f32,

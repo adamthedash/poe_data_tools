@@ -1,19 +1,19 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Line1 {
     pub scale: f32,
     pub uint1: Option<u32>,
     pub uint2: Option<u32>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub enum Weight {
     Float(f32),
     All,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Group {
     pub name: String,
     pub d: Option<String>,
@@ -21,7 +21,7 @@ pub struct Group {
     pub objects: Vec<Object>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Object {
     pub weight: Weight,
     pub ao_file: String,
@@ -30,7 +30,7 @@ pub struct Object {
     pub float1: Option<f32>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct DDTFile {
     pub version: u32,
     pub line1: Line1,

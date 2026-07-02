@@ -1,13 +1,13 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Emitter {
     pub emitter_type: String,
     pub material: Option<String>,
     pub key_values: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct PETFile {
     pub version: Option<u32>,
     pub emitters: Vec<Emitter>,

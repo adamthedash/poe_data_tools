@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::file_parsers::dolm::types::{Dolm, DolmVertex, IndexBuffer};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct SMDFile {
     pub version: u8,
     pub vertex_format: u8,
@@ -12,25 +12,25 @@ pub struct SMDFile {
     pub tail: Tail,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub enum Section {
     V2(V2Section),
     V3(V3Section),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct V3Section {
     pub dolm: Dolm,
     pub shape_names: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct ShapeExtents {
     pub name: String,
     pub triangle_index: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct V2Section {
     pub c04_2: Option<u32>,
     pub shape_extents: Vec<ShapeExtents>,
@@ -38,14 +38,14 @@ pub struct V2Section {
     pub vertex_buffer: Vec<DolmVertex>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Ellipsoid {
     pub floats: [f32; 15],
     pub unk1: u32,
     pub name: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Sphere {
     pub centre: [f32; 3],
     pub radius: f32,
@@ -53,20 +53,20 @@ pub struct Sphere {
     pub name: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct SphereConnection {
     pub s0_index: u32,
     pub s1_index: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct SkinnedVertex {
     pub pos: [f32; 3],
     pub unk1: [u32; 4],
     pub unk2: [f32; 4],
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Tail {
     pub tail_version: u32,
     pub ellipsoids: Vec<Ellipsoid>,
