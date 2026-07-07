@@ -7,10 +7,9 @@ use crate::{
     file_parsers::{dat::types::DatFile, error::ParseError},
 };
 
-/// Errors related to interpreting the bytes of a dat file using a schema
+/// Errors related to applying a specific column schema
 #[derive(Debug, thiserror::Error)]
-pub enum DatError {
-    // ========== Column-parsing level ===============
+pub enum DatColumnError {
     #[error("requested column out of bounds: bytes {range:?}, row width: {width}")]
     ColumnOutOfBounds { range: Range<usize>, width: usize },
 
@@ -37,13 +36,18 @@ pub enum DatError {
 
     #[error("invalid boolean value: {0}")]
     InvalidBool(u8),
+}
 
-    // ==========================
+pub(super) type ColResult<T, E = DatColumnError> = std::result::Result<T, E>;
+
+/// Errors related to interpreting the bytes of a dat file using a schema
+#[derive(Debug, thiserror::Error)]
+pub enum DatError {
     /// Contextual error layer
     #[error("failed to parse column: {column:?}")]
     Column {
         column: Box<ColumnSchema>,
-        source: Box<DatError>,
+        source: DatColumnError,
     },
 
     #[error(transparent)]
@@ -64,7 +68,7 @@ pub enum DatError {
     EmptyTable,
 }
 
-pub(super) type Result<T, E = DatError> = std::result::Result<T, E>;
+pub(super) type DatResult<T, E = DatError> = std::result::Result<T, E>;
 
 // Take a null-terminated UTF-16 string
 pub fn take_utf16_string(input: &[u8]) -> String {
@@ -85,9 +89,9 @@ impl DatFile {
     }
 
     /// Returns column values as slices
-    pub fn view_col(&self, offset: usize, width: usize) -> Result<impl Iterator<Item = &[u8]>> {
+    pub fn view_col(&self, offset: usize, width: usize) -> ColResult<impl Iterator<Item = &[u8]>> {
         if offset + width > self.width() {
-            return Err(DatError::ColumnOutOfBounds {
+            return Err(DatColumnError::ColumnOutOfBounds {
                 range: offset..offset + width,
                 width: self.width(),
             });
@@ -106,22 +110,24 @@ impl DatFile {
         &self,
         offset: usize,
         dtype_width: usize,
-    ) -> Result<impl Iterator<Item = Result<Vec<&[u8]>>>> {
+    ) -> ColResult<impl Iterator<Item = ColResult<Vec<&[u8]>>>> {
         let iter = self.view_col(offset, 16)?.map(move |bytes| {
             let length = u64::from_le_bytes(bytes[..8].try_into().unwrap()) as usize;
             let pointer = u64::from_le_bytes(bytes[8..].try_into().unwrap()) as usize;
 
             // Check bounds
-            let start = pointer.checked_sub(8).ok_or(DatError::PointerUnderflow)?;
+            let start = pointer
+                .checked_sub(8)
+                .ok_or(DatColumnError::PointerUnderflow)?;
             let end = start
                 .checked_add(
                     length
                         .checked_mul(dtype_width)
-                        .ok_or(DatError::PointerOverflow)?,
+                        .ok_or(DatColumnError::PointerOverflow)?,
                 )
-                .ok_or(DatError::PointerOverflow)?;
+                .ok_or(DatColumnError::PointerOverflow)?;
             if end > self.variable_data.len() {
-                return Err(DatError::ArrayOutOfBounds {
+                return Err(DatColumnError::ArrayOutOfBounds {
                     range: start..end,
                     length,
                 });
@@ -140,13 +146,15 @@ impl DatFile {
     pub fn view_col_as_string(
         &self,
         offset: usize,
-    ) -> Result<impl Iterator<Item = Result<Option<String>>> + '_> {
+    ) -> ColResult<impl Iterator<Item = ColResult<Option<String>>> + '_> {
         let iter = self.view_col(offset, 8)?.map(move |bytes| {
             let pointer = u64::from_le_bytes(bytes.try_into().unwrap()) as usize;
 
-            let start = pointer.checked_sub(8).ok_or(DatError::PointerUnderflow)?;
+            let start = pointer
+                .checked_sub(8)
+                .ok_or(DatColumnError::PointerUnderflow)?;
             if start > self.variable_data.len() {
-                return Err(DatError::StringOutOfBounds {
+                return Err(DatColumnError::StringOutOfBounds {
                     start,
                     length: self.variable_data.len(),
                 });
@@ -172,7 +180,7 @@ impl DatFile {
         offset: usize,
         dtype_width: usize,
         parse_func: F,
-    ) -> Result<impl Iterator<Item = Result<Vec<T>>> + 'a> {
+    ) -> ColResult<impl Iterator<Item = ColResult<Vec<T>>> + 'a> {
         let iter = self
             .view_col_as_array(offset, dtype_width)?
             .map(move |array| array.map(|array| array.into_iter().map(&parse_func).collect()));
@@ -184,14 +192,16 @@ impl DatFile {
     pub fn view_col_as_array_of_strings(
         &self,
         offset: usize,
-    ) -> Result<impl Iterator<Item = Result<Vec<Option<String>>>> + '_> {
+    ) -> ColResult<impl Iterator<Item = ColResult<Vec<Option<String>>>> + '_> {
         let iter = self
             .view_col_as_array_of(offset, 8, |bytes| {
                 let pointer = u64::from_le_bytes(bytes.try_into().unwrap()) as usize;
 
-                let start = pointer.checked_sub(8).ok_or(DatError::PointerUnderflow)?;
+                let start = pointer
+                    .checked_sub(8)
+                    .ok_or(DatColumnError::PointerUnderflow)?;
                 if start > self.variable_data.len() {
-                    return Err(DatError::StringOutOfBounds {
+                    return Err(DatColumnError::StringOutOfBounds {
                         start,
                         length: self.variable_data.len(),
                     });
@@ -207,7 +217,7 @@ impl DatFile {
                 Ok(string)
             })?
             // Pull the Result up to the item level
-            .map(|x| x?.into_iter().collect::<Result<Vec<_>>>());
+            .map(|x| x?.into_iter().collect::<ColResult<Vec<_>>>());
 
         Ok(iter)
     }

@@ -9,11 +9,11 @@ use arrow_array::{
     },
 };
 
-use super::table_view::Result;
+use super::table_view::ColResult;
 use crate::{
     dat::{
         ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
-        table_view::DatError,
+        table_view::{DatColumnError, DatError, DatResult},
     },
     file_parsers::{
         FileParser,
@@ -64,13 +64,13 @@ fn parse_i16(bytes: &[u8]) -> i16 {
     i16::from_le_bytes(bytes.try_into().unwrap())
 }
 
-fn parse_bool(bytes: &[u8]) -> Result<bool> {
+fn parse_bool(bytes: &[u8]) -> ColResult<bool> {
     assert!(bytes.len() == 1);
 
     match bytes[0] {
         0 => Ok(false),
         1 => Ok(true),
-        x => Err(DatError::InvalidBool(x)),
+        x => Err(DatColumnError::InvalidBool(x)),
     }
 }
 
@@ -79,17 +79,17 @@ fn parse_column(
     table: &DatFile,
     column: &ColumnSchema,
     cur_offset: usize,
-) -> Result<(usize, Result<ArrayRef>)> {
+) -> ColResult<(usize, ColResult<ArrayRef>)> {
     let (bytes_taken, series) = match (column.array, column.interval) {
         // Array
         (true, false) => {
             let series = match column.column_type.as_str() {
                 // Array of "array" is used to indicate an unknown data type as far as I can tell
-                "array" => Err(DatError::UnknownArrayType),
+                "array" => Err(DatColumnError::UnknownArrayType),
 
                 "string" => table
                     .view_col_as_array_of_strings(cur_offset)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(StringBuilder::new());
                         for row in s {
@@ -104,7 +104,7 @@ fn parse_column(
 
                 "foreignrow" => table
                     .view_col_as_array_of(cur_offset, 16, parse_foreignrow)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(UInt64Builder::new());
                         for row in s {
@@ -119,7 +119,7 @@ fn parse_column(
 
                 "row" => table
                     .view_col_as_array_of(cur_offset, 8, parse_maybe_row)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(UInt64Builder::new());
                         for row in s {
@@ -134,7 +134,7 @@ fn parse_column(
 
                 "enumrow" => table
                     .view_col_as_array_of(cur_offset, 4, parse_u32)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(UInt32Builder::new());
                         for row in s {
@@ -149,7 +149,7 @@ fn parse_column(
 
                 "u32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_u32)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(UInt32Builder::new());
                         for row in s {
@@ -164,7 +164,7 @@ fn parse_column(
 
                 "f32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_f32)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(Float32Builder::new());
                         for row in s {
@@ -179,7 +179,7 @@ fn parse_column(
 
                 "i32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_i32)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(Int32Builder::new());
                         for row in s {
@@ -194,7 +194,7 @@ fn parse_column(
 
                 "i16" => table
                     .view_col_as_array_of(cur_offset, 2, parse_i16)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(Int16Builder::new());
                         for row in s {
@@ -209,7 +209,7 @@ fn parse_column(
 
                 "u16" => table
                     .view_col_as_array_of(cur_offset, 2, parse_u16)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(UInt16Builder::new());
                         for row in s {
@@ -222,7 +222,11 @@ fn parse_column(
                         builder.finish()
                     }),
 
-                _ => return Err(DatError::UnknownColumnType(Box::new(column.to_owned()))),
+                _ => {
+                    return Err(DatColumnError::UnknownColumnType(Box::new(
+                        column.to_owned(),
+                    )));
+                }
             }
             .map(|s| Arc::new(s) as _);
 
@@ -247,7 +251,11 @@ fn parse_column(
 
                 (8, series)
             }
-            _ => return Err(DatError::UnknownColumnType(Box::new(column.to_owned()))),
+            _ => {
+                return Err(DatColumnError::UnknownColumnType(Box::new(
+                    column.to_owned(),
+                )));
+            }
         },
 
         // Scalar
@@ -255,7 +263,7 @@ fn parse_column(
             "string" => {
                 let series = table
                     .view_col_as_string(cur_offset)
-                    .and_then(|strings| strings.collect::<Result<Vec<_>>>())
+                    .and_then(|strings| strings.collect::<ColResult<Vec<_>>>())
                     // .map(|s| Series::new(col_name.into(), s));
                     .map(|s| Arc::new(StringArray::from(s)) as _);
                 (8, series)
@@ -336,22 +344,26 @@ fn parse_column(
             "bool" => {
                 let series = table
                     .view_col(cur_offset, 1)
-                    .and_then(|items| items.map(parse_bool).collect::<Result<Vec<_>>>())
+                    .and_then(|items| items.map(parse_bool).collect::<ColResult<Vec<_>>>())
                     // .map(|s| Series::new(col_name.into(), s));
                     .map(|s| Arc::new(BooleanArray::from(s)) as _);
                 (1, series)
             }
 
-            _ => return Err(DatError::UnknownColumnType(Box::new(column.to_owned()))),
+            _ => {
+                return Err(DatColumnError::UnknownColumnType(Box::new(
+                    column.to_owned(),
+                )));
+            }
         },
-        _ => return Err(DatError::ArrayInterval(Box::new(column.to_owned()))),
+        _ => return Err(DatColumnError::ArrayInterval(Box::new(column.to_owned()))),
     };
 
     Ok((bytes_taken, series))
 }
 
 /// Parse a table with the given schema into an Arrow RecordBatch
-pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBatch> {
+pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> DatResult<RecordBatch> {
     let column_names = schema.column_names().collect::<Vec<_>>();
 
     // Parse each of the columns
@@ -364,7 +376,7 @@ pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBat
         let (bytes_taken, series) =
             parse_column(table, column, cur_offset).map_err(|e| DatError::Column {
                 column: Box::new(column.to_owned()),
-                source: Box::new(e),
+                source: e,
             })?;
 
         // If we successfully parse the data, add it to the table
@@ -396,7 +408,7 @@ pub fn load_parsed_table(
     schemas: &SchemaCollection,
     filename: &str,
     version: u32,
-) -> Result<RecordBatch> {
+) -> DatResult<RecordBatch> {
     // Load table schema - todo: HashMap rather than vector
     let schema = schemas
         .tables
