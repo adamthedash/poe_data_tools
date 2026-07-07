@@ -1,6 +1,5 @@
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{Context, Result, anyhow, bail, ensure};
 use arrow_array::{
     ArrayRef, BooleanArray, Float32Array, Int16Array, Int32Array, RecordBatch, StringArray,
     UInt16Array, UInt32Array, UInt64Array,
@@ -10,8 +9,12 @@ use arrow_array::{
     },
 };
 
+use super::table_view::Result;
 use crate::{
-    dat::ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
+    dat::{
+        ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
+        table_view::DatError,
+    },
     file_parsers::{
         FileParser,
         dat::{DatParser, types::DatFile},
@@ -63,9 +66,12 @@ fn parse_i16(bytes: &[u8]) -> i16 {
 
 fn parse_bool(bytes: &[u8]) -> Result<bool> {
     assert!(bytes.len() == 1);
-    ensure!(bytes[0] < 2, "Invalid boolean value: {:?}", bytes[0]);
 
-    Ok(bytes[0] == 1)
+    match bytes[0] {
+        0 => Ok(false),
+        1 => Ok(true),
+        x => Err(DatError::InvalidBool(x)),
+    }
 }
 
 /// Apply a schema to a single column
@@ -79,7 +85,7 @@ fn parse_column(
         (true, false) => {
             let series = match column.column_type.as_str() {
                 // Array of "array" is used to indicate an unknown data type as far as I can tell
-                "array" => Err(anyhow!("Unknown array type")),
+                "array" => Err(DatError::UnknownArrayType),
 
                 "string" => table
                     .view_col_as_array_of_strings(cur_offset)?
@@ -216,7 +222,7 @@ fn parse_column(
                         builder.finish()
                     }),
 
-                _ => bail!("Unknown column type: {:?}", column),
+                _ => return Err(DatError::UnknownColumnType(Box::new(column.to_owned()))),
             }
             .map(|s| Arc::new(s) as _);
 
@@ -241,7 +247,7 @@ fn parse_column(
 
                 (8, series)
             }
-            _ => bail!("Unknown column type: {:?}", column),
+            _ => return Err(DatError::UnknownColumnType(Box::new(column.to_owned()))),
         },
 
         // Scalar
@@ -336,9 +342,9 @@ fn parse_column(
                 (1, series)
             }
 
-            _ => bail!("Unknown column type: {:?}", column),
+            _ => return Err(DatError::UnknownColumnType(Box::new(column.to_owned()))),
         },
-        _ => bail!("Can't be both array and interval"),
+        _ => return Err(DatError::ArrayInterval(Box::new(column.to_owned()))),
     };
 
     Ok((bytes_taken, series))
@@ -353,10 +359,13 @@ pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBat
     let mut cur_offset = 0;
     for column in &schema.columns {
         // Parse column data.
-        // We return out on parse failure as it may impact the interpretation of followon columns
+        // NOTE: We return out on parse failure as it may impact the interpretation of followon columns
         // if the offset is incorrect.
-        let (bytes_taken, series) = parse_column(table, column, cur_offset)
-            .with_context(|| format!("Failed to parse column: {:?}", column))?;
+        let (bytes_taken, series) =
+            parse_column(table, column, cur_offset).map_err(|e| DatError::Column {
+                column: Box::new(column.to_owned()),
+                source: Box::new(e),
+            })?;
 
         // If we successfully parse the data, add it to the table
         match series {
@@ -377,8 +386,7 @@ pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBat
     }
 
     // Collect em into a dataframe
-    let df = RecordBatch::try_from_iter(column_names.into_iter().zip(parsed_columns))
-        .context("Failed to create df")?;
+    let df = RecordBatch::try_from_iter(column_names.into_iter().zip(parsed_columns))?;
     Ok(df)
 }
 
@@ -396,19 +404,19 @@ pub fn load_parsed_table(
         // valid_for == 3 is common between both games
         .filter(|t| t.valid_for == version || t.valid_for == 3)
         .find(|t| *t.name.to_lowercase() == *PathBuf::from(&filename).file_stem().unwrap())
-        .with_context(|| format!("Couldn't find schema for {:?}", filename))?;
+        .ok_or_else(|| DatError::SchemaNotFound(filename.to_owned()))?;
 
     // Load dat file
     let bytes = fs.read(filename)?;
     // Load dat file
-    let table = DatParser
-        .parse(&bytes)
-        .context("Failed to parse table data")?;
+    let table = DatParser.parse(&bytes)?;
 
-    ensure!(!table.rows.is_empty(), "Empty table");
+    if table.rows.is_empty() {
+        return Err(DatError::EmptyTable);
+    }
 
     // Apply it
-    let df = parse_table(&table, schema).context("Failed to apply schema to table")?;
+    let df = parse_table(&table, schema)?;
 
     Ok(df)
 }

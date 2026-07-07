@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use anyhow::Context;
 use poe_data_tools::{
     file_parsers::{FileParser, psg::PSGParser},
     fs::{FS, FileSystem},
@@ -11,9 +10,7 @@ fn main() {
     // that)
     let steam_folder =
         Path::new("/home/adam/.cache/poe_data_tools/patch-poe2.poecdn.com/4.3.1.2").to_owned();
-    let fs = FS::from_steam(steam_folder)
-        .context("cound't create file system")
-        .unwrap();
+    let fs = FS::from_steam(steam_folder).unwrap();
 
     // Print out a summary of all the Passive Skill Graph (.psg) files
     let tree_files = fs

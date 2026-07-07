@@ -14,7 +14,6 @@ path = "src/lib.rs"
 
 [dependencies]
 # Error handling
-anyhow = "1.0.100"
 thiserror = { workspace = true }
 
 # Content download
@@ -32,8 +31,10 @@ log = "0.4.29"
 serde = {version = "1.0.228", features = ["derive"]}
 serde_with = "3.18.0"
 serde_json = { version = "1.0.145", features = ["preserve_order"] }
+
 # CSV table export
 arrow-array = "56.2.0"
+arrow-schema = "56.2.0"
 
 # Parsing
 # Forked version of winnow with better debugging capabilities
