@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use annotated_parser::{Parser as _, ParserAdapter, combinators::TakeTillInc};
+use annotated_parser::{ByteParser, Parser as _, ParserAdapter};
 use serde_json::{Number, Value, json, map::Map};
 use winnow::{
     Parser,
@@ -20,7 +20,9 @@ use crate::{
 
 // Take a null-terminated UTF-16 string
 pub(super) fn utf16le_cstring() -> impl U8Parser<Output = String> {
-    TakeTillInc::new(b"\0\0").try_map(|(bytes, _)| String::from_utf16le(&bytes))
+    u16::LE
+        .repeat_till_exc(b"\0\0")
+        .try_map(|bytes| String::from_utf16(&bytes))
 }
 
 /// Read an index and read a string out of the variable section starting at the index

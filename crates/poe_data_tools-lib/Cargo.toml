@@ -39,7 +39,7 @@ arrow-schema = "56.2.0"
 # Parsing
 # Forked version of winnow with better debugging capabilities
 winnow = { package = "adamthedash_winnow", version = "1.0.0" }
-annotated_parser = { version = "0.1.0", features = ["f16"] }
+annotated_parser = { version = "0.2.0", features = ["f16"] }
 regex = "1.12.3"
 
 rayon = "1.11.0"

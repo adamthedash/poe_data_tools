@@ -11,6 +11,7 @@ use arrow_array::{
 
 use super::table_view::ColResult;
 use crate::{
+    Patch,
     dat::{
         schema::{ColumnSchema, DatTableSchema, SchemaCollection},
         table_view::{DatColumnError, DatError, DatResult},
@@ -19,11 +20,11 @@ use crate::{
         FileParser,
         dat::{DatParser, types::DatFile},
     },
-    fs::{FS, FileSystem},
+    fs::FileSystem,
 };
 
 fn parse_foreignrow(bytes: &[u8]) -> u64 {
-    // todo: polars doesn't support u128, so figure something out later. For now
+    // TODO: polars doesn't support u128, so figure something out later. For now
     // just downcast
     u128::from_le_bytes(bytes.try_into().unwrap()) as u64
 }
@@ -404,35 +405,41 @@ pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> DatResult<Record
     Ok(df)
 }
 
-/// Loads a table into a parsed dataframe
-// TODO: Make this an extension trait for FileSystem
-// TODO: use Path instead of version number
-pub fn load_parsed_table(
-    fs: &mut FS,
-    schemas: &SchemaCollection,
-    path: &str,
-    version: u32,
-) -> DatResult<RecordBatch> {
-    // Load table schema
-    // TODO: HashMap rather than vector
-    let schema = schemas
-        .tables
-        .iter()
-        // valid_for == 3 is common between both games
-        .filter(|t| t.valid_for == version || t.valid_for == 3)
-        .find(|t| *t.name.to_lowercase() == *PathBuf::from(&path).file_stem().unwrap())
-        .ok_or_else(|| DatError::SchemaNotFound(path.to_owned()))?;
+/// Extension trait providing easier loading of dat tables
+pub trait FSDatEx: FileSystem {
+    /// Loads a table into an Arrow RecordBatch
+    // TODO: Support for enum tables
+    fn load_dat_table(
+        &mut self,
+        schemas: &SchemaCollection,
+        path: &str,
+        version: &Patch,
+    ) -> DatResult<RecordBatch> {
+        let version = version.major();
 
-    // Load dat file & parse generic structure
-    let bytes = fs.read(path)?;
-    let table = DatParser.parse(&bytes)?;
+        // Load table schema
+        // TODO: HashMap rather than vector
+        let schema = schemas
+            .tables
+            .iter()
+            // valid_for == 3 is common between both games
+            .filter(|t| t.valid_for == version || t.valid_for == 3)
+            .find(|t| *t.name.to_lowercase() == *PathBuf::from(&path).file_stem().unwrap())
+            .ok_or_else(|| DatError::SchemaNotFound(path.to_owned()))?;
 
-    if table.rows.is_empty() {
-        return Err(DatError::EmptyTable);
+        // Load dat file & parse generic structure
+        let bytes = self.read(path)?;
+        let table = DatParser.parse(&bytes)?;
+
+        if table.rows.is_empty() {
+            return Err(DatError::EmptyTable);
+        }
+
+        // Apply the schema
+        let df = parse_table(&table, schema)?;
+
+        Ok(df)
     }
-
-    // Apply the schema
-    let df = parse_table(&table, schema)?;
-
-    Ok(df)
 }
+
+impl<T> FSDatEx for T where T: FileSystem {}

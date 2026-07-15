@@ -1,6 +1,6 @@
 use std::{any::type_name, collections::HashMap, path::Path};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use arrow_array::{
     ArrowPrimitiveType, BooleanArray, GenericListArray, GenericStringArray, PrimitiveArray,
     RecordBatch,
@@ -10,7 +10,7 @@ use arrow_array::{
 use itertools::izip;
 use poe_data_tools::{
     Patch,
-    dat::{schema::fetch_schema, table::load_parsed_table},
+    dat::{schema::fetch_schema, table::FSDatEx},
     fs::FS,
 };
 use serde::Serialize;
@@ -108,22 +108,13 @@ pub fn load_passive_info(
 ) -> Result<Vec<PassiveSkillInfo>> {
     let schemas = fetch_schema(cache_dir).context("Failed to load schema")?;
 
-    let version_number = match version {
-        Patch::One => 1,
-        Patch::Two => 2,
-        Patch::Specific(v) if v.starts_with("3") => 1,
-        Patch::Specific(v) if v.starts_with("4") => 2,
-        _ => bail!("Unsupported version: {:?}", version),
-    };
-
-    let get_filename = |f| match version_number {
+    let get_filename = |f| match version.major() {
         1 => format!("data/{f}.datc64"),
         2 => format!("data/balance/{f}.datc64"),
-        _ => unreachable!(),
+        v => unreachable!("unknown version: {v}"),
     };
 
-    let passive_table =
-        load_parsed_table(fs, &schemas, &get_filename("passiveskills"), version_number)?;
+    let passive_table = fs.load_dat_table(&schemas, &get_filename("passiveskills"), version)?;
 
     let flavour_text = passive_table
         .get_column_as_string("FlavourText")?
@@ -201,7 +192,7 @@ pub fn load_passive_info(
         .collect::<Result<Vec<_>>>()?;
     let stat_values = Zip { iters: stat_values };
 
-    let stat_table = load_parsed_table(fs, &schemas, &get_filename("stats"), version_number)?;
+    let stat_table = fs.load_dat_table(&schemas, &get_filename("stats"), version)?;
 
     let stats = stat_table
         .get_column_as_string("Id")?
@@ -228,7 +219,7 @@ pub fn load_passive_info(
     // Reminder texts
 
     let reminder_text_table =
-        load_parsed_table(fs, &schemas, &get_filename("remindertext"), version_number)?;
+        fs.load_dat_table(&schemas, &get_filename("remindertext"), version)?;
     let reminder_texts = reminder_text_table
         .get_column_as_string("Text")?
         .into_iter()
