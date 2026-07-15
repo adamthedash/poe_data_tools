@@ -7,14 +7,12 @@ use std::string::FromUtf16Error;
 
 use regex::Regex;
 
-use crate::file_parsers::error::Result;
-
 /// Errors related to parsing UTF-16 encoded bytes with Byte Order Marker
 #[derive(Debug, thiserror::Error)]
 pub enum BOMError {
     #[error("not enough bytes for BOM")]
     NotEnoughBytes,
-    #[error("invalid BOM btyes: {0:?}")]
+    #[error("invalid BOM bytes: {0:?}")]
     InvalidBytes([u8; 2]),
     #[error(transparent)]
     InvalidUTF16(#[from] FromUtf16Error),

@@ -14,6 +14,9 @@ pub enum SchemaError {
 
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
+
+    #[error("response has no/invalid etag header")]
+    BadEtag,
 }
 
 type Result<T, E = SchemaError> = std::result::Result<T, E>;
@@ -216,7 +219,12 @@ pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
     fs::create_dir_all(cache_dir)?;
     fs::write(
         etag_path,
-        response.headers().get("etag").unwrap().to_str().unwrap(),
+        response
+            .headers()
+            .get("etag")
+            .ok_or(SchemaError::BadEtag)?
+            .to_str()
+            .map_err(|_| SchemaError::BadEtag)?,
     )?;
     let content = response.bytes()?;
     fs::write(&schema_path, content)?;
