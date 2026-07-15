@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use crate::fs::cdn::CDNError;
+
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Errors for the file system
@@ -15,9 +17,9 @@ pub enum Error {
     #[error(transparent)]
     Reqwest(#[from] Arc<reqwest::Error>),
 
-    /// Catchall for any failures when processing network responses
-    #[error("received invalid response: {0}")]
-    InvalidResponse(String),
+    /// Failures related to CDN downloader
+    #[error("error during CDN download")]
+    CDNError(#[from] CDNError),
 
     /// Bad user-provided config value catchall
     #[error("invalid config: {0}")]

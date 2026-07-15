@@ -22,6 +22,16 @@ use crate::{
     fs::{Result, error::Error as FSError},
 };
 
+#[derive(Debug, thiserror::Error, Clone)]
+pub enum CDNError {
+    #[error("response has no etag header")]
+    NoEtag,
+    #[error("response contains invalid etag header")]
+    BadEtag,
+    #[error("CDN provided no valid URLs")]
+    NoUrls,
+}
+
 /// A cache folder for a specific game version
 #[derive(Debug)]
 struct CacheFolder {
@@ -229,11 +239,9 @@ impl CDNLoader {
 
             resp.headers()
                 .get("etag")
-                .ok_or_else(|| FSError::InvalidResponse("response has no etag header".to_owned()))?
+                .ok_or(CDNError::NoEtag)?
                 .to_str()
-                .map_err(|e| {
-                    FSError::InvalidResponse(format!("response contains invalid etag: {e:?}"))
-                })?
+                .map_err(|_| CDNError::BadEtag)?
                 .to_owned()
         };
 
@@ -270,11 +278,9 @@ impl CDNLoader {
             let etag = resp
                 .headers()
                 .get("etag")
-                .ok_or_else(|| FSError::InvalidResponse("response has no etag header".to_owned()))?
+                .ok_or(CDNError::NoEtag)?
                 .to_str()
-                .map_err(|e| {
-                    FSError::InvalidResponse(format!("response contains invalid etag: {e:?}"))
-                })?
+                .map_err(|_| CDNError::BadEtag)?
                 .to_owned();
 
             let bytes = resp.bytes()?;
@@ -331,11 +337,9 @@ impl CDNLoader {
 
             resp.headers()
                 .get("etag")
-                .ok_or_else(|| FSError::InvalidResponse("response has no etag header".to_owned()))?
+                .ok_or(CDNError::NoEtag)?
                 .to_str()
-                .map_err(|e| {
-                    FSError::InvalidResponse(format!("response contains invalid etag: {e:?}"))
-                })?
+                .map_err(|_| CDNError::BadEtag)?
                 .to_owned()
         };
 
@@ -373,11 +377,9 @@ impl CDNLoader {
             let etag = resp
                 .headers()
                 .get("etag")
-                .ok_or_else(|| FSError::InvalidResponse("response has no etag header".to_owned()))?
+                .ok_or(CDNError::NoEtag)?
                 .to_str()
-                .map_err(|e| {
-                    FSError::InvalidResponse(format!("response contains invalid etag: {e:?}"))
-                })?
+                .map_err(|_| CDNError::BadEtag)?
                 .to_owned();
 
             let bytes = resp.bytes().await?;
@@ -464,20 +466,18 @@ fn cur_url(host: String, send: &[u8]) -> Result<Url> {
     let mut buf = [0; 1024];
     let read = stream.read(&mut buf)?;
 
-    let Ok(strings) = parse_response().parse_next(&mut &buf[..read]) else {
-        return Err(FSError::InvalidResponse(
-            "Failed to parse URLs from CDN".to_owned(),
-        ));
-    };
+    let strings = parse_response()
+        .parse_next(&mut &buf[..read])
+        .map_err(|_| CDNError::NoUrls)?;
 
     // Grab the first one and return it as a URL
-    strings
+    let url = strings
         .into_iter()
         .flat_map(|s| Url::parse(&s).ok())
         .next()
-        .ok_or(FSError::InvalidResponse(
-            "No valid URLs returned from CDN".to_owned(),
-        ))
+        .ok_or(CDNError::NoUrls)?;
+
+    Ok(url)
 }
 
 #[cfg(test)]

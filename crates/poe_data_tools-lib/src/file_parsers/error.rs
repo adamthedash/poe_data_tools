@@ -7,7 +7,7 @@ use crate::file_parsers::shared::BOMError;
 pub type Result<T, E = ParseError> = std::result::Result<T, E>;
 
 #[derive(Debug, thiserror::Error)]
-#[error("error for file version: {version:?}")]
+#[error("parse error for file version: {version:?}")]
 pub struct ParseError {
     /// Optional version if parsing failed midway through
     pub version: Option<u32>,
