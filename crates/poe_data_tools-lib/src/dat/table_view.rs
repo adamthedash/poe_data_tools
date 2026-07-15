@@ -1,10 +1,14 @@
 use std::{fmt::Display, ops::Range};
 
+use annotated_parser::Parser;
 use arrow_schema::ArrowError;
 
 use crate::{
-    dat::ivy_schema::ColumnSchema,
-    file_parsers::{dat::types::DatFile, error::ParseError},
+    dat::{parser::utf16le_cstring, schema::ColumnSchema},
+    file_parsers::{
+        dat::types::DatFile,
+        error::{AnnotatedError, ParseError},
+    },
 };
 
 /// Errors related to applying a specific column schema
@@ -24,6 +28,9 @@ pub enum DatColumnError {
 
     #[error("string start out of bounds: byte {start}, variable data section length: {length}")]
     StringOutOfBounds { start: usize, length: usize },
+
+    #[error("error reading string from variable data section")]
+    StringReadError(AnnotatedError),
 
     #[error("unknown array type in schema")]
     UnknownArrayType,
@@ -69,19 +76,6 @@ pub enum DatError {
 }
 
 pub(super) type DatResult<T, E = DatError> = std::result::Result<T, E>;
-
-// Take a null-terminated UTF-16 string
-pub fn take_utf16_string(input: &[u8]) -> String {
-    let u16_data = input
-        .as_chunks::<2>()
-        .0
-        .iter()
-        .map(|c| u16::from_le_bytes(*c))
-        .take_while(|x| *x != 0)
-        .collect::<Vec<_>>();
-
-    String::from_utf16(&u16_data).expect("Failed to parse UTF-16 string.")
-}
 
 /// Methods for reading Dat tables column-wise
 impl DatFile {
@@ -162,7 +156,9 @@ impl DatFile {
                 });
             }
 
-            let string = take_utf16_string(&self.variable_data[start..]);
+            let (string, _) = utf16le_cstring()
+                .parse(&mut &self.variable_data[start..])
+                .map_err(|e| DatColumnError::StringReadError(e.into()))?;
             let string = if string.is_empty() {
                 None
             } else {
@@ -209,7 +205,10 @@ impl DatFile {
                     });
                 }
 
-                let string = take_utf16_string(&self.variable_data[start..]);
+                let (string, _) = utf16le_cstring()
+                    .parse(&mut &self.variable_data[start..])
+                    .map_err(|e| DatColumnError::StringReadError(e.into()))?;
+
                 let string = if string.is_empty() {
                     None
                 } else {

@@ -16,45 +16,50 @@ path = "src/lib.rs"
 # Error handling
 thiserror = { workspace = true }
 
-# Content download
-reqwest = { version = "0.12.25", features = ["blocking"] }
-url = "2.5.7"
-dirs = "6.0.0"
-bytes = "1.11.0"
-tokio = { version = "1.51.1", features = ["fs", "rt"]}
-futures = "0.3.32"
+# Serialisation
+serde = { workspace = true, features = ["derive"]}
+serde_with = { workspace = true }
+serde_json = { workspace = true }
 
 # Logging
-log = "0.4.29"
-
-# Serialisation
-serde = {version = "1.0.228", features = ["derive"]}
-serde_with = "3.18.0"
-serde_json = { version = "1.0.145", features = ["preserve_order"] }
+log = { workspace = true }
 
 # CSV table export
-arrow-array = "56.2.0"
-arrow-schema = "56.2.0"
+arrow-array = { workspace = true }
+arrow-schema = { workspace = true }
+
+# Content download & IO
+reqwest = { workspace = true, features = ["blocking"] }
+url = { workspace = true }
+dirs = { workspace = true }
+bytes = { workspace = true }
+tokio = { workspace = true, features = ["fs", "rt"]}
+futures = { workspace = true }
 
 # Parsing
 # Forked version of winnow with better debugging capabilities
-winnow = { package = "adamthedash_winnow", version = "1.0.0" }
-annotated_parser = { version = "0.1.0", features = ["f16"] }
-regex = "1.12.3"
+winnow = { workspace = true }
+annotated_parser = { workspace = true, features = ["f16"] }
+regex = { workspace = true }
 
-rayon = "1.11.0"
-iterators_extended = "0.2.0"
-itertools = "0.14.0"
-enum_dispatch = "0.3.13"
-murmurhash64 = "0.3.1"
-oozextract = "0.5.0"
+# Iterator / parallelism helpers
+rayon = { workspace = true }
+iterators_extended = { workspace = true }
+itertools = { workspace = true }
+
+# GGG-related
+murmurhash64 = { workspace = true }
+oozextract = { workspace = true }
+
+enum_dispatch = { workspace = true }
 
 
 [dev-dependencies]
 criterion = { version = "0.3", features = ["html_reports"] }
-glob = "0.3.3"
 tempfile = "3.27"
-env_logger = "0.11"
+
+glob = { workspace = true }
+env_logger = { workspace = true }
 
 [[bench]]
 name = "fs"

@@ -22,9 +22,12 @@ pub enum SchemaError {
 type Result<T, E = SchemaError> = std::result::Result<T, E>;
 
 /// Full set of Dat table schemas
+/// https://github.com/poe-tool-dev/dat-schema
 #[derive(Deserialize, Debug, Clone)]
 pub struct SchemaCollection {
+    /// Per-table schemas
     pub tables: Vec<DatTableSchema>,
+    /// Enum variants
     pub enumerations: Vec<Enumeration>,
 }
 
@@ -51,6 +54,7 @@ impl SchemaCollection {
     }
 }
 
+/// Enum table variants. These may be incomplete as they are largely guesswork by the community
 #[derive(Deserialize, Debug, Clone)]
 pub struct Enumeration {
     /// PoE Version
@@ -67,6 +71,7 @@ pub struct Enumeration {
     pub enumerators: Vec<Option<String>>,
 }
 
+/// Column schemas for a single table
 #[derive(Deserialize, Debug, Clone)]
 pub struct DatTableSchema {
     /// PoE Version
@@ -77,11 +82,12 @@ pub struct DatTableSchema {
     pub valid_for: u32,
     /// Table name
     pub name: String,
+    /// Per-column schemas
     pub columns: Vec<ColumnSchema>,
 }
 
 impl DatTableSchema {
-    /// Iterate over column names, generating names for unknown columns
+    /// Iterate over column names, generating placeholder names for unknown columns
     pub fn column_names(&self) -> impl Iterator<Item = String> {
         self.columns.iter().scan(0_usize, |num_unknowns, c| {
             if let Some(name) = &c.name {
@@ -124,19 +130,21 @@ pub struct ColumnSchema {
     pub description: Option<String>,
     /// Whether this column represents an array of values
     pub array: bool,
+    /// Whether this column represents a numeric interval (from..to)
+    pub interval: bool,
     /// Primitive type contained in this column
     #[serde(rename = "type")]
     pub column_type: String,
     /// Whether values in this column are unique (i.e. can be used as a key)
     pub unique: bool,
+    /// Whether values in this column are for a specific locale
     pub localized: bool,
     /// Foreign table that values refer to
     pub references: Option<References>,
+
     pub until: Option<String>,
     pub file: Option<String>,
     pub files: Option<Vec<String>>,
-    /// Whether this column represents a numeric interval (from..to)
-    pub interval: bool,
 }
 
 impl ColumnSchema {
@@ -238,7 +246,7 @@ pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
 mod tests {
     use dirs::cache_dir;
 
-    use crate::dat::ivy_schema::fetch_schema;
+    use crate::dat::schema::fetch_schema;
 
     #[test]
     fn load_schema() {

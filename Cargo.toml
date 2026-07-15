@@ -11,7 +11,57 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/adamthedash/poe_data_tools"
 
 [workspace.dependencies]
+# Error handling
 thiserror = "2.0"
+anyhow = "1.0"
+
+# Serialisation
+serde = "1.0"
+serde_with = "3.18"
+serde_json = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# CSV / table related
+arrow-csv = "56.2"
+arrow-array = "56.2"
+arrow-cast = "56.2"
+arrow-schema = "56.2"
+
+# Art decoding
+image = { version = "0.25", default-features = false } 
+image-extras = { version = "0.1", default-features = false }
+
+# Content download
+reqwest = "0.12"
+url = "2.5"
+dirs = "6.0"
+bytes = "1.11"
+tokio = "1.51"
+futures = "0.3"
+
+# Parsing
+# Forked version of winnow with better debugging capabilities
+winnow = { package = "adamthedash_winnow", version = "1.0" }
+annotated_parser = { version = "0.2" }
+regex = "1.12"
+
+# Iterator / parallelism helpers
+rayon = "1.11"
+itertools = "0.14"
+iterators_extended = "0.2"
+
+# GGG-related
+murmurhash64 = "0.3"
+oozextract = "0.5"
+
+# CLI
+clap = "4.5"
+glob = "0.3"
+
+enum_dispatch = "0.3"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

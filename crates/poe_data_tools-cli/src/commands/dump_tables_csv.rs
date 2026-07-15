@@ -14,7 +14,7 @@ use glob::{MatchOptions, Pattern};
 use poe_data_tools::{
     Patch,
     dat::{
-        ivy_schema::{DatTableSchema, fetch_schema, load_schema},
+        schema::{DatTableSchema, fetch_schema, load_schema},
         table::parse_table,
     },
     file_parsers::{FileParser, dat::DatParser},

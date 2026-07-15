@@ -10,12 +10,13 @@ Everything here has been has been lovingly hand crafted, but I won't rule out th
 
 ### TODO List
 - (lib) Better documentation / public API redesign
-- (lib) Anyhow -> structured errors
 - (lib) Native async API for filesystem
 - (lib) Improve download scheduling for `CDNFS::batch_read`
 - (repo) Use shared workspace dependencies, relax version reqs for lib
 - (bin) [gLTF](https://en.wikipedia.org/wiki/GlTF) export for mesh files
 - (lib) move `AnnotatedError` into annotated_parser crate
+- (lib) MSRV
+- (lib) python/typescript wrappers?
 
 ### Resources (mostly for me)
 https://gitlab.com/zao/poe-rs  

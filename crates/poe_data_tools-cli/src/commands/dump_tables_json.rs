@@ -10,8 +10,8 @@ use glob::{MatchOptions, Pattern};
 use poe_data_tools::{
     Patch,
     dat::{
-        ivy_schema::{Enumeration, SchemaCollection, fetch_schema, load_schema},
         parser::create_parser,
+        schema::{Enumeration, SchemaCollection, fetch_schema, load_schema},
     },
     file_parsers::{
         FileParser,

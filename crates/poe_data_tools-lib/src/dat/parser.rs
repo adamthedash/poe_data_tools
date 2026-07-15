@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use annotated_parser::{ByteParser, Parser as _, ParserAdapter};
 use serde_json::{Number, Value, json, map::Map};
 use winnow::{
     Parser,
@@ -11,11 +12,18 @@ use winnow::{
 
 use crate::{
     dat::{
-        ivy_schema::{ColumnSchema, DatTableSchema},
-        table_view::take_utf16_string,
+        schema::{ColumnSchema, DatTableSchema},
+        table_view::DatColumnError,
     },
-    file_parsers::shared::winnow::WinnowParser,
+    file_parsers::shared::{annotated_parser::U8Parser, winnow::WinnowParser},
 };
+
+// Take a null-terminated UTF-16 string
+pub(super) fn utf16le_cstring() -> impl U8Parser<Output = String> {
+    u16::LE
+        .repeat_till_exc(b"\0\0")
+        .try_map(|bytes| String::from_utf16(&bytes))
+}
 
 /// Read an index and read a string out of the variable section starting at the index
 /// Returns null instead of erroring if a bad offset is found
@@ -23,7 +31,12 @@ fn string<'a>(variable_section: &[u8]) -> impl WinnowParser<&'a [u8], Option<Str
     let vs_len = variable_section.len();
     le_u64.map(move |offset| {
         if (8..vs_len as u64 + 8).contains(&offset) {
-            let string = take_utf16_string(&variable_section[offset as usize - 8..]);
+            let (string, _) = utf16le_cstring()
+                .parse(&mut &variable_section[offset as usize - 8..])
+                // TODO: Propagate errors up
+                .map_err(|e| DatColumnError::StringReadError(e.into()))
+                .unwrap();
+
             Some(string)
         } else {
             log::trace!("Bad offset for string {offset}");
