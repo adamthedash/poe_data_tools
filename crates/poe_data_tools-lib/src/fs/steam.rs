@@ -8,7 +8,7 @@ use std::{
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
 
-use super::{FileSystem, Result, error::Error as FSError};
+use super::{FileSystem, Result, error::FSError};
 use crate::{
     file_parsers::{
         FileParser,

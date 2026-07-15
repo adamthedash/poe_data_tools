@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use crate::fs::cdn::CDNError;
 
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+pub type Result<T, E = FSError> = std::result::Result<T, E>;
 
 /// Errors for the file system
 // NOTE: Need to wrap non-clone variants in Arc so we can return the same error
 // for all files when a batch read fails
 #[derive(Debug, thiserror::Error, Clone)]
-pub enum Error {
+pub enum FSError {
     /// Any issue related to reading/writing files
     #[error(transparent)]
     IO(#[from] Arc<std::io::Error>),
@@ -34,19 +34,19 @@ pub enum Error {
     Parse(#[from] Arc<crate::file_parsers::error::ParseError>),
 }
 
-impl From<std::io::Error> for Error {
+impl From<std::io::Error> for FSError {
     fn from(value: std::io::Error) -> Self {
         Arc::new(value).into()
     }
 }
 
-impl From<reqwest::Error> for Error {
+impl From<reqwest::Error> for FSError {
     fn from(value: reqwest::Error) -> Self {
         Arc::new(value).into()
     }
 }
 
-impl From<crate::file_parsers::error::ParseError> for Error {
+impl From<crate::file_parsers::error::ParseError> for FSError {
     fn from(value: crate::file_parsers::error::ParseError) -> Self {
         Arc::new(value).into()
     }

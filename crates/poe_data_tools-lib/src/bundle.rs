@@ -4,7 +4,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterato
 
 use crate::{
     file_parsers::{bundle::types::BundleFile, error::ParseError},
-    fs::error::Error as FSError,
+    fs::error::FSError,
 };
 
 impl BundleFile {

@@ -19,7 +19,7 @@ use winnow::{
 
 use crate::{
     file_parsers::{error::ParseError, shared::winnow::WinnowParser},
-    fs::{Result, error::Error as FSError},
+    fs::{Result, error::FSError},
 };
 
 #[derive(Debug, thiserror::Error, Clone)]

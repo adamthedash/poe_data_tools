@@ -62,7 +62,7 @@ pub enum DatError {
 
     /// Error during load of bytes from filesystem
     #[error(transparent)]
-    FileSystem(#[from] crate::fs::error::Error),
+    FileSystem(#[from] crate::fs::error::FSError),
 
     #[error("table has no data")]
     EmptyTable,

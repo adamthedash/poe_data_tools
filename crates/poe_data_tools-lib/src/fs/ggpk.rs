@@ -20,7 +20,7 @@ use crate::{
             types::{Entry, EntryData, GGPKFile},
         },
     },
-    fs::{FileSystem, Result, error::Error as FSError},
+    fs::{FileSystem, Result, error::FSError},
     hasher::murmur64a::{BuildHasherEx, BuildMurmurHash64A},
     path::parse_paths,
 };
