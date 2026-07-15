@@ -1,6 +1,6 @@
 [package]
 name = "poe_data_tools"
-version = "2.0.0-alpha.1"
+version = "2.0.0"
 readme = "README.md"
 description = "A library for working with Path of Exile game data"
 
