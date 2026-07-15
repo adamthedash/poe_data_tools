@@ -19,10 +19,10 @@ pub enum DatColumnError {
     #[error("overflow during variable data lookup")]
     PointerOverflow,
 
-    #[error("array out of bounds: bytes {range:?}, variable data setction length: {length}")]
+    #[error("array out of bounds: bytes {range:?}, variable data section length: {length}")]
     ArrayOutOfBounds { range: Range<usize>, length: usize },
 
-    #[error("string start out of bounds: byte {start}, variable data setction length: {length}")]
+    #[error("string start out of bounds: byte {start}, variable data section length: {length}")]
     StringOutOfBounds { start: usize, length: usize },
 
     #[error("unknown array type in schema")]
@@ -73,8 +73,10 @@ pub(super) type DatResult<T, E = DatError> = std::result::Result<T, E>;
 // Take a null-terminated UTF-16 string
 pub fn take_utf16_string(input: &[u8]) -> String {
     let u16_data = input
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes(c.try_into().unwrap()))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| u16::from_le_bytes(*c))
         .take_while(|x| *x != 0)
         .collect::<Vec<_>>();
 

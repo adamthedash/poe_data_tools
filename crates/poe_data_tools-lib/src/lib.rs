@@ -1,5 +1,4 @@
 #![feature(trait_alias)]
-#![feature(str_from_utf16_endian)]
 #![feature(f16)]
 #![feature(option_reference_flattening)]
 

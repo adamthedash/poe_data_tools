@@ -240,8 +240,10 @@ fn parse_column(
                     let mut builder = ListBuilder::new(Int32Builder::new());
                     values.for_each(|bytes| {
                         bytes
-                            .chunks_exact(4)
-                            .map(parse_i32)
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .map(|b| parse_i32(b))
                             .for_each(|val| builder.values().append_value(val));
                         builder.append(true);
                     });
