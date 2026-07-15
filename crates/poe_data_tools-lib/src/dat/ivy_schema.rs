@@ -1,9 +1,25 @@
 use std::{fs, path::Path};
 
-use anyhow::Result;
 use serde::Deserialize;
 
 use crate::Patch;
+
+#[derive(Debug, thiserror::Error)]
+pub enum SchemaError {
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
+
+    #[error(transparent)]
+    Serde(#[from] serde_json::Error),
+
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
+
+    #[error("response has no/invalid etag header")]
+    BadEtag,
+}
+
+type Result<T, E = SchemaError> = std::result::Result<T, E>;
 
 /// Full set of Dat table schemas
 #[derive(Deserialize, Debug, Clone)]
@@ -153,7 +169,12 @@ pub struct References {
 /// Load a schema collection from a local path
 pub fn load_schema(path: &Path) -> Result<SchemaCollection> {
     log::info!("Loading schema from: {:?}", path);
-    Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
+
+    let contents = fs::read_to_string(path)?;
+
+    let schema = serde_json::from_str(&contents)?;
+
+    Ok(schema)
 }
 
 /// Fetch the latest schema collection or fall back to cache
@@ -166,8 +187,11 @@ pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
     let etag_path = schema_path.with_extension("json.etag");
 
     // File fresh? Use it
-    if let Ok(metadata) = fs::metadata(&schema_path)
-        && metadata.modified()?.elapsed()?.as_secs() < 3600
+    if fs::metadata(&schema_path)?
+        .modified()?
+        .elapsed()
+        .map(|d| d.as_secs() < 3600)
+        .unwrap_or(false)
     {
         log::info!("Using cached schema");
         return Ok(serde_json::from_str(
@@ -195,7 +219,12 @@ pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
     fs::create_dir_all(cache_dir)?;
     fs::write(
         etag_path,
-        response.headers().get("etag").unwrap().to_str().unwrap(),
+        response
+            .headers()
+            .get("etag")
+            .ok_or(SchemaError::BadEtag)?
+            .to_str()
+            .map_err(|_| SchemaError::BadEtag)?,
     )?;
     let content = response.bytes()?;
     fs::write(&schema_path, content)?;

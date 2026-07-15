@@ -1,11 +1,12 @@
 pub mod parser;
 pub mod types;
-use anyhow::Context;
 use parser::parse_mat_str;
 use types::MATFile;
 
 use crate::file_parsers::{
-    FileParser, VersionedResult, VersionedResultExt, shared::utf16_bom_to_string,
+    FileParser, VersionedFile,
+    error::{ParseError, Result},
+    shared::utf16_bom_to_string,
 };
 
 pub struct MATParser;
@@ -13,10 +14,17 @@ pub struct MATParser;
 impl FileParser for MATParser {
     type Output = MATFile;
 
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         let contents = utf16_bom_to_string(bytes)
-            .or_else(|_| String::from_utf16le(bytes).context("Failed to parse as UTF16-LE"))?;
+            .or_else(|_| String::from_utf16le(bytes))
+            .map_err(ParseError::processing)?;
 
-        parse_mat_str(&contents).unversioned()
+        parse_mat_str(&contents)
+    }
+}
+
+impl VersionedFile for MATFile {
+    fn version(&self) -> Option<u32> {
+        None
     }
 }

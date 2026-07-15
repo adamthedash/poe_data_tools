@@ -1,4 +1,3 @@
-use anyhow::{Result, anyhow};
 use regex::Regex;
 use winnow::{
     Parser,
@@ -12,12 +11,15 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    remove_trailing,
-    winnow::{
-        WinnowParser, filename, nullable_uint, quoted, quoted_comma_separated, quoted_str,
-        repeat_array, unquoted, unquoted_str,
+use crate::file_parsers::{
+    error::{AsParseError, Result},
+    shared::{
+        lift::{SliceParser, lift},
+        remove_trailing,
+        winnow::{
+            WinnowParser, filename, nullable_uint, quoted, quoted_comma_separated, quoted_str,
+            repeat_array, unquoted, unquoted_str,
+        },
     },
 };
 
@@ -411,9 +413,5 @@ pub fn parse_epk_str(contents: &str) -> Result<EPKFile> {
 
     let mut parser = repeat(.., effect());
 
-    let epk_file = parser
-        .parse(lines.as_slice())
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-    Ok(epk_file)
+    parser.parse(lines.as_slice()).to_parse_error()
 }

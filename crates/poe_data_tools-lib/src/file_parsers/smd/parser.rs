@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     binary::{le_f32, le_i8, le_u8, le_u16, le_u32, length_take},
@@ -9,11 +8,11 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
     dolm::{
         parser::{dolm, index_buffer},
         types::DolmVertex,
     },
+    error::{AsParseError, ParseResultEx, Result},
     shared::winnow::{WinnowParser, le_f16, repeat_array, take_array},
 };
 
@@ -295,9 +294,8 @@ fn sphere_connection<'a>() -> impl WinnowParser<&'a [u8], SphereConnection> {
     winnow::trace!("sphere_connection", parser)
 }
 
-pub fn parse_smd(mut contents: &[u8]) -> VersionedResult<SMDFile> {
-    let version =
-        le_u8(&mut contents).map_err(|e: ContextError| anyhow!("Failed to parse file: {e:?}"))?;
+pub fn parse_smd(mut contents: &[u8]) -> Result<SMDFile> {
+    let version = le_u8::<_, ContextError>(&mut contents).to_parse_error()?;
 
     let ((vertex_format, section, bbox), tail) = (
         dispatch! {
@@ -314,8 +312,8 @@ pub fn parse_smd(mut contents: &[u8]) -> VersionedResult<SMDFile> {
         },
     )
         .parse_next(&mut contents)
-        .map_err(|e: ContextError| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version as u32))?;
+        .to_parse_error()
+        .with_version(version as u32)?;
 
     Ok(SMDFile {
         version,
@@ -324,5 +322,4 @@ pub fn parse_smd(mut contents: &[u8]) -> VersionedResult<SMDFile> {
         bbox,
         tail,
     })
-    .with_version(Some(version as u32))
 }

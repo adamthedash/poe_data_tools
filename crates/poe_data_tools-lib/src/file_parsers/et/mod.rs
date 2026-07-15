@@ -1,5 +1,7 @@
 use crate::file_parsers::{
-    FileParser, VersionedResult, VersionedResultExt, shared::utf16_bom_to_string,
+    FileParser, VersionedFile,
+    error::{AsParseError, Result},
+    shared::utf16_bom_to_string,
 };
 
 pub mod parser;
@@ -12,9 +14,15 @@ pub struct ETParser;
 impl FileParser for ETParser {
     type Output = ETFile;
 
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
-        let contents = utf16_bom_to_string(bytes)?;
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        let contents = utf16_bom_to_string(bytes).to_parse_error()?;
 
-        parse_et_str(&contents).unversioned()
+        parse_et_str(&contents)
+    }
+}
+
+impl VersionedFile for ETFile {
+    fn version(&self) -> Option<u32> {
+        None
     }
 }

@@ -3,12 +3,10 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     fs::File,
-    hash::{BuildHasher, Hasher},
     io::{BufReader, Read, Seek, SeekFrom},
     path::Path,
 };
 
-use anyhow::{Context, anyhow};
 use bytes::Bytes;
 use iterators_extended::bucket::Bucket;
 
@@ -22,8 +20,8 @@ use crate::{
             types::{Entry, EntryData, GGPKFile},
         },
     },
-    fs::FileSystem,
-    hasher::murmur64a::BuildMurmurHash64A,
+    fs::{FileSystem, Result, error::FSError},
+    hasher::murmur64a::{BuildHasherEx, BuildMurmurHash64A},
     path::parse_paths,
 };
 
@@ -65,7 +63,7 @@ fn enumerate_file_info(
                 &EntryData::File { offset, length } => {
                     // NOTE: Using our own full path hashes rather than stored MurmurHash2 values from GGPK
                     // as there are duplicate file name hashes that refer to distinct files
-                    let hash = HASHER.hash_one(name.to_lowercase().as_bytes());
+                    let hash = HASHER.hash_one_str(&name.to_lowercase());
                     Box::new(std::iter::once((hash, FileInfo { offset, length })))
                 }
             }
@@ -74,7 +72,7 @@ fn enumerate_file_info(
 
 impl GGPKFS {
     /// Provided path should point to a Content.ggpk file
-    pub fn new(ggpk_path: &Path) -> anyhow::Result<Self> {
+    pub fn new(ggpk_path: &Path) -> Result<Self> {
         let mut file = BufReader::new(File::open(ggpk_path)?);
         let index = parse_ggpk(&mut file)?;
 
@@ -88,6 +86,7 @@ impl GGPKFS {
         })
     }
 
+    /// Seek + Read from underlying file
     fn _read(&self, offset: usize, length: usize) -> std::io::Result<Bytes> {
         let mut file = self.file.borrow_mut();
         file.seek(SeekFrom::Start(offset as u64))?;
@@ -131,19 +130,19 @@ impl FileSystem for GGPKFS {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, anyhow::Result<Bytes>)> + 'a> {
+    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, Result<Bytes>)> + 'a> {
         // Get FileInfo's
         let (mut fileinfos, errors) = paths
             .iter()
             .map(|path| {
                 let path = path.as_ref();
                 // Compute hash
-                let hash = HASHER.hash_one(path.to_lowercase().as_bytes());
+                let hash = HASHER.hash_one_str(&path.to_lowercase());
 
                 // Look up the file info for this file
                 match self.lut.get(&hash) {
                     Some(f) => Ok((path, f)),
-                    None => Err((path, Err(anyhow!("Path not found in index: {}", path)))),
+                    None => Err((path, Err(FSError::FileNotFound(path.to_owned())))),
                 }
             })
             .bucket_result();
@@ -154,7 +153,7 @@ impl FileSystem for GGPKFS {
         let file_contents = fileinfos.into_iter().map(|(path, fileinfo)| {
             let res = self
                 ._read(fileinfo.offset, fileinfo.length)
-                .context("Failed to read file");
+                .map_err(FSError::from);
             (path, res)
         });
 
@@ -167,20 +166,20 @@ impl FileSystem for GGPKFS {
         )
     }
 
-    fn read(&self, path: &str) -> anyhow::Result<Bytes> {
+    fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
-        let hash = HASHER.hash_one(path.to_lowercase().as_bytes());
+        let hash = HASHER.hash_one_str(&path.to_lowercase());
 
         // Look up the file info for this file
         let fileinfo = self
             .lut
             .get(&hash)
-            .with_context(|| format!("Path not found in index: {}", path))?;
+            .ok_or_else(|| FSError::FileNotFound(path.to_owned()))?;
 
         // Read the contents
-        let buf = self._read(fileinfo.offset, fileinfo.length)?;
+        let bytes = self._read(fileinfo.offset, fileinfo.length)?;
 
-        Ok(buf)
+        Ok(bytes)
     }
 }
 
@@ -192,20 +191,12 @@ pub struct GGPKBundleFS {
 }
 
 impl GGPKBundleFS {
-    pub fn new(ggpk_path: &Path) -> anyhow::Result<Self> {
+    pub fn new(ggpk_path: &Path) -> Result<Self> {
         let ggpk = GGPKFS::new(ggpk_path)?;
 
-        let index_bytes = ggpk
-            .read("/Bundles2/_.index.bin")
-            .context("Failed to load bundle index from GGPK")?;
-        let index_bundle = BundleParser
-            .parse(&index_bytes)
-            .as_anyhow()
-            .context("Failed to parse bundle")?;
-        let index = BundleIndexParser
-            .parse(&index_bundle.read_all()?)
-            .as_anyhow()
-            .context("Failed to parse bundle as index")?;
+        let index_bytes = ggpk.read("/Bundles2/_.index.bin")?;
+        let index_bundle = BundleParser.parse(&index_bytes)?;
+        let index = BundleIndexParser.parse(&index_bundle.read_all()?)?;
 
         let lut = index
             .files
@@ -233,21 +224,18 @@ impl FileSystem for GGPKBundleFS {
     fn batch_read<'a>(
         &'a self,
         paths: &'a [impl AsRef<str>],
-    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, anyhow::Result<Bytes>)> + 'a> {
+    ) -> Box<dyn Iterator<Item = (Cow<'a, str>, Result<Bytes>)> + 'a> {
         // Get FileInfo's
         let (fileinfos, errors) = paths
             .iter()
             .map(|path| {
                 let path = path.as_ref();
-                // Compute hash
-                let mut hasher = HASHER.build_hasher();
-                hasher.write(path.to_lowercase().as_bytes());
-                let hash = hasher.finish();
+                let hash = HASHER.hash_one_str(&path.to_lowercase());
 
                 // Look up the file info for this file
                 match self.lut.get(&hash).map(|i| &self.index.files[*i]) {
                     Some(f) => Ok((path, f)),
-                    None => Err((path, Err(anyhow!("Path not found in index: {}", path)))),
+                    None => Err((path, Err(FSError::FileNotFound(path.to_owned())))),
                 }
             })
             .bucket_result();
@@ -271,16 +259,11 @@ impl FileSystem for GGPKBundleFS {
                 "/Bundles2/{}.bundle.bin",
                 self.index.bundles[bundle_index as usize].name
             );
+
             let bundle = self
                 .ggpk
                 .read(&bundle_path)
-                .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path))
-                .and_then(|bundle_contents| {
-                    BundleParser
-                        .parse(&bundle_contents)
-                        .as_anyhow()
-                        .context("Failed to parse bundle")
-                });
+                .and_then(|bytes| Ok(BundleParser.parse(&bytes)?));
 
             // Read the file contents
             let contents: Box<dyn Iterator<Item = _>> = match bundle {
@@ -290,7 +273,7 @@ impl FileSystem for GGPKBundleFS {
                 Err(e) => Box::new(
                     files
                         .into_iter()
-                        .map(move |(path, _)| (path, Err(anyhow!("{:?}", e)))),
+                        .map(move |(path, _)| (path, Err(e.clone()))),
                 ),
             };
 
@@ -306,17 +289,15 @@ impl FileSystem for GGPKBundleFS {
         )
     }
 
-    fn read(&self, path: &str) -> anyhow::Result<Bytes> {
+    fn read(&self, path: &str) -> Result<Bytes> {
         // Compute the hash of this file path
-        let mut hasher = HASHER.build_hasher();
-        hasher.write(path.to_lowercase().as_bytes());
-        let hash = hasher.finish();
+        let hash = HASHER.hash_one_str(&path.to_lowercase());
 
         // Look up the file info for this file
         let index = self
             .lut
             .get(&hash)
-            .with_context(|| format!("Path not found in index: {}", path))?;
+            .ok_or_else(|| FSError::FileNotFound(path.to_owned()))?;
         let file = &self.index.files[*index];
 
         // Load the bundle
@@ -324,14 +305,8 @@ impl FileSystem for GGPKBundleFS {
             "/Bundles2/{}.bundle.bin",
             self.index.bundles[file.bundle_index as usize].name
         );
-        let bundle_contents = self
-            .ggpk
-            .read(&bundle_path)
-            .with_context(|| format!("Failed to load bundle file: {:?}", bundle_path))?;
-        let bundle = BundleParser
-            .parse(&bundle_contents)
-            .as_anyhow()
-            .context("Failed to parse bundle")?;
+        let bundle_contents = self.ggpk.read(&bundle_path)?;
+        let bundle = BundleParser.parse(&bundle_contents)?;
 
         // Pull out the file's contents
         let content = bundle.read_range(file.offset as usize, file.size as usize)?;

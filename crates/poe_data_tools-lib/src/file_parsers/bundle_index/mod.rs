@@ -1,16 +1,25 @@
-use crate::file_parsers::{FileParser, VersionedResult, VersionedResultExt};
+use crate::file_parsers::{
+    FileParser, VersionedFile,
+    error::{AsParseError, Result},
+};
 
 pub mod parser;
 pub mod types;
-use parser::parse_bundle_index_bytes;
 use types::BundleIndexFile;
+use winnow::Parser;
 
 pub struct BundleIndexParser;
 
 impl FileParser for BundleIndexParser {
     type Output = BundleIndexFile;
 
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
-        parse_bundle_index_bytes(bytes).unversioned()
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        parser::bundle_index_file().parse(bytes).to_parse_error()
+    }
+}
+
+impl VersionedFile for BundleIndexFile {
+    fn version(&self) -> Option<u32> {
+        None
     }
 }

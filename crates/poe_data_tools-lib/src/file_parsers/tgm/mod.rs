@@ -1,4 +1,4 @@
-use crate::file_parsers::{FileParser, VersionedResult};
+use crate::file_parsers::{FileParser, VersionedFile, error::Result};
 
 pub mod parser;
 pub mod types;
@@ -10,7 +10,13 @@ pub struct TGMParser;
 impl FileParser for TGMParser {
     type Output = TGMFile;
 
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
         parse_tgm_bytes(bytes)
+    }
+}
+
+impl VersionedFile for TGMFile {
+    fn version(&self) -> Option<u32> {
+        Some(self.version as u32)
     }
 }

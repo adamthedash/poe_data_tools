@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, float, space1},
@@ -8,7 +7,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::{SliceParser, lift},
         winnow::{WinnowParser, filename, quoted, quoted_str, version_line},
@@ -72,7 +71,7 @@ fn default_group<'a>() -> impl SliceParser<'a, &'a str, Group> {
     )
 }
 
-pub fn parse_dct_str(contents: &str) -> VersionedResult<DCTFile> {
+pub fn parse_dct_str(contents: &str) -> Result<DCTFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -82,7 +81,7 @@ pub fn parse_dct_str(contents: &str) -> VersionedResult<DCTFile> {
 
     let version = lift(version_line())
         .parse_next(&mut lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .to_parse_error()?;
 
     let mut parser = (
         lift(float),
@@ -98,8 +97,5 @@ pub fn parse_dct_str(contents: &str) -> VersionedResult<DCTFile> {
             }
         });
 
-    parser
-        .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))
+    parser.parse(lines).to_parse_error().with_version(version)
 }

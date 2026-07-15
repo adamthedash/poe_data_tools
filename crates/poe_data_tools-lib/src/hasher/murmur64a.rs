@@ -35,3 +35,18 @@ impl BuildHasher for BuildMurmurHash64A {
         MurmurHash64A::new(self.seed)
     }
 }
+
+pub trait BuildHasherEx: BuildHasher {
+    /// Hash a string
+    // NOTE: This is required because the str::hash hashse a length-prefixed set of bytes.
+    // GGG's impl just hashes the bytes
+    fn hash_one_str(&self, string: &str) -> u64;
+}
+
+impl BuildHasherEx for BuildMurmurHash64A {
+    fn hash_one_str(&self, string: &str) -> u64 {
+        let mut hasher = self.build_hasher();
+        hasher.write(string.as_bytes());
+        hasher.finish()
+    }
+}

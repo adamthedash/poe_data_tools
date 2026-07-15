@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::{dec_uint, space1},
@@ -7,7 +6,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::lift,
         winnow::{WinnowParser, optional_filename, quoted, separated_array, version_line},
@@ -25,7 +24,7 @@ fn combination<'a>() -> impl WinnowParser<&'a str, EcfCombination> {
     )
 }
 
-pub fn parse_ecf_str(contents: &str) -> VersionedResult<EcfFile> {
+pub fn parse_ecf_str(contents: &str) -> Result<EcfFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -35,15 +34,12 @@ pub fn parse_ecf_str(contents: &str) -> VersionedResult<EcfFile> {
 
     let version = lift(version_line())
         .parse_next(&mut lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-    //
+        .to_parse_error()?;
+
     let mut parser = repeat(0.., lift(combination())).map(|combinations| EcfFile {
         version,
         combinations,
     });
 
-    parser
-        .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))
+    parser.parse(lines).to_parse_error().with_version(version)
 }

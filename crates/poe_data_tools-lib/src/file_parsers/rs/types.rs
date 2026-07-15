@@ -1,12 +1,12 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct RSFile {
     pub version: u32,
     pub rooms: Vec<Room>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Room {
     pub weight: Option<u32>,
     pub arm_file: String,

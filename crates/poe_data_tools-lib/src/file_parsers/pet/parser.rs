@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::dec_uint,
@@ -9,7 +8,7 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::{SliceParser, lift},
         winnow::{optional_filename, quoted, unquoted_str, version_line},
@@ -37,7 +36,7 @@ fn emitter<'a>() -> impl SliceParser<'a, &'a str, Emitter> {
     )
 }
 
-pub fn parse_pet_str(contents: &str) -> VersionedResult<PETFile> {
+pub fn parse_pet_str(contents: &str) -> Result<PETFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -48,7 +47,7 @@ pub fn parse_pet_str(contents: &str) -> VersionedResult<PETFile> {
 
     let version = opt(lift(version_line()))
         .parse_next(&mut lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .to_parse_error()?;
 
     let mut parser = (
         length_repeat(
@@ -71,6 +70,6 @@ pub fn parse_pet_str(contents: &str) -> VersionedResult<PETFile> {
 
     parser
         .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(version)
+        .to_parse_error()
+        .with_maybe_version(version)
 }

@@ -1,7 +1,7 @@
-use anyhow::Context;
-
 use crate::file_parsers::{
-    FileParser, VersionedResult, VersionedResultExt, shared::utf16_bom_to_string,
+    FileParser, VersionedFile,
+    error::{AsParseError, ParseError, Result},
+    shared::utf16_bom_to_string,
 };
 
 pub mod parser;
@@ -14,10 +14,19 @@ pub struct EPKParser;
 impl FileParser for EPKParser {
     type Output = EPKFile;
 
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
-        let contents = utf16_bom_to_string(bytes)
-            .or_else(|_| String::from_utf8(bytes.to_vec()).context("Failed to parse as UTF-8"))?;
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        let contents = if let Ok(s) = utf16_bom_to_string(bytes).to_parse_error() {
+            s
+        } else {
+            String::from_utf8(bytes.to_vec()).map_err(ParseError::processing)?
+        };
 
-        parse_epk_str(&contents).unversioned()
+        parse_epk_str(&contents)
+    }
+}
+
+impl VersionedFile for EPKFile {
+    fn version(&self) -> Option<u32> {
+        None
     }
 }

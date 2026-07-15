@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct NumLine {
     pub uint1: u32,
     pub uint2: u32,
@@ -10,25 +10,25 @@ pub struct NumLine {
     pub bool4: Option<bool>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct VirtualETFile {
     pub path: String,
     pub bool1: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct VirtualSection {
     pub virtual_et_files: [VirtualETFile; 2],
     pub virtual_rotations: [u32; 2],
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub enum GTFile {
     Wildcard,
     Path(String),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct ETFile {
     pub name: String,
     pub hex: Option<String>,

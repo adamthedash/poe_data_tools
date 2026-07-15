@@ -8,13 +8,12 @@ use arrow_array::{
     types::{Int32Type, UInt16Type, UInt64Type},
 };
 use itertools::izip;
-use serde::Serialize;
-
-use crate::{
+use poe_data_tools::{
     Patch,
     dat::{ivy_schema::fetch_schema, table::load_parsed_table},
     fs::FS,
 };
+use serde::Serialize;
 
 /// Helper to interpret Arrow dataframe columns
 trait ColumnHelper {

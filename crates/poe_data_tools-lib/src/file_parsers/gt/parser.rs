@@ -1,4 +1,3 @@
-use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     ascii::space1,
@@ -6,9 +5,12 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::lift,
-    winnow::{WinnowParser, parse_bool, quoted_str, unquoted_str},
+use crate::file_parsers::{
+    error::{AsParseError, Result},
+    shared::{
+        lift::lift,
+        winnow::{WinnowParser, parse_bool, quoted_str, unquoted_str},
+    },
 };
 
 fn bools<'a>() -> impl WinnowParser<&'a str, (bool, bool, Option<bool>, Option<bool>, Option<bool>)>
@@ -49,9 +51,5 @@ pub fn parse_gt_str(contents: &str) -> Result<GTFile> {
             },
         );
 
-    let gt_file = parser
-        .parse(lines.as_slice())
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-    Ok(gt_file)
+    parser.parse(lines.as_slice()).to_parse_error()
 }

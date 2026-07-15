@@ -1,4 +1,8 @@
-use crate::file_parsers::{FileParser, VersionedResult, shared::utf16_bom_to_string};
+use crate::file_parsers::{
+    FileParser, VersionedFile,
+    error::{AsParseError, Result},
+    shared::utf16_bom_to_string,
+};
 
 pub mod parser;
 pub mod types;
@@ -10,9 +14,15 @@ pub struct TRLParser;
 impl FileParser for TRLParser {
     type Output = TRLFile;
 
-    fn parse(&self, bytes: &[u8]) -> VersionedResult<Self::Output> {
-        let contents = utf16_bom_to_string(bytes)?;
+    fn parse(&self, bytes: &[u8]) -> Result<Self::Output> {
+        let contents = utf16_bom_to_string(bytes).to_parse_error()?;
 
         parse_trl_str(&contents)
+    }
+}
+
+impl VersionedFile for TRLFile {
+    fn version(&self) -> Option<u32> {
+        self.version
     }
 }

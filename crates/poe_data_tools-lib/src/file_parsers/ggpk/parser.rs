@@ -1,6 +1,5 @@
 use std::io::{Read, Seek, SeekFrom};
 
-use anyhow::anyhow;
 use winnow::{
     Parser,
     binary::{le_u16, le_u32, le_u64},
@@ -10,7 +9,35 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::winnow::{WinnowParser, take_array};
+use crate::file_parsers::{
+    error::{AsParseError, ParseErrorInner, Result},
+    shared::winnow::{WinnowParser, take_array},
+};
+
+#[derive(Debug, thiserror::Error)]
+enum GGPKError {
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
+    #[error(transparent)]
+    Winnow(#[from] winnow::error::ContextError),
+    #[error("unexpected GGPK chunk tag: {0:?}")]
+    UnexpectedTag(Tag),
+}
+
+impl<I, E> From<winnow::error::ParseError<I, E>> for GGPKError
+where
+    E: Into<GGPKError>,
+{
+    fn from(value: winnow::error::ParseError<I, E>) -> Self {
+        value.into_inner().into()
+    }
+}
+
+impl From<GGPKError> for ParseErrorInner {
+    fn from(value: GGPKError) -> Self {
+        ParseErrorInner::Other(Box::new(value))
+    }
+}
 
 #[derive(Debug)]
 enum Tag {
@@ -40,14 +67,12 @@ fn chunk_header<'a>() -> impl WinnowParser<&'a [u8], (u32, Tag)> {
     winnow::trace!("chunk_header", (le_u32, tag()))
 }
 
-fn pdir<F: Read + Seek>(file: &mut F) -> anyhow::Result<Entry> {
+fn pdir<F: Read + Seek>(file: &mut F) -> Result<Entry, GGPKError> {
     let mut buf = [0; 4 + 4 + 32];
     file.read_exact(&mut buf)?;
 
     let (name_length, num_entries, sha_digest) =
-        (le_u32::<_, ContextError>, le_u32, take_array::<32, _>())
-            .parse(buf.as_slice())
-            .map_err(|e| anyhow!("{e:?}"))?;
+        (le_u32::<_, ContextError>, le_u32, take_array::<32, _>()).parse(buf.as_slice())?;
 
     let mut buf = vec![
         0;
@@ -62,8 +87,7 @@ fn pdir<F: Read + Seek>(file: &mut F) -> anyhow::Result<Entry> {
             .try_map(|chars: Vec<_>| String::from_utf16(&chars)),
         repeat(num_entries as usize, (le_u32, le_u64)),
     )
-        .parse(buf.as_slice())
-        .map_err(|e| anyhow!("{e:?}"))?;
+        .parse(buf.as_slice())?;
 
     name.pop().expect("Name didn't have null terminator");
 
@@ -74,14 +98,14 @@ fn pdir<F: Read + Seek>(file: &mut F) -> anyhow::Result<Entry> {
             file.seek(SeekFrom::Start(offset))?;
             file.read_exact(&mut buf)?;
 
-            let (length, tag) = chunk_header().parse(&buf).map_err(|e| anyhow!("{e:?}"))?;
+            let (length, tag) = chunk_header().parse(&buf)?;
             match tag {
                 Tag::PDir => pdir(file),
                 Tag::File => parse_file(file, length, hash),
-                t => panic!("Unexpected tag: {t:?}"),
+                t => Err(GGPKError::UnexpectedTag(t)),
             }
         })
-        .collect::<anyhow::Result<Vec<_>>>()?;
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Entry {
         name,
@@ -91,7 +115,7 @@ fn pdir<F: Read + Seek>(file: &mut F) -> anyhow::Result<Entry> {
     })
 }
 
-fn parse_file<F>(file: &mut F, length: u32, hash: u32) -> anyhow::Result<Entry>
+fn parse_file<F>(file: &mut F, length: u32, hash: u32) -> Result<Entry, GGPKError>
 where
     F: Read + Seek,
 {
@@ -100,17 +124,15 @@ where
     let mut buf = [0; 4 + 32];
     file.read_exact(&mut buf)?;
 
-    let (name_length, sha_digest) = (le_u32::<_, ContextError>, take_array::<32, _>())
-        .parse(buf.as_slice())
-        .map_err(|e| anyhow!("{e:?}"))?;
+    let (name_length, sha_digest) =
+        (le_u32::<_, ContextError>, take_array::<32, _>()).parse(buf.as_slice())?;
 
     let mut buf = vec![0; name_length as usize * std::mem::size_of::<u16>()];
     file.read_exact(&mut buf)?;
 
     let mut name = repeat(name_length as usize, le_u16::<_, ContextError>)
         .try_map(|chars: Vec<_>| String::from_utf16(&chars))
-        .parse(buf.as_slice())
-        .map_err(|e| anyhow!("{e:?}"))?;
+        .parse(buf.as_slice())?;
 
     name.pop().expect("Name didn't have null terminator");
 
@@ -129,7 +151,7 @@ where
     })
 }
 
-pub fn parse_ggpk(mut file: impl Read + Seek) -> anyhow::Result<GGPKFile> {
+fn _parse_ggpk(mut file: impl Read + Seek) -> Result<GGPKFile, GGPKError> {
     let mut buf = [0; 4 + 4 + 4 + 8 + 8];
     file.read_exact(&mut buf)?;
     let ((_length, _tag), _version, entries) = (
@@ -137,22 +159,20 @@ pub fn parse_ggpk(mut file: impl Read + Seek) -> anyhow::Result<GGPKFile> {
         le_u32,
         repeat::<_, _, Vec<_>, _, _>(2, le_u64),
     )
-        .parse(&buf)
-        .map_err(|e| anyhow!("{e:?}"))?;
+        .parse(&buf)?;
 
     let mut buf = [0; 4 + 4];
     let entries = entries
         .into_iter()
-        .map(|offset| -> anyhow::Result<_> {
+        .map(|offset| -> Result<_, GGPKError> {
             file.seek(SeekFrom::Start(offset))?;
             file.read_exact(&mut buf)?;
 
-            let (_length, tag) = chunk_header().parse(&buf).map_err(|e| anyhow!("{e:?}"))?;
+            let (_length, tag) = chunk_header().parse(&buf)?;
             let entry = match tag {
                 Tag::PDir => pdir(&mut file)?,
                 Tag::Free => return Ok(None),
-                Tag::File => unreachable!("Top level should not have any files"),
-                t => panic!("Unexpected tag: {t:?}"),
+                t => return Err(GGPKError::UnexpectedTag(t)),
             };
 
             Ok(Some(entry))
@@ -163,7 +183,11 @@ pub fn parse_ggpk(mut file: impl Read + Seek) -> anyhow::Result<GGPKFile> {
             // Filter out FREE chunks
             Ok(None) => None,
         })
-        .collect::<anyhow::Result<Vec<_>>>()?;
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(GGPKFile { entries })
+}
+
+pub fn parse_ggpk(file: impl Read + Seek) -> Result<GGPKFile> {
+    _parse_ggpk(file).to_parse_error()
 }

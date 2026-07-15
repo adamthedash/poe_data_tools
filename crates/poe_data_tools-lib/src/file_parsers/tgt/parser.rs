@@ -1,15 +1,14 @@
 use annotated_parser::{
-    AnnotationMode, ForwardRef,
+    ForwardRef,
     combinators::LengthRepeat,
     parsers::{EoF, str::U32},
     prelude::*,
 };
-use anyhow::Context;
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
-    shared::annotated_parser::{StrParser, ToAnyhow, quoted, whitespace},
+    error::{AsParseError, ParseResultEx, Result},
+    shared::annotated_parser::{StrParser, quoted, whitespace},
 };
 
 fn subtile_material_indices(
@@ -149,12 +148,13 @@ pub fn tgt_file() -> (impl StrParser<Output = TGTFile>, ForwardRef<u32>) {
     (parser, version_out)
 }
 
-pub fn parse_tgt_str(mut contents: &str) -> VersionedResult<TGTFile> {
+pub fn parse_tgt_str(mut contents: &str) -> Result<TGTFile> {
     let (mut parser, version) = tgt_file();
 
-    parser
-        .parse_with(&mut contents, AnnotationMode::FAIL)
-        .to_anyhow()
-        .context("Failed to parse file")
-        .with_version(*version.try_get())
+    let (file, _) = parser
+        .parse(&mut contents)
+        .to_parse_error()
+        .with_maybe_version(*version.try_get())?;
+
+    Ok(file)
 }

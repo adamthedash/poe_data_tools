@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Connection {
     /// Destination node
     pub passive_id: u32,
@@ -8,7 +8,7 @@ pub struct Connection {
     pub curvature: Option<i32>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Passive {
     pub id: u32,
     pub orbit: i32,
@@ -17,7 +17,7 @@ pub struct Passive {
     pub connections: Vec<Connection>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Group {
     pub x: f32,
     pub y: f32,
@@ -36,7 +36,7 @@ pub struct Group {
     pub passives: Vec<Passive>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct PSGFile {
     pub version: u8,
     /// 1 == Passive skill tree

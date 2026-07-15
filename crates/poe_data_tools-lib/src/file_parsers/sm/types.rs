@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct SMFile {
     pub version: u32,
     pub smd_file: String,
@@ -9,13 +9,13 @@ pub struct SMFile {
     pub bone_groups: Option<Vec<BoneGroup>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Material {
     pub mat_file: Option<String>,
     pub unk1: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct BoneGroup {
     pub name: String,
     pub bones: Vec<String>,

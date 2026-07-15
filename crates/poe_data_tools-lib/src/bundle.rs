@@ -1,17 +1,19 @@
-use anyhow::Context;
 use bytes::Bytes;
 use oozextract::Extractor;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
-use crate::file_parsers::bundle::types::BundleFile;
+use crate::{
+    file_parsers::{bundle::types::BundleFile, error::ParseError},
+    fs::error::FSError,
+};
 
 impl BundleFile {
     /// Return the entire content of the bundle
-    pub fn read_all(&self) -> anyhow::Result<Bytes> {
+    pub fn read_all(&self) -> Result<Bytes, FSError> {
         self.read_range(0, self.head.uncompressed_size as usize)
     }
 
-    pub fn read_range(&self, offset: usize, len: usize) -> anyhow::Result<Bytes> {
+    pub fn read_range(&self, offset: usize, len: usize) -> Result<Bytes, FSError> {
         let block_size = self.head.uncompressed_block_granularity as usize;
 
         // Create a buffer, needs to be block-aligned since we're decoding entire blocks into it
@@ -31,10 +33,9 @@ impl BundleFile {
             .try_for_each(|(chunk, block)| {
                 let mut ext = Extractor::new();
 
-                ext.read_from_slice(block, chunk)
-                    .map(|_| ())
-                    .context("Failed to decompress bundle block")
-            })?;
+                ext.read_from_slice(block, chunk).map(|_| ())
+            })
+            .map_err(ParseError::other)?;
 
         // Grab subset form block aligned buffer
         let slice = Bytes::from(buf).slice(offset % block_size..offset % block_size + len);

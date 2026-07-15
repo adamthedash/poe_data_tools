@@ -4,7 +4,7 @@ use serde::Serialize;
 
 pub type Emitter = HashMap<String, String>;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct TRLFile {
     pub version: Option<u32>,
     pub emitters: Vec<Emitter>,

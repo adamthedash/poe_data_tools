@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use winnow::{
     Parser,
     ascii::space0,
@@ -8,14 +7,14 @@ use winnow::{
 
 use super::types::*;
 use crate::file_parsers::{
-    VersionedResult, VersionedResultExt,
+    error::{AsParseError, ParseResultEx, Result},
     shared::{
         lift::lift,
         winnow::{filename, quoted, version_line},
     },
 };
 
-pub fn parse_tmo_str(contents: &str) -> VersionedResult<TMOFile> {
+pub fn parse_tmo_str(contents: &str) -> Result<TMOFile> {
     let lines = contents
         .lines()
         .map(|l| l.trim())
@@ -25,7 +24,7 @@ pub fn parse_tmo_str(contents: &str) -> VersionedResult<TMOFile> {
 
     let version = lift(version_line())
         .parse_next(&mut lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
+        .to_parse_error()?;
 
     let mut parser = repeat(
         0..,
@@ -48,8 +47,5 @@ pub fn parse_tmo_str(contents: &str) -> VersionedResult<TMOFile> {
     )
     .map(|overrides| TMOFile { version, overrides });
 
-    parser
-        .parse(lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
-        .with_version(Some(version))
+    parser.parse(lines).to_parse_error().with_version(version)
 }

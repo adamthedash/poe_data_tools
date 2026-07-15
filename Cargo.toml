@@ -10,6 +10,9 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/adamthedash/poe_data_tools"
 
+[workspace.dependencies]
+thiserror = "2.0"
+
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
 opt-level = 1

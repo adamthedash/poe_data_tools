@@ -14,12 +14,15 @@ Everything here has been has been lovingly hand crafted, but I won't rule out th
 - (lib) Native async API for filesystem
 - (lib) Improve download scheduling for `CDNFS::batch_read`
 - (repo) Use shared workspace dependencies, relax version reqs for lib
+- (bin) [gLTF](https://en.wikipedia.org/wiki/GlTF) export for mesh files
+- (lib) move `AnnotatedError` into annotated_parser crate
 
 ### Resources (mostly for me)
 https://gitlab.com/zao/poe-rs  
 https://gist.github.com/zao/96cb1869db121fbd038f8cd66f7d5736 - for .fmt/tdt/tgm  
 https://gitlab.com/zao/poe-cpp/-/tree/master/libpoe/poe/format  
 https://bitbucket.org/zao/gggtools/src/evolve-ggpkviewer/spec/  
+https://github.com/annalithic/poeformats
 
 
 ```

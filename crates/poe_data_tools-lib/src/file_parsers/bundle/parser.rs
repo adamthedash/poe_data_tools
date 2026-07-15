@@ -1,6 +1,3 @@
-use std::fmt::Display;
-
-use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     binary::{le_u32, le_u64},
@@ -11,19 +8,11 @@ use winnow::{
 use super::types::*;
 use crate::file_parsers::shared::winnow::WinnowParser;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 enum BundleError {
+    #[error("invalid encoding identifier: {0}")]
     InvalidEncoding(u32),
 }
-impl Display for BundleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BundleError::InvalidEncoding(x) => write!(f, "Invalid encoding identifier: {x}"),
-        }
-    }
-}
-
-impl std::error::Error for BundleError {}
 
 fn first_file_encode<'a>() -> impl WinnowParser<&'a [u8], FirstFileEncode> {
     winnow::trace!(
@@ -107,10 +96,4 @@ pub fn bundle<'a>() -> impl WinnowParser<&'a [u8], BundleFile> {
     };
 
     winnow::trace!("bundle", parser)
-}
-
-pub fn parse_bundle_bytes(contents: &[u8]) -> Result<BundleFile> {
-    bundle()
-        .parse(contents)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))
 }

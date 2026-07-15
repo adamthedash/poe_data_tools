@@ -1,4 +1,3 @@
-use anyhow::{Result, anyhow};
 use winnow::{
     Parser,
     ascii::{dec_uint as U, space1},
@@ -8,11 +7,14 @@ use winnow::{
 };
 
 use super::types::*;
-use crate::file_parsers::shared::{
-    lift::{SliceParser, lift},
-    winnow::{
-        WinnowParser, filename, parse_bool, quoted, repeat_array, separated_array, unquoted,
-        unquoted_str,
+use crate::file_parsers::{
+    error::{AsParseError, Result},
+    shared::{
+        lift::{SliceParser, lift},
+        winnow::{
+            WinnowParser, filename, parse_bool, quoted, repeat_array, separated_array, unquoted,
+            unquoted_str,
+        },
     },
 };
 
@@ -114,9 +116,5 @@ pub fn parse_et_str(contents: &str) -> Result<ETFile> {
             },
         );
 
-    let et_file = parser
-        .parse(&lines)
-        .map_err(|e| anyhow!("Failed to parse file: {e:?}"))?;
-
-    Ok(et_file)
+    parser.parse(&lines).to_parse_error()
 }

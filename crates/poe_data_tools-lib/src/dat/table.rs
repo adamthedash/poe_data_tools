@@ -1,6 +1,5 @@
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{Context, Result, anyhow, bail, ensure};
 use arrow_array::{
     ArrayRef, BooleanArray, Float32Array, Int16Array, Int32Array, RecordBatch, StringArray,
     UInt16Array, UInt32Array, UInt64Array,
@@ -10,8 +9,12 @@ use arrow_array::{
     },
 };
 
+use super::table_view::ColResult;
 use crate::{
-    dat::ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
+    dat::{
+        ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
+        table_view::{DatColumnError, DatError, DatResult},
+    },
     file_parsers::{
         FileParser,
         dat::{DatParser, types::DatFile},
@@ -61,11 +64,14 @@ fn parse_i16(bytes: &[u8]) -> i16 {
     i16::from_le_bytes(bytes.try_into().unwrap())
 }
 
-fn parse_bool(bytes: &[u8]) -> Result<bool> {
+fn parse_bool(bytes: &[u8]) -> ColResult<bool> {
     assert!(bytes.len() == 1);
-    ensure!(bytes[0] < 2, "Invalid boolean value: {:?}", bytes[0]);
 
-    Ok(bytes[0] == 1)
+    match bytes[0] {
+        0 => Ok(false),
+        1 => Ok(true),
+        x => Err(DatColumnError::InvalidBool(x)),
+    }
 }
 
 /// Apply a schema to a single column
@@ -73,17 +79,17 @@ fn parse_column(
     table: &DatFile,
     column: &ColumnSchema,
     cur_offset: usize,
-) -> Result<(usize, Result<ArrayRef>)> {
+) -> ColResult<(usize, ColResult<ArrayRef>)> {
     let (bytes_taken, series) = match (column.array, column.interval) {
         // Array
         (true, false) => {
             let series = match column.column_type.as_str() {
                 // Array of "array" is used to indicate an unknown data type as far as I can tell
-                "array" => Err(anyhow!("Unknown array type")),
+                "array" => Err(DatColumnError::UnknownArrayType),
 
                 "string" => table
                     .view_col_as_array_of_strings(cur_offset)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(StringBuilder::new());
                         for row in s {
@@ -98,7 +104,7 @@ fn parse_column(
 
                 "foreignrow" => table
                     .view_col_as_array_of(cur_offset, 16, parse_foreignrow)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(UInt64Builder::new());
                         for row in s {
@@ -113,7 +119,7 @@ fn parse_column(
 
                 "row" => table
                     .view_col_as_array_of(cur_offset, 8, parse_maybe_row)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(UInt64Builder::new());
                         for row in s {
@@ -128,7 +134,7 @@ fn parse_column(
 
                 "enumrow" => table
                     .view_col_as_array_of(cur_offset, 4, parse_u32)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(UInt32Builder::new());
                         for row in s {
@@ -143,7 +149,7 @@ fn parse_column(
 
                 "u32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_u32)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(UInt32Builder::new());
                         for row in s {
@@ -158,7 +164,7 @@ fn parse_column(
 
                 "f32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_f32)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(Float32Builder::new());
                         for row in s {
@@ -173,7 +179,7 @@ fn parse_column(
 
                 "i32" => table
                     .view_col_as_array_of(cur_offset, 4, parse_i32)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(Int32Builder::new());
                         for row in s {
@@ -188,7 +194,7 @@ fn parse_column(
 
                 "i16" => table
                     .view_col_as_array_of(cur_offset, 2, parse_i16)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(Int16Builder::new());
                         for row in s {
@@ -203,7 +209,7 @@ fn parse_column(
 
                 "u16" => table
                     .view_col_as_array_of(cur_offset, 2, parse_u16)?
-                    .collect::<Result<Vec<_>>>()
+                    .collect::<ColResult<Vec<_>>>()
                     .map(|s| {
                         let mut builder = ListBuilder::new(UInt16Builder::new());
                         for row in s {
@@ -216,7 +222,11 @@ fn parse_column(
                         builder.finish()
                     }),
 
-                _ => bail!("Unknown column type: {:?}", column),
+                _ => {
+                    return Err(DatColumnError::UnknownColumnType(Box::new(
+                        column.to_owned(),
+                    )));
+                }
             }
             .map(|s| Arc::new(s) as _);
 
@@ -230,8 +240,10 @@ fn parse_column(
                     let mut builder = ListBuilder::new(Int32Builder::new());
                     values.for_each(|bytes| {
                         bytes
-                            .chunks_exact(4)
-                            .map(parse_i32)
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .map(|b| parse_i32(b))
                             .for_each(|val| builder.values().append_value(val));
                         builder.append(true);
                     });
@@ -241,7 +253,11 @@ fn parse_column(
 
                 (8, series)
             }
-            _ => bail!("Unknown column type: {:?}", column),
+            _ => {
+                return Err(DatColumnError::UnknownColumnType(Box::new(
+                    column.to_owned(),
+                )));
+            }
         },
 
         // Scalar
@@ -249,7 +265,7 @@ fn parse_column(
             "string" => {
                 let series = table
                     .view_col_as_string(cur_offset)
-                    .and_then(|strings| strings.collect::<Result<Vec<_>>>())
+                    .and_then(|strings| strings.collect::<ColResult<Vec<_>>>())
                     // .map(|s| Series::new(col_name.into(), s));
                     .map(|s| Arc::new(StringArray::from(s)) as _);
                 (8, series)
@@ -330,22 +346,26 @@ fn parse_column(
             "bool" => {
                 let series = table
                     .view_col(cur_offset, 1)
-                    .and_then(|items| items.map(parse_bool).collect::<Result<Vec<_>>>())
+                    .and_then(|items| items.map(parse_bool).collect::<ColResult<Vec<_>>>())
                     // .map(|s| Series::new(col_name.into(), s));
                     .map(|s| Arc::new(BooleanArray::from(s)) as _);
                 (1, series)
             }
 
-            _ => bail!("Unknown column type: {:?}", column),
+            _ => {
+                return Err(DatColumnError::UnknownColumnType(Box::new(
+                    column.to_owned(),
+                )));
+            }
         },
-        _ => bail!("Can't be both array and interval"),
+        _ => return Err(DatColumnError::ArrayInterval(Box::new(column.to_owned()))),
     };
 
     Ok((bytes_taken, series))
 }
 
 /// Parse a table with the given schema into an Arrow RecordBatch
-pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBatch> {
+pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> DatResult<RecordBatch> {
     let column_names = schema.column_names().collect::<Vec<_>>();
 
     // Parse each of the columns
@@ -353,10 +373,13 @@ pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBat
     let mut cur_offset = 0;
     for column in &schema.columns {
         // Parse column data.
-        // We return out on parse failure as it may impact the interpretation of followon columns
+        // NOTE: We return out on parse failure as it may impact the interpretation of followon columns
         // if the offset is incorrect.
-        let (bytes_taken, series) = parse_column(table, column, cur_offset)
-            .with_context(|| format!("Failed to parse column: {:?}", column))?;
+        let (bytes_taken, series) =
+            parse_column(table, column, cur_offset).map_err(|e| DatError::Column {
+                column: Box::new(column.to_owned()),
+                source: e,
+            })?;
 
         // If we successfully parse the data, add it to the table
         match series {
@@ -377,8 +400,7 @@ pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> Result<RecordBat
     }
 
     // Collect em into a dataframe
-    let df = RecordBatch::try_from_iter(column_names.into_iter().zip(parsed_columns))
-        .context("Failed to create df")?;
+    let df = RecordBatch::try_from_iter(column_names.into_iter().zip(parsed_columns))?;
     Ok(df)
 }
 
@@ -388,7 +410,7 @@ pub fn load_parsed_table(
     schemas: &SchemaCollection,
     filename: &str,
     version: u32,
-) -> Result<RecordBatch> {
+) -> DatResult<RecordBatch> {
     // Load table schema - todo: HashMap rather than vector
     let schema = schemas
         .tables
@@ -396,20 +418,19 @@ pub fn load_parsed_table(
         // valid_for == 3 is common between both games
         .filter(|t| t.valid_for == version || t.valid_for == 3)
         .find(|t| *t.name.to_lowercase() == *PathBuf::from(&filename).file_stem().unwrap())
-        .with_context(|| format!("Couldn't find schema for {:?}", filename))?;
+        .ok_or_else(|| DatError::SchemaNotFound(filename.to_owned()))?;
 
     // Load dat file
     let bytes = fs.read(filename)?;
     // Load dat file
-    let table = DatParser
-        .parse(&bytes)
-        .as_anyhow()
-        .context("Failed to parse table data")?;
+    let table = DatParser.parse(&bytes)?;
 
-    ensure!(!table.rows.is_empty(), "Empty table");
+    if table.rows.is_empty() {
+        return Err(DatError::EmptyTable);
+    }
 
     // Apply it
-    let df = parse_table(&table, schema).context("Failed to apply schema to table")?;
+    let df = parse_table(&table, schema)?;
 
     Ok(df)
 }

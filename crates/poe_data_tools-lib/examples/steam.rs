@@ -2,22 +2,21 @@ use std::path::Path;
 
 use poe_data_tools::{
     file_parsers::{FileParser, psg::PSGParser},
-    fs::{FS, FileSystem, cdn::cdn_base_url},
+    fs::{FS, FileSystem},
 };
 
 fn main() {
-    env_logger::init();
-
-    let cache_dir = Path::new("./cache");
-    let base_url = cdn_base_url(cache_dir, "2").expect("couldn't get CDN URL");
-    let fs = FS::from_cdn(&base_url, cache_dir).expect("couldn't create filesystem");
+    // (I don't have a steam install, but it's the same stucture as the CDN cache, so I'm just using
+    // that)
+    let steam_folder =
+        Path::new("/home/adam/.cache/poe_data_tools/patch-poe2.poecdn.com/4.3.1.2").to_owned();
+    let fs = FS::from_steam(steam_folder).unwrap();
 
     // Print out a summary of all the Passive Skill Graph (.psg) files
     let tree_files = fs
         .list()
         .filter(|f| f.ends_with(".psg"))
         .collect::<Vec<_>>();
-
     for (file, bytes) in fs.batch_read(&tree_files) {
         let Ok(bytes) = bytes else {
             eprintln!("Error reading {file:?}");
