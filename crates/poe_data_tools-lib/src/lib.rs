@@ -2,17 +2,23 @@
 #![feature(f16)]
 #![feature(option_reference_flattening)]
 
-pub mod bundle;
+mod bundle;
 pub mod dat;
 pub mod file_parsers;
 pub mod fs;
 pub mod hasher;
-pub mod path;
+mod path;
 
+/// The version of the Path of Exile game
 #[derive(Debug, Clone)]
 pub enum Patch {
+    /// Any version of PoE 1
     One,
+    /// Any version of PoE 2
     Two,
+    /// A specific game patch eg. "3.4.0.12"
+    /// PoE1 - "3.*"
+    /// PoE2 - "4.*"
     Specific(String),
 }
 
@@ -25,7 +31,7 @@ impl Patch {
             Two => 2,
             Specific(s) if s.starts_with("3.") => 1,
             Specific(s) if s.starts_with("4.") => 1,
-            Specific(s) => unreachable!("Invalid major patch version {s:?}"),
+            Specific(s) => panic!("Invalid major patch version {s:?}"),
         }
     }
 

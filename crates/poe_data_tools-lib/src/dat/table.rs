@@ -12,7 +12,7 @@ use arrow_array::{
 use super::table_view::ColResult;
 use crate::{
     dat::{
-        ivy_schema::{ColumnSchema, DatTableSchema, SchemaCollection},
+        schema::{ColumnSchema, DatTableSchema, SchemaCollection},
         table_view::{DatColumnError, DatError, DatResult},
     },
     file_parsers::{
@@ -405,31 +405,33 @@ pub fn parse_table(table: &DatFile, schema: &DatTableSchema) -> DatResult<Record
 }
 
 /// Loads a table into a parsed dataframe
+// TODO: Make this an extension trait for FileSystem
+// TODO: use Path instead of version number
 pub fn load_parsed_table(
     fs: &mut FS,
     schemas: &SchemaCollection,
-    filename: &str,
+    path: &str,
     version: u32,
 ) -> DatResult<RecordBatch> {
-    // Load table schema - todo: HashMap rather than vector
+    // Load table schema
+    // TODO: HashMap rather than vector
     let schema = schemas
         .tables
         .iter()
         // valid_for == 3 is common between both games
         .filter(|t| t.valid_for == version || t.valid_for == 3)
-        .find(|t| *t.name.to_lowercase() == *PathBuf::from(&filename).file_stem().unwrap())
-        .ok_or_else(|| DatError::SchemaNotFound(filename.to_owned()))?;
+        .find(|t| *t.name.to_lowercase() == *PathBuf::from(&path).file_stem().unwrap())
+        .ok_or_else(|| DatError::SchemaNotFound(path.to_owned()))?;
 
-    // Load dat file
-    let bytes = fs.read(filename)?;
-    // Load dat file
+    // Load dat file & parse generic structure
+    let bytes = fs.read(path)?;
     let table = DatParser.parse(&bytes)?;
 
     if table.rows.is_empty() {
         return Err(DatError::EmptyTable);
     }
 
-    // Apply it
+    // Apply the schema
     let df = parse_table(&table, schema)?;
 
     Ok(df)

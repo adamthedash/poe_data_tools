@@ -24,6 +24,7 @@ impl Hasher for MurmurHash64A {
     }
 }
 
+/// Hasher used internally by GGG
 pub struct BuildMurmurHash64A {
     pub seed: u64,
 }
@@ -38,7 +39,7 @@ impl BuildHasher for BuildMurmurHash64A {
 
 pub trait BuildHasherEx: BuildHasher {
     /// Hash a string
-    // NOTE: This is required because the str::hash hashse a length-prefixed set of bytes.
+    // NOTE: This is required because the BuildHasher::hash_one<str> hashes a length-prefixed set of bytes.
     // GGG's impl just hashes the bytes
     fn hash_one_str(&self, string: &str) -> u64;
 }

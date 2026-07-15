@@ -10,7 +10,7 @@ use arrow_array::{
 use itertools::izip;
 use poe_data_tools::{
     Patch,
-    dat::{ivy_schema::fetch_schema, table::load_parsed_table},
+    dat::{schema::fetch_schema, table::load_parsed_table},
     fs::FS,
 };
 use serde::Serialize;
