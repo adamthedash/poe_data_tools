@@ -173,6 +173,8 @@ pub struct CDNLoader {
     base_url: Url,
     /// Place where any new files will be downloaded to
     cache: CacheConfig,
+    /// Async client
+    client: reqwest::Client,
 }
 
 impl CDNLoader {
@@ -188,9 +190,16 @@ impl CDNLoader {
 
         let cache = CacheConfig::from_primary_cache_path(cache_dir)?;
 
+        // Short timeout for initial connection, but none for transfer to allow for fetching large
+        // files on a poor network connection
+        let client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .build()?;
+
         Ok(Self {
             base_url: base_url.clone(),
             cache,
+            client,
         })
     }
 
@@ -306,12 +315,6 @@ impl CDNLoader {
     pub async fn load_async(&self, path_stub: &Path) -> Result<Bytes> {
         let url = self.build_url(path_stub)?;
 
-        // Short timeout for initial connection, but none for transfer to allow for fetching large
-        // files on a poor network connection
-        let client = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(10))
-            .build()?;
-
         // If already cached, assume nothing has changed due to version immutability
         if let Some((cache_path, _)) = self.cache.primary.search(path_stub) {
             log::debug!("Using cached bundle: {:?}", cache_path);
@@ -321,7 +324,8 @@ impl CDNLoader {
 
         // Ask server for the etag so we can check against cache
         let etag = {
-            let resp = client
+            let resp = self
+                .client
                 .head(url.clone())
                 // TODO: Maybe be a little friendlier if we can do this? But would be more complex
                 // code
@@ -372,7 +376,7 @@ impl CDNLoader {
         } else {
             // No candidate cached version, download from CDN
             log::info!("Downloading bundle: {}", url);
-            let resp = client.get(url).send().await?;
+            let resp = self.client.get(url).send().await?;
 
             let etag = resp
                 .headers()
