@@ -5,6 +5,10 @@ build:
 coverage:
 	cargo bench --bench coverage
 
+bench_cdn:
+	rm -rf scratch/.cache
+	time cargo bench --bench cdn
+
 debug VERSION FILE:
 	cargo run --release --features debug -- -p {{VERSION}} translate data{{VERSION}} {{FILE}}
 
