@@ -1,7 +1,13 @@
+# Rust
 /target
 Cargo.lock
+
+# Local testing data
 data*
 db
+scratch
+
+# Profiling related
 perf*
 flamegraph*
-scratch
+**/trace-*.json
