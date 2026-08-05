@@ -194,10 +194,12 @@ pub fn fetch_schema(cache_dir: &Path) -> Result<SchemaCollection> {
     let schema_path = cache_dir.join("schema.min.json");
     let etag_path = schema_path.with_extension("json.etag");
 
-    // File fresh? Use it
-    if fs::metadata(&schema_path)?
-        .modified()?
-        .elapsed()
+    // File fresh? Use it. A missing file is treated as stale so the schema
+    // gets downloaded on first use.
+    if fs::metadata(&schema_path)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.elapsed().ok())
         .map(|d| d.as_secs() < 3600)
         .unwrap_or(false)
     {
