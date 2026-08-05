@@ -23,3 +23,13 @@ cat VERSION FILE:
 
 list VERSION FILE:
 	cargo run --release -- -p {{VERSION}} list {{FILE}}
+
+# Create a new tag & push it (here just for my own reference)
+# tag TAG REVISION:
+# 	jj tag set -r {{REVISION}} {{TAG}}
+# 	jj git push --tag {{TAG}}
+
+# publish:
+# 	cargo publish -p poe_data_tools
+# 	cargo publish -p poe_data_tools-cli
+
