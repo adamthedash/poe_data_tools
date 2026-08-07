@@ -63,6 +63,15 @@ glob = "0.3"
 
 enum_dispatch = "0.3"
 
+# DEV-DEPENDENCIES
+tempfile = "3.27"
+assert_cmd = "2.2"
+
+criterion = "0.3"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tracing-chrome = "0.7"
+
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]
 opt-level = 1

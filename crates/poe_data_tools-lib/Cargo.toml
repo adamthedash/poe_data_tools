@@ -55,11 +55,11 @@ enum_dispatch = { workspace = true }
 
 
 [dev-dependencies]
-criterion = { version = "0.3", features = ["html_reports"] }
-tempfile = "3.27"
-tracing = "0.1"
-tracing-subscriber = "0.3"
-tracing-chrome = "0.7"
+criterion = { workspace = true }
+tempfile = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-chrome = { workspace = true }
 
 glob = { workspace = true }
 env_logger = { workspace = true }

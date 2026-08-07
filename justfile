@@ -24,6 +24,10 @@ cat VERSION FILE:
 list VERSION FILE:
 	cargo run --release -- -p {{VERSION}} list {{FILE}}
 
+integration:
+	# Single thread so cache access doesn't conflict
+	cargo test -p poe_data_tools-cli --test integration -- --test-threads 1
+
 # Create a new tag & push it (here just for my own reference)
 # tag TAG REVISION:
 # 	jj tag set -r {{REVISION}} {{TAG}}
