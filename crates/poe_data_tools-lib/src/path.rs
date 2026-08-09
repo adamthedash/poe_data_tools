@@ -98,6 +98,7 @@ impl ParsedPathRep {
 #[derive(Debug)]
 pub struct PathSegment {
     pub value: String,
+    #[allow(unused)]
     pub is_leaf: bool,
     pub parent_index: Option<usize>,
 }
