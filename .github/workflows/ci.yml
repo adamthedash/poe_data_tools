@@ -19,6 +19,9 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
+        
+      - name: Cache rust compilation
+        uses: Swatinem/rust-cache@v2
 
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets
