@@ -9,13 +9,11 @@ See [here](FORMATS.md) for knowledge base of PoE file formats.
 Everything here has been has been lovingly hand crafted, but I won't rule out the use of LLMs down the line. If/when that happens, its use will be clearly outlined here.
 
 ### TODO List
-- (lib) Better documentation / public API redesign
 - (lib) Native async API for filesystem
 - (lib) Improve download scheduling for `CDNFS::batch_read`
-- (repo) Use shared workspace dependencies, relax version reqs for lib
 - (bin) [gLTF](https://en.wikipedia.org/wiki/GlTF) export for mesh files
 - (lib) move `AnnotatedError` into annotated_parser crate
-- (lib) MSRV
+- (lib) ~MSRV~ - not possible due to use of `f16` feature for some file types
 - (lib) python/typescript wrappers?
 
 ### Resources (mostly for me)
