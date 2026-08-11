@@ -11,6 +11,14 @@ A library for accessing & parsing Path of Exile game files.
 - File system-like abstraction over Steam, GGPK, and CDN data sources
 - Parsers for many proprietary Path of Exile 1 & 2 game file formats
 
+# Versioning
+Releases will follow [Semantic Versioning](https://semver.org/) guidelines, with the following additional rules for file parsers:  
+- (major) - data type change, removal, or renaming of existing fields in file data structs
+- (major) - change of parsing library
+- (minor) - addition of a new field to a data struct
+- (minor) - addition of new file format
+
+
 # Format coverage
 PoE 1 (patch 3.28.0.14.3), PoE Data Tools v2.0.0
 
