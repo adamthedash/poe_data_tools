@@ -14,11 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: rustup toolchain install
-        uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: rustfmt, clippy
         
       - name: Cache rust compilation
         uses: Swatinem/rust-cache@v2
