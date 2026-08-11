@@ -17,7 +17,7 @@ default = []
 debug = ["winnow/debug"]
 
 [dependencies]
-poe_data_tools = { path = "../poe_data_tools-lib", version = "2.0.2-pre" }
+poe_data_tools = { path = "../poe_data_tools-lib", version = "3.0.0-pre" }
 
 # Serialisation
 serde = { workspace=true, features = ["derive"]}
