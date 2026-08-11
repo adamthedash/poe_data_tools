@@ -1,6 +1,7 @@
 pub mod amd;
 pub mod ao;
 pub mod arm;
+pub mod ast;
 pub mod bundle;
 pub mod bundle_index;
 pub mod cht;
@@ -46,6 +47,7 @@ use self::{
     psg::PSGParser, rs::RSParser, sm::SMParser, smd::SMDParser, tgm::TGMParser, tgt::TGTParser,
     tmo::TMOParser, toy::TOYParser, trl::TRLParser, tsi::TSIParser, tst::TSTParser,
 };
+use crate::file_parsers::ast::ASTParser;
 
 pub trait FileParser {
     /// Structured output type
@@ -80,6 +82,7 @@ pub enum Parser {
     Amd(AMDParser),
     Ao(AOParser),
     Arm(ARMParser),
+    Ast(ASTParser),
     Cht(CHTParser),
     Clt(CLTParser),
     Dct(DCTParser),
@@ -117,6 +120,7 @@ impl Parser {
             "amd" => Amd(AMDParser),
             "ao" => Ao(AOParser),
             "arm" => Arm(ARMParser),
+            "ast" => Ast(ASTParser),
             "cht" => Cht(CHTParser),
             "clt" => Clt(CLTParser),
             "dct" => Dct(DCTParser),
@@ -161,6 +165,7 @@ impl FileParser for Parser {
             Amd(p) => ParserOutput::Amd(p.parse(bytes)?),
             Ao(p) => ParserOutput::Ao(p.parse(bytes)?),
             Arm(p) => ParserOutput::Arm(Box::new(p.parse(bytes)?)),
+            Ast(p) => ParserOutput::Ast(p.parse(bytes)?),
             Cht(p) => ParserOutput::Cht(p.parse(bytes)?),
             Clt(p) => ParserOutput::Clt(p.parse(bytes)?),
             Dct(p) => ParserOutput::Dct(p.parse(bytes)?),
@@ -202,6 +207,7 @@ pub enum ParserOutput {
     Amd(<AMDParser as FileParser>::Output),
     Ao(<AOParser as FileParser>::Output),
     Arm(Box<<ARMParser as FileParser>::Output>),
+    Ast(<ASTParser as FileParser>::Output),
     Cht(<CHTParser as FileParser>::Output),
     Clt(<CLTParser as FileParser>::Output),
     Dct(<DCTParser as FileParser>::Output),
@@ -237,6 +243,7 @@ impl VersionedFile for ParserOutput {
             Amd(o) => o.version(),
             Ao(o) => o.version(),
             Arm(o) => o.version(),
+            Ast(o) => o.version(),
             Cht(o) => o.version(),
             Clt(o) => o.version(),
             Dct(o) => o.version(),

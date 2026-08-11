@@ -1,12 +1,14 @@
-use winnow::{
-    Parser,
-    binary::{le_u32, le_u64},
-    combinator::{repeat, seq},
-    token::take,
+use annotated_parser::{
+    ForwardRef,
+    parsers::{TakeArray, TakeVec},
+    prelude::*,
 };
 
 use super::types::*;
-use crate::file_parsers::shared::winnow::WinnowParser;
+use crate::file_parsers::{
+    error::{AsParseError, Result},
+    shared::annotated_parser::U8Parser,
+};
 
 #[derive(Debug, thiserror::Error)]
 enum BundleError {
@@ -14,10 +16,9 @@ enum BundleError {
     InvalidEncoding(u32),
 }
 
-fn first_file_encode<'a>() -> impl WinnowParser<&'a [u8], FirstFileEncode> {
-    winnow::trace!(
-        "first_file_encode",
-        le_u32.try_map(|x| {
+fn first_file_encode() -> impl U8Parser<Output = FirstFileEncode> {
+    u32::LE
+        .try_map(|x| {
             use FirstFileEncode::*;
             let ffe = match x {
                 8 => Kraken6,
@@ -31,69 +32,68 @@ fn first_file_encode<'a>() -> impl WinnowParser<&'a [u8], FirstFileEncode> {
 
             Ok(ffe)
         })
-    )
+        .trace("first_file_encode")
 }
 
-fn head_payload<'a>() -> impl WinnowParser<&'a [u8], (HeadPayload, u32)> {
-    winnow::trace!(
-        "head_payload",
-        seq!((
-            _: take(12_usize),
-            first_file_encode(),
-            _: take(4_usize),
-            le_u64,
-            le_u64,
-            le_u32,
-            le_u32,
-            _: take(16_usize),
-        ))
-        .map(
+fn header() -> impl U8Parser<Output = HeadPayload> {
+    (
+        TakeArray::<12>,
+        first_file_encode(),
+        TakeArray::<4>,
+        u64::LE.trace("uncompressed_size"),
+        u64::LE.trace("total_payload_size"),
+        u32::LE.trace("block_count"),
+        u32::LE.trace("uncompressed_block_gr"),
+        TakeArray::<16>,
+    )
+        .map_silent(
             |(
+                unk1,
                 first_file_encode,
+                unk2,
                 uncompressed_size,
                 total_payload_size,
                 block_count,
                 uncompressed_block_granularity,
-            )| {
-                let head_payload = HeadPayload {
-                    first_file_encode,
-                    uncompressed_size,
-                    total_payload_size,
-                    uncompressed_block_granularity,
-                };
-
-                (head_payload, block_count)
+                unk3,
+            )| HeadPayload {
+                unk1,
+                first_file_encode,
+                unk2,
+                uncompressed_size,
+                total_payload_size,
+                block_count,
+                uncompressed_block_granularity,
+                unk3,
             },
         )
-    )
+        .trace("header")
 }
 
-fn blocks<'a>(block_count: u32) -> impl WinnowParser<&'a [u8], Vec<Vec<u8>>> {
-    let parser = move |input: &mut &[u8]| -> winnow::Result<_> {
-        let block_sizes: Vec<_> = repeat(block_count as usize, le_u32).parse_next(input)?;
+fn blocks(block_count: ForwardRef<u32>) -> impl U8Parser<Output = Vec<Vec<u8>>> {
+    let block_sizes = u32::LE.repeat_vec(block_count).trace("block_sizes").store();
 
-        let mut blocks = vec![];
-        for size in block_sizes {
-            let block = take(size).parse_next(input)?;
-            blocks.push(block.to_vec());
-        }
+    let block_size = ForwardRef::new_source();
+    let blocks = TakeVec::new(block_size.clone()).parameterize(block_sizes.output(), block_size);
 
-        Ok(blocks)
-    };
-
-    winnow::trace!("blocks", parser)
+    (block_sizes, blocks)
+        .map_silent(|(_, blocks)| blocks)
+        .trace("blocks")
 }
 
-pub fn bundle<'a>() -> impl WinnowParser<&'a [u8], BundleFile> {
-    let parser = |input: &mut &[u8]| {
-        let (head, block_count) = head_payload().parse_next(input)?;
+pub fn bundle() -> impl U8Parser<Output = BundleFile> {
+    let head = header().store();
+    let blocks = blocks(head.output().map(|h| h.block_count));
 
-        let blocks = blocks(block_count).parse_next(input)?;
+    (head, blocks)
+        .map_silent(|(head, blocks)| BundleFile { head, blocks })
+        .trace("bundle")
+}
 
-        let bundle = BundleFile { head, blocks };
+pub fn parse_bundle_bytes(mut input: &[u8]) -> Result<BundleFile> {
+    let mut parser = bundle();
 
-        Ok(bundle)
-    };
+    let (bundle_file, _) = parser.parse(&mut input).to_parse_error()?;
 
-    winnow::trace!("bundle", parser)
+    Ok(bundle_file)
 }

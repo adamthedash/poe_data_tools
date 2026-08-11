@@ -1,12 +1,13 @@
 use bytes::Bytes;
+use serde::Serialize;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BundleInfo {
     pub name: String,
     pub uncompressed_size: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FileInfo {
     pub hash: u64,
     pub bundle_index: u32,
@@ -14,7 +15,7 @@ pub struct FileInfo {
     pub size: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PathRep {
     pub hash: u64,
     pub offset: u32,
@@ -22,7 +23,7 @@ pub struct PathRep {
     pub recursive_size: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BundleIndexFile {
     pub bundles: Vec<BundleInfo>,
     pub files: Vec<FileInfo>,
