@@ -1,3 +1,6 @@
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/adamthedash)  
+
+
 # PoE Data Tools
 Parsing tools for Path of Exile game files. Available as a standalone binary and as a rust crate.  
 
