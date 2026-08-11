@@ -58,4 +58,5 @@ poe_data_tools --patch 2 list 'art/**'
 
 # Versioning
 Releases will follow [Semantic Versioning](https://semver.org/) guidelines for the CLI interface, with the following additional rules:
-- (minor) - `poe_data_tools` lib version bump, including breaking changes to file formats
+- (minor) - `poe_data_tools` version bump with changes/additions to file formats
+- (patch) - `poe_data_tools` version bump which do not affect file formats

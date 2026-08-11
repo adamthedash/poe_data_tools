@@ -1,6 +1,6 @@
 [package]
 name = "poe_data_tools-cli"
-version = "2.0.2-pre"
+version = "2.1.0-pre"
 readme = "README.md"
 description = "A CLI for working with Path of Exile game data"
 
