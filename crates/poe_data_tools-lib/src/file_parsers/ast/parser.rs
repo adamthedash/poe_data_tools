@@ -84,10 +84,9 @@ fn light(version: ForwardRef<u8>) -> impl U8Parser<Output = Light> {
         )
 }
 
-/// Track data for v8+
-fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
+pub fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
     let header = (
-        u8::LE.trace("unk1").run_if(version.map(|v| *v < 8)),
+        u8::LE.trace("unk1").run_if(version.map(|v| *v < 11)),
         u32::LE.trace("bone_index"),
         u32::LE.trace("num_scales"),
         u32::LE.trace("num_rotations"),
@@ -95,6 +94,8 @@ fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
         u32::LE.trace("num_unk2"),
         u32::LE.trace("num_unk3"),
         u32::LE.trace("num_unk4"),
+        u32::LE.trace("num_unk5").run_if(version.map(|v| *v >= 9)),
+        u32::LE.trace("num_unk6").run_if(version.map(|v| *v >= 9)),
     )
         .map_silent(
             |(
@@ -106,6 +107,8 @@ fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
                 num_unk2,
                 num_unk3,
                 num_unk4,
+                num_unk5,
+                num_unk6,
             )| TrackHeader {
                 unk1,
                 index,
@@ -115,6 +118,8 @@ fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
                 num_unk2,
                 num_unk3,
                 num_unk4,
+                num_unk5,
+                num_unk6,
             },
         )
         .trace("header")
@@ -124,9 +129,6 @@ fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
 
     (
         header,
-        take_arr_u8::<8>()
-            .trace("unk1")
-            .run_if(version.map(|v| *v >= 8)),
         f32::LE
             .repeat::<4>()
             .repeat_vec(header_out.map(|h| h.num_scales))
@@ -151,17 +153,26 @@ fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
             .repeat::<4>()
             .repeat_vec(header_out.map(|h| h.num_unk4))
             .trace("unk4s"),
+        f32::LE
+            .repeat::<4>()
+            .repeat_vec(header_out.map(|h| h.num_unk5.unwrap_or(0)))
+            .trace("unk5s"),
+        f32::LE
+            .repeat::<4>()
+            .repeat_vec(header_out.map(|h| h.num_unk6.unwrap_or(0)))
+            .trace("unk6s"),
     )
         .map_silent(
-            |(header, unk1, scales, rotations, positions, unk2s, unk3s, unk4s)| Track {
+            |(header, scales, rotations, positions, unk2s, unk3s, unk4s, unk5s, unk6s)| Track {
                 header,
-                unk1,
                 scales,
                 rotations,
                 positions,
                 unk2s,
                 unk3s,
                 unk4s,
+                unk5s,
+                unk6s,
             },
         )
         .trace("track")

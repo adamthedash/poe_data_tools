@@ -75,12 +75,13 @@ pub struct TrackHeader {
     pub num_unk2: u32,
     pub num_unk3: u32,
     pub num_unk4: u32,
+    pub num_unk5: Option<u32>,
+    pub num_unk6: Option<u32>,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Track {
     pub header: TrackHeader,
-    pub unk1: Option<[u8; 8]>,
 
     pub scales: Vec<[f32; 4]>,
     pub rotations: Vec<[f32; 5]>,
@@ -88,4 +89,6 @@ pub struct Track {
     pub unk2s: Vec<[f32; 4]>,
     pub unk3s: Vec<[f32; 5]>,
     pub unk4s: Vec<[f32; 4]>,
+    pub unk5s: Vec<[f32; 4]>,
+    pub unk6s: Vec<[f32; 4]>,
 }
