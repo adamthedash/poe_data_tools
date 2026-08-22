@@ -67,7 +67,7 @@ pub struct Animation {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct TrackHeader {
-    pub unk1: Option<u8>,
+    pub unk1: u8,
     pub index: u32,
     pub num_scales: u32,
     pub num_rotations: u32,
@@ -75,8 +75,7 @@ pub struct TrackHeader {
     pub num_unk2: u32,
     pub num_unk3: u32,
     pub num_unk4: u32,
-    pub num_unk5: Option<u32>,
-    pub num_unk6: Option<u32>,
+    pub unk5: Option<u32>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -89,6 +88,4 @@ pub struct Track {
     pub unk2s: Vec<[f32; 4]>,
     pub unk3s: Vec<[f32; 5]>,
     pub unk4s: Vec<[f32; 4]>,
-    pub unk5s: Vec<[f32; 4]>,
-    pub unk6s: Vec<[f32; 4]>,
 }

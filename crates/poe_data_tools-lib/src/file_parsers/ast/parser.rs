@@ -86,7 +86,7 @@ fn light(version: ForwardRef<u8>) -> impl U8Parser<Output = Light> {
 
 pub fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
     let header = (
-        u8::LE.trace("unk1").run_if(version.map(|v| *v < 11)),
+        u8::LE.trace("unk1"),
         u32::LE.trace("bone_index"),
         u32::LE.trace("num_scales"),
         u32::LE.trace("num_rotations"),
@@ -94,8 +94,7 @@ pub fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
         u32::LE.trace("num_unk2"),
         u32::LE.trace("num_unk3"),
         u32::LE.trace("num_unk4"),
-        u32::LE.trace("num_unk5").run_if(version.map(|v| *v >= 9)),
-        u32::LE.trace("num_unk6").run_if(version.map(|v| *v >= 9)),
+        u32::LE.trace("unk5").run_if(version.map(|v| *v >= 10)),
     )
         .map_silent(
             |(
@@ -108,7 +107,6 @@ pub fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
                 num_unk3,
                 num_unk4,
                 num_unk5,
-                num_unk6,
             )| TrackHeader {
                 unk1,
                 index,
@@ -118,8 +116,7 @@ pub fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
                 num_unk2,
                 num_unk3,
                 num_unk4,
-                num_unk5,
-                num_unk6,
+                unk5: num_unk5,
             },
         )
         .trace("header")
@@ -153,17 +150,9 @@ pub fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
             .repeat::<4>()
             .repeat_vec(header_out.map(|h| h.num_unk4))
             .trace("unk4s"),
-        f32::LE
-            .repeat::<4>()
-            .repeat_vec(header_out.map(|h| h.num_unk5.unwrap_or(0)))
-            .trace("unk5s"),
-        f32::LE
-            .repeat::<4>()
-            .repeat_vec(header_out.map(|h| h.num_unk6.unwrap_or(0)))
-            .trace("unk6s"),
     )
         .map_silent(
-            |(header, scales, rotations, positions, unk2s, unk3s, unk4s, unk5s, unk6s)| Track {
+            |(header, scales, rotations, positions, unk2s, unk3s, unk4s)| Track {
                 header,
                 scales,
                 rotations,
@@ -171,8 +160,6 @@ pub fn track(version: ForwardRef<u8>) -> impl U8Parser<Output = Track> {
                 unk2s,
                 unk3s,
                 unk4s,
-                unk5s,
-                unk6s,
             },
         )
         .trace("track")
