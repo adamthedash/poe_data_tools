@@ -97,7 +97,7 @@ enum Command {
     name = "poe_data_tools",
     group(
         ArgGroup::new("source")
-        .args(&["steam", "cache_dir", "ggpk"])
+        .args(&["steam", "cache_dir", "ggpk", "ggpk_raw"])
         .required(false) // At least one is not required, but they are mutually exclusive
         .multiple(false) // Only one can be used at a time
     )
@@ -116,6 +116,10 @@ struct Cli {
     #[arg(long)]
     ggpk: Option<PathBuf>,
 
+    /// Specify the standalone .ggpk path (optional) - for pre-bundle versions (pax demo)
+    #[arg(long)]
+    ggpk_raw: Option<PathBuf>,
+
     /// Specify the cache directory (optional)
     #[arg(long)]
     cache_dir: Option<PathBuf>,
@@ -133,6 +137,7 @@ enum Source {
     Cdn { cache_dir: PathBuf },
     Steam { steam_folder: PathBuf },
     Ggpk { ggpk_path: PathBuf },
+    GgpkRaw { ggpk_path: PathBuf },
 }
 
 #[derive(Debug)]
@@ -157,6 +162,8 @@ fn parse_args() -> Result<Args> {
         Source::Steam { steam_folder }
     } else if let Some(ggpk_path) = cli.ggpk {
         Source::Ggpk { ggpk_path }
+    } else if let Some(ggpk_path) = cli.ggpk_raw {
+        Source::GgpkRaw { ggpk_path }
     } else {
         Source::Cdn {
             cache_dir: cache_dir.clone(),
@@ -203,6 +210,7 @@ fn main() -> Result<()> {
         }
         Source::Steam { steam_folder } => FS::from_steam(steam_folder),
         Source::Ggpk { ggpk_path } => FS::from_ggpk(&ggpk_path),
+        Source::GgpkRaw { ggpk_path } => FS::from_ggpk_raw(&ggpk_path),
     }
     .context("Failed to initialise file system")?;
 
