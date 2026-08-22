@@ -12,7 +12,7 @@ bench_cdn:
 debug VERSION FILE:
 	cargo run --release --features debug -- -p {{VERSION}} translate data{{VERSION}} {{FILE}}
 
-run VERSION FILE:
+translate VERSION FILE:
 	cargo run --release -- -p {{VERSION}} translate data{{VERSION}} {{FILE}}
 
 extract VERSION FILE:
@@ -31,9 +31,11 @@ integration:
 # Create a new tag & push it (here just for my own reference)
 # tag TAG REVISION:
 # 	jj tag set -r {{REVISION}} {{TAG}}
+# 	jj tag track {{tag}}
 # 	jj git push --tag {{TAG}}
 
-# publish:
-# 	cargo publish -p poe_data_tools
-# 	cargo publish -p poe_data_tools-cli
+# Publish to crates.io
+publish:
+	cargo publish -p poe_data_tools
+	cargo publish -p poe_data_tools-cli
 
