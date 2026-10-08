@@ -18,7 +18,8 @@ pub enum Patch {
     Two,
     /// A specific game patch eg. "3.4.0.12"
     /// PoE1 - "3.*"
-    /// PoE2 - "4.*"
+    /// PoE2 - "4.*" | "0.*"
+    // (adam) NOTE: After patch 4.5.5.X, PoE2 started versioning with 0.5.5.X
     Specific(String),
 }
 
@@ -30,7 +31,8 @@ impl Patch {
             One => 1,
             Two => 2,
             Specific(s) if s.starts_with("3.") => 1,
-            Specific(s) if s.starts_with("4.") => 1,
+            Specific(s) if s.starts_with("4.") | s.starts_with("0.") => 1,
+            // TODO: Bubble this error up rather than panicing
             Specific(s) => panic!("Invalid major patch version {s:?}"),
         }
     }

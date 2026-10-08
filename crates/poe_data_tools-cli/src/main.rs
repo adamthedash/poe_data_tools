@@ -194,12 +194,7 @@ fn main() -> Result<()> {
 
     let mut fs = match args.source {
         Source::Cdn { cache_dir } => {
-            let version_string = match &args.patch {
-                Patch::One => "1",
-                Patch::Two => "2",
-                Patch::Specific(v) => v,
-            };
-            FS::from_cdn(&cdn_base_url(&cache_dir, version_string)?, &cache_dir)
+            FS::from_cdn(&cdn_base_url(&cache_dir, &args.patch)?, &cache_dir)
         }
         Source::Steam { steam_folder } => FS::from_steam(steam_folder),
         Source::Ggpk { ggpk_path } => FS::from_ggpk(&ggpk_path),

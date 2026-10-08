@@ -1,6 +1,9 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use dirs::cache_dir;
-use poe_data_tools::fs::{FS, FileSystem, cdn::cdn_base_url, steam::steam_folder_search};
+use poe_data_tools::{
+    Patch,
+    fs::{FS, FileSystem, cdn::cdn_base_url, steam::steam_folder_search},
+};
 
 fn fs_benchmark_steam(c: &mut Criterion) {
     read_some_files("steam", c, steam_fs(), "data/skill*.datc64");
@@ -24,7 +27,7 @@ fn fs_benchmark_cdn_large_art(c: &mut Criterion) {
 
 fn fs_load_index(c: &mut Criterion) {
     let cache_dir = cache_dir().unwrap().join("poe_data_tools");
-    let base_url = cdn_base_url(&cache_dir, "2").expect("Failed to get base url");
+    let base_url = cdn_base_url(&cache_dir, &Patch::Two).expect("Failed to get base url");
     c.bench_function("load_index", |b| {
         b.iter(|| {
             let _fs = FS::from_cdn(&base_url, &cache_dir);
@@ -39,7 +42,7 @@ fn steam_fs() -> FS {
 
 fn cdn_fs() -> FS {
     let cache_dir = cache_dir().unwrap().join("poe_data_tools");
-    let base_url = cdn_base_url(&cache_dir, "2").expect("Failed to get base url");
+    let base_url = cdn_base_url(&cache_dir, &Patch::Two).expect("Failed to get base url");
     FS::from_cdn(&base_url, &cache_dir).expect("Failed to load file system")
 }
 

@@ -18,7 +18,7 @@ fn main() {
 
     let version = Patch::One;
     let cache_dir = Path::new("../../scratch/.cache");
-    let base_url = cdn_base_url(cache_dir, version.as_str()).unwrap();
+    let base_url = cdn_base_url(cache_dir, &version).unwrap();
     let fs = CDNFS::new(&base_url, cache_dir).unwrap();
 
     let files = fs.list().collect::<Vec<_>>();
