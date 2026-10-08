@@ -15,7 +15,7 @@ use error::Result;
 use steam::SteamFS;
 use url::Url;
 
-use crate::fs::ggpk::GGPKBundleFS;
+use crate::fs::ggpk::{GGPKBundleFS, GGPKFS};
 
 #[enum_dispatch]
 pub trait FileSystem {
@@ -42,6 +42,8 @@ pub enum FS {
     CDN(CDNFS),
     /// Locally installed game via standalone installer
     GGPK(GGPKBundleFS),
+    /// Pre-bundle GGPK (pax)
+    GGPKRaw(GGPKFS),
 }
 
 impl FS {
@@ -58,5 +60,9 @@ impl FS {
     /// Initialise a file system over a standalone GGPK file
     pub fn from_ggpk(ggpk_path: &Path) -> Result<FS> {
         GGPKBundleFS::new(ggpk_path).map(Self::GGPK)
+    }
+    /// Initialise a file system over a standalone GGPK file
+    pub fn from_ggpk_raw(ggpk_path: &Path) -> Result<FS> {
+        GGPKFS::new(ggpk_path).map(Self::GGPKRaw)
     }
 }
