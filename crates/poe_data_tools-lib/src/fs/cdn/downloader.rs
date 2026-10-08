@@ -18,6 +18,7 @@ use winnow::{
 };
 
 use crate::{
+    Patch,
     file_parsers::{error::ParseError, shared::winnow::WinnowParser},
     fs::{Result, error::FSError},
 };
@@ -406,10 +407,10 @@ impl CDNLoader {
 }
 
 /// Get the base URL for the CDN for the provided game version. Uses cached version if available.
-pub fn cdn_base_url(cache_dir: &Path, version: &str) -> Result<Url> {
+pub fn cdn_base_url(cache_dir: &Path, version: &Patch) -> Result<Url> {
     // Check cache for version URL
     let cache_dir = cache_dir.join("cdn_url");
-    let cache_file = cache_dir.join(version);
+    let cache_file = cache_dir.join(version.as_str());
 
     // If we have a recently cached version, just use that instead
     if cache_file.exists()
@@ -427,19 +428,22 @@ pub fn cdn_base_url(cache_dir: &Path, version: &str) -> Result<Url> {
 
     let url = match version {
         // Latest PoE 1
-        "1" => cur_url("patch.pathofexile.com:12995".to_string(), &[1, 6])?,
+        Patch::One => cur_url("patch.pathofexile.com:12995".to_string(), &[1, 6])?,
         // Latest PoE 2
-        "2" => cur_url("patch.pathofexile2.com:13060".to_string(), &[1, 7])?,
+        Patch::Two => cur_url("patch.pathofexile2.com:13060".to_string(), &[1, 7])?,
         // Specific PoE 1 patch
-        v if v.starts_with("3.") => Url::parse(format!("https://patch.poecdn.com/{}/", v).as_str())
-            .map_err(ParseError::other)?,
-        // Specific PoE 2 patch
-        v if v.starts_with("4.") => {
-            Url::parse(format!("https://patch-poe2.poecdn.com/{}/", v).as_str())
-                .map_err(ParseError::other)?
+        Patch::Specific(v) if version.major() == 1 => {
+            Url::parse(&format!("https://patch.poecdn.com/{v}/")).map_err(ParseError::other)?
         }
-        // Invalid patch
-        _ => panic!("Invalid version provided"),
+        // Specific PoE 2 patch
+        Patch::Specific(v) if version.major() == 2 => {
+            Url::parse(&format!("https://patch-poe2.poecdn.com/{v}/")).map_err(ParseError::other)?
+        }
+        v => {
+            return Err(FSError::InvalidConfig(format!(
+                "Invalid PoE patch version provided: {v:?}"
+            )));
+        }
     };
 
     fs::create_dir_all(&cache_dir)?;

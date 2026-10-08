@@ -10,7 +10,7 @@ use poe_data_tools::{
 fn bench_version(version: Patch) {
     // Set up file system
     let cache_dir = dirs::cache_dir().unwrap().join("poe_data_tools");
-    let base_url = cdn_base_url(&cache_dir, version.as_str()).expect("Failed to get CDN URL");
+    let base_url = cdn_base_url(&cache_dir, &version).expect("Failed to get CDN URL");
     let fs = FS::from_cdn(&base_url, &cache_dir).expect("Failed to create filesystem");
 
     let filenames = fs

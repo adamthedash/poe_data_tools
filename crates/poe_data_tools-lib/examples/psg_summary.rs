@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use poe_data_tools::{
+    Patch,
     file_parsers::{FileParser, psg::PSGParser},
     fs::{FS, FileSystem, cdn::cdn_base_url},
 };
@@ -9,7 +10,7 @@ fn main() {
     env_logger::init();
 
     let cache_dir = Path::new("./cache");
-    let base_url = cdn_base_url(cache_dir, "2").expect("couldn't get CDN URL");
+    let base_url = cdn_base_url(cache_dir, &Patch::Two).expect("couldn't get CDN URL");
     let fs = FS::from_cdn(&base_url, cache_dir).expect("couldn't create filesystem");
 
     // Print out a summary of all the Passive Skill Graph (.psg) files
