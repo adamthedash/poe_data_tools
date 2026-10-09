@@ -31,7 +31,7 @@ impl Patch {
             One => 1,
             Two => 2,
             Specific(s) if s.starts_with("3.") => 1,
-            Specific(s) if s.starts_with("4.") | s.starts_with("0.") => 1,
+            Specific(s) if s.starts_with("4.") | s.starts_with("0.") => 2,
             // TODO: Bubble this error up rather than panicing
             Specific(s) => panic!("Invalid major patch version {s:?}"),
         }
@@ -56,5 +56,19 @@ impl std::str::FromStr for Patch {
             "2" => Ok(Patch::Two),
             _ => Ok(Patch::Specific(s.to_string())),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_major() {
+        assert_eq!(Patch::One.major(), 1);
+        assert_eq!(Patch::Two.major(), 2);
+        assert_eq!(Patch::Specific("3.0.0.3".to_owned()).major(), 1);
+        assert_eq!(Patch::Specific("4.0.0.3".to_owned()).major(), 2);
+        assert_eq!(Patch::Specific("0.0.0.3".to_owned()).major(), 2);
     }
 }
