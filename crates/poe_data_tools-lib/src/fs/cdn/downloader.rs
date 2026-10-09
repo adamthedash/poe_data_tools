@@ -554,4 +554,21 @@ mod tests {
         );
         assert_eq!(cache.search_fallbacks(Path::new("bing.bong")).count(), 1);
     }
+
+    #[test]
+    fn test_base_url() {
+        let temp = setup_fake_cache();
+        let temp = temp.path();
+
+        let url = cdn_base_url(temp, &Patch::One).unwrap();
+        assert_eq!(url.domain().unwrap(), "patch.poecdn.com");
+        let url = cdn_base_url(temp, &Patch::Two).unwrap();
+        assert_eq!(url.domain().unwrap(), "patch-poe2.poecdn.com");
+        let url = cdn_base_url(temp, &Patch::Specific("3.0.0.0".to_owned())).unwrap();
+        assert_eq!(url.domain().unwrap(), "patch.poecdn.com");
+        let url = cdn_base_url(temp, &Patch::Specific("4.0.0.0".to_owned())).unwrap();
+        assert_eq!(url.domain().unwrap(), "patch-poe2.poecdn.com");
+        let url = cdn_base_url(temp, &Patch::Specific("0.0.0.0".to_owned())).unwrap();
+        assert_eq!(url.domain().unwrap(), "patch-poe2.poecdn.com");
+    }
 }

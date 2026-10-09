@@ -58,3 +58,17 @@ impl std::str::FromStr for Patch {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_major() {
+        assert_eq!(Patch::One.major(), 1);
+        assert_eq!(Patch::Two.major(), 2);
+        assert_eq!(Patch::Specific("3.0.0.3".to_owned()).major(), 1);
+        assert_eq!(Patch::Specific("4.0.0.3".to_owned()).major(), 2);
+        assert_eq!(Patch::Specific("0.0.0.3".to_owned()).major(), 2);
+    }
+}
