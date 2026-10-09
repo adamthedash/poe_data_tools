@@ -31,7 +31,7 @@ impl Patch {
             One => 1,
             Two => 2,
             Specific(s) if s.starts_with("3.") => 1,
-            Specific(s) if s.starts_with("4.") | s.starts_with("0.") => 1,
+            Specific(s) if s.starts_with("4.") | s.starts_with("0.") => 2,
             // TODO: Bubble this error up rather than panicing
             Specific(s) => panic!("Invalid major patch version {s:?}"),
         }
